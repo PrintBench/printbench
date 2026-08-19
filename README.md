@@ -8,7 +8,7 @@ rasterizer, so there is nothing to compile and nothing to install.
 
 ## Status
 
-Phase 4 complete — 3D viewer and downloads.
+Phase 5 complete — search and faceted filtering.
 See `docs/` and the plan for the phase roadmap.
 
 | Phase | Scope | State |
@@ -18,8 +18,8 @@ See `docs/` and the plan for the phase roadmap.
 | 2 | Libraries, scanning, browse | done |
 | 3 | Geometry parsing and thumbnails | done |
 | 4 | 3D viewer and downloads | done |
-| 5 | Search and faceted filtering | next |
-| 6 | Uploads and editing | |
+| 5 | Search and faceted filtering | done |
+| 6 | Uploads and editing | next |
 | 7 | Print history, open-in-slicer, send-to-printer | |
 | 8 | Library health and polish | |
 
@@ -62,6 +62,7 @@ npm run verify:phase2      # scan pipeline and safety guards
 npm run verify:phase2:ui   # web -> queue -> worker -> pages, needs `npm run dev`
 npm run verify:phase3      # mesh parsing, rendering and serving, needs `npm run dev`
 npm run verify:phase4      # downloads, HTTP Range and ZIP archives, needs `npm run dev`
+npm run verify:phase5      # search, facets and the command palette, needs `npm run dev`
 ```
 
 After upgrading better-auth, reconcile `packages/db/src/schema/auth.ts` against
@@ -90,6 +91,9 @@ web shell is replaceable without touching the app.
 ## Design decisions
 
 - **No Redis.** Jobs run on pg-boss, backed by Postgres.
+- **No Elasticsearch.** Search is a weighted Postgres tsvector with a GIN index
+  plus trigram matching for typos. Search state lives in the URL, so a filtered
+  search is shareable and the back button works.
 - **No native render toolchain.** A z-buffer software rasteriser streams
   triangles, so a 6GB STL renders in bounded memory — something neither headless
   Chromium nor headless-gl can do. It is also deterministic, so renders are

@@ -1,6 +1,7 @@
 export * from './config/env'
 export * from './policy/policy'
 export * from './search/refresh'
+export * from './search/search-service'
 export * from './library/media-types'
 export * from './library/paths'
 export * from './library/grouping'
