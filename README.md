@@ -8,15 +8,15 @@ rasterizer, so there is nothing to compile and nothing to install.
 
 ## Status
 
-Phase 1 complete — accounts, roles and the app shell.
+Phase 2 complete — libraries, scanning and browsing.
 See `docs/` and the plan for the phase roadmap.
 
 | Phase | Scope | State |
 |-------|-------|-------|
 | 0 | Monorepo, schema, migrations, Docker, CI | done |
 | 1 | Auth, roles, app shell | done |
-| 2 | Libraries, scanning, browse | next |
-| 3 | Geometry parsing and thumbnails | |
+| 2 | Libraries, scanning, browse | done |
+| 3 | Geometry parsing and thumbnails | next |
 | 4 | 3D viewer and downloads | |
 | 5 | Search and faceted filtering | |
 | 6 | Uploads and editing | |
@@ -58,6 +58,8 @@ cleans up after itself:
 
 ```bash
 npm run verify:phase1
+npm run verify:phase2      # scan pipeline and safety guards
+npm run verify:phase2:ui   # web -> queue -> worker -> pages, needs `npm run dev`
 ```
 
 After upgrading better-auth, reconcile `packages/db/src/schema/auth.ts` against

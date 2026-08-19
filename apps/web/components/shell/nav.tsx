@@ -54,7 +54,7 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
     items: [
       { href: '/', label: 'Dashboard', icon: 'home' },
       { href: '/search', label: 'Search', icon: 'search', soon: true },
-      { href: '/models', label: 'Models', icon: 'boxes', soon: true },
+      { href: '/models', label: 'Models', icon: 'boxes' },
     ],
   },
   {
@@ -70,7 +70,7 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
     title: 'Manage',
     items: [
-      { href: '/admin/libraries', label: 'Libraries', icon: 'drive', requires: 'library:manage', soon: true },
+      { href: '/admin/libraries', label: 'Libraries', icon: 'drive', requires: 'library:manage' },
       { href: '/admin/health', label: 'Library health', icon: 'health', requires: 'library:manage', soon: true },
       { href: '/admin/users', label: 'Users', icon: 'users', requires: 'user:manage' },
       { href: '/admin/settings', label: 'Settings', icon: 'settings', requires: 'settings:manage', soon: true },

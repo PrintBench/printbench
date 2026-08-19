@@ -19,13 +19,15 @@
     "db:generate": "npm run generate -w @pm/db",
     "db:migrate": "npm run migrate -w @pm/db",
     "build": "npm run build -w @pm/web && npm run build -w @pm/worker",
-    "typecheck": "tsc --build",
+    "typecheck": "tsc --build && npm run typecheck -w @pm/web",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:phase1": "tsx scripts/verify-phase1.mts",
-    "auth:schema": "tsx scripts/introspect-auth-schema.mts"
+    "auth:schema": "tsx scripts/introspect-auth-schema.mts",
+    "verify:phase2": "tsx scripts/verify-phase2.mts",
+    "verify:phase2:ui": "tsx scripts/verify-phase2-ui.mts"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
