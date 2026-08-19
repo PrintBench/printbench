@@ -1,0 +1,1 @@
+ALTER TABLE "models" ADD COLUMN "indexed_at" timestamp with time zone;

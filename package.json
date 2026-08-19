@@ -1,0 +1,40 @@
+{
+  "name": "print-manager",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,worker -c cyan,magenta \"npm:dev:web\" \"npm:dev:worker\"",
+    "dev:web": "npm run dev -w @pm/web",
+    "dev:worker": "npm run dev -w @pm/worker",
+    "db:up": "docker compose -f docker-compose.dev.yml up -d",
+    "db:down": "docker compose -f docker-compose.dev.yml down",
+    "db:generate": "npm run generate -w @pm/db",
+    "db:migrate": "npm run migrate -w @pm/db",
+    "build": "npm run build -w @pm/web && npm run build -w @pm/worker",
+    "typecheck": "tsc --build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify:phase1": "tsx scripts/verify-phase1.mts",
+    "auth:schema": "tsx scripts/introspect-auth-schema.mts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.8.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.11",
+    "wait-on": "^9.1.0"
+  }
+}

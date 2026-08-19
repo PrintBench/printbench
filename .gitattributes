@@ -1,0 +1,21 @@
+# Normalise to LF in the repository; check out native on Windows.
+* text=auto
+
+# These are read by Linux at runtime — CRLF breaks the shebang with a
+# "bad interpreter" error inside the container. Always LF, on every platform.
+*.sh            text eol=lf
+docker/**       text eol=lf
+Dockerfile*     text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+
+# Generated; keep diffs out of review.
+package-lock.json  -diff linguist-generated
+packages/db/migrations/meta/**  -diff linguist-generated
+
+# Binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.stl binary
+*.3mf binary

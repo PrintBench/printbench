@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/db" },
+    { "path": "./packages/core" },
+    { "path": "./packages/mesh" },
+    { "path": "./packages/jobs" },
+    { "path": "./packages/auth" },
+    { "path": "./apps/worker" }
+  ],
+  "exclude": ["reference"]
+}
