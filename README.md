@@ -8,7 +8,7 @@ rasterizer, so there is nothing to compile and nothing to install.
 
 ## Status
 
-Phase 2 complete — libraries, scanning and browsing.
+Phase 3 complete — geometry analysis and thumbnails.
 See `docs/` and the plan for the phase roadmap.
 
 | Phase | Scope | State |
@@ -16,8 +16,8 @@ See `docs/` and the plan for the phase roadmap.
 | 0 | Monorepo, schema, migrations, Docker, CI | done |
 | 1 | Auth, roles, app shell | done |
 | 2 | Libraries, scanning, browse | done |
-| 3 | Geometry parsing and thumbnails | next |
-| 4 | 3D viewer and downloads | |
+| 3 | Geometry parsing and thumbnails | done |
+| 4 | 3D viewer and downloads | next |
 | 5 | Search and faceted filtering | |
 | 6 | Uploads and editing | |
 | 7 | Print history, open-in-slicer, send-to-printer | |
@@ -60,6 +60,7 @@ cleans up after itself:
 npm run verify:phase1
 npm run verify:phase2      # scan pipeline and safety guards
 npm run verify:phase2:ui   # web -> queue -> worker -> pages, needs `npm run dev`
+npm run verify:phase3      # mesh parsing, rendering and serving, needs `npm run dev`
 ```
 
 After upgrading better-auth, reconcile `packages/db/src/schema/auth.ts` against
@@ -88,9 +89,13 @@ web shell is replaceable without touching the app.
 ## Design decisions
 
 - **No Redis.** Jobs run on pg-boss, backed by Postgres.
-- **No native render toolchain.** A z-buffer software rasterizer streams
+- **No native render toolchain.** A z-buffer software rasteriser streams
   triangles, so a 6GB STL renders in bounded memory — something neither headless
-  Chromium nor headless-gl can do.
+  Chromium nor headless-gl can do. It is also deterministic, so renders are
+  golden-image tested, and identical on Windows and Linux.
+- **Mesh parsing is pure TypeScript** — STL (binary and ASCII), 3MF, OBJ and
+  PLY, with no compiled dependencies. A slicer-exported 3MF's embedded plate
+  render is used in preference to rasterising.
 - **Large downloads bypass Node** via `X-Accel-Redirect` to nginx, or a presigned
   URL on S3.
 - **Metadata is written back to disk** as a `.printmanager.json` sidecar per

@@ -27,7 +27,8 @@
     "verify:phase1": "tsx scripts/verify-phase1.mts",
     "auth:schema": "tsx scripts/introspect-auth-schema.mts",
     "verify:phase2": "tsx scripts/verify-phase2.mts",
-    "verify:phase2:ui": "tsx scripts/verify-phase2-ui.mts"
+    "verify:phase2:ui": "tsx scripts/verify-phase2-ui.mts",
+    "verify:phase3": "tsx scripts/verify-phase3.mts"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

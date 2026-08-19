@@ -9,13 +9,26 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 ** exponent).toFixed(exponent === 0 ? 0 : 1)} ${units[exponent]}`
 }
 
-/**
- * Grid tile for a model.
- *
- * Thumbnails arrive in phase 3. Until then the placeholder is derived from the
- * model name so each tile is visually distinct — a grid of identical grey boxes
- * is much harder to scan than one with stable, differentiated colour.
- */
+/** Millimetres, rounded the way a printer would quote them. */
+export function formatDimensions(x?: number, y?: number, z?: number): string | null {
+  if (!x || !y) return null
+  const round = (value: number) => (value >= 100 ? Math.round(value) : Math.round(value * 10) / 10)
+  return `${round(x)} × ${round(y)} × ${round(z ?? 0)} mm`
+}
+
+export interface ModelCardProps {
+  publicId: string
+  name: string
+  path: string
+  fileCount: number
+  totalSize: number
+  libraryName?: string
+  previewExtension?: string | null
+  /** Set once a thumbnail has been rendered for the preview file. */
+  thumbFileId?: string | null
+  dimensions?: string | null
+}
+
 export function ModelCard({
   publicId,
   name,
@@ -24,15 +37,9 @@ export function ModelCard({
   totalSize,
   libraryName,
   previewExtension,
-}: {
-  publicId: string
-  name: string
-  path: string
-  fileCount: number
-  totalSize: number
-  libraryName?: string
-  previewExtension?: string | null
-}) {
+  thumbFileId,
+  dimensions,
+}: ModelCardProps) {
   const hue = hashHue(publicId)
 
   return (
@@ -44,12 +51,30 @@ export function ModelCard({
       )}
     >
       <div
-        className="relative flex aspect-[4/3] items-center justify-center"
-        style={{
-          background: `linear-gradient(145deg, oklch(72% 0.07 ${hue}) 0%, oklch(58% 0.09 ${hue + 24}) 100%)`,
-        }}
+        className="relative flex aspect-[4/3] items-center justify-center overflow-hidden"
+        style={
+          thumbFileId
+            ? // A subtle tint behind the render, so a transparent thumbnail still
+              // sits on something rather than floating on the card colour.
+              { background: `linear-gradient(160deg, oklch(96% 0.012 ${hue}), oklch(90% 0.02 ${hue + 20}))` }
+            : { background: `linear-gradient(145deg, oklch(72% 0.07 ${hue}) 0%, oklch(58% 0.09 ${hue + 24}) 100%)` }
+        }
       >
-        <Box className="size-8 text-white/70" strokeWidth={1.5} />
+        {thumbFileId ? (
+          // Plain img rather than next/image: these are already the right size,
+          // already WebP, and immutably cached, so the optimiser adds only cost.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/files/${thumbFileId}/thumb`}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="size-full object-contain transition-transform duration-200 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <Box className="size-8 text-white/70" strokeWidth={1.5} />
+        )}
+
         {previewExtension && (
           <span className="absolute bottom-2 right-2 rounded bg-black/35 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/90 backdrop-blur-sm">
             {previewExtension}
@@ -74,6 +99,9 @@ export function ModelCard({
           <span aria-hidden>·</span>
           {formatBytes(totalSize)}
         </p>
+        {dimensions && (
+          <p className="truncate text-xs tabular-nums text-[var(--color-ink-faint)]">{dimensions}</p>
+        )}
       </div>
     </Link>
   )

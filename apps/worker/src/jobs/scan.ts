@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { getDb, schema } from '@pm/db'
 import { LocalAdapter, scanLibrary, type LibraryLocation } from '@pm/core'
 import type { JobPayload } from '@pm/jobs'
-import { JOB } from '@pm/jobs'
+import { JOB, getQueue } from '@pm/jobs'
 
 /**
  * Runs a library scan.
@@ -41,7 +41,25 @@ export async function handleLibraryScan(payload: JobPayload<typeof JOB.librarySc
 
   const outcome = await scanLibrary(
     { db, storage, library: { ...location, groupingMode: library.groupingMode } as LibraryLocation },
-    { mode: payload.mode, force: payload.force },
+    {
+      mode: payload.mode,
+      force: payload.force,
+      /*
+       * Fan out derived work in batches. A 50k-file library produces roughly a
+       * hundred multi-row inserts rather than 150,000 individual ones.
+       *
+       * Analysis first: it is cheap and drives the dimension badges. Thumbnails
+       * next, because they are what people actually look at. Digests last —
+       * nothing user-facing waits on them.
+       */
+      onDerivedWork: async (fileIds) => {
+        const queue = getQueue()
+        const payloads = fileIds.map((fileId) => ({ fileId }))
+        await queue.sendMany(JOB.fileAnalyze, payloads)
+        await queue.sendMany(JOB.fileThumbnail, payloads)
+        await queue.sendMany(JOB.fileDigest, payloads)
+      },
+    },
   )
 
   const seconds = ((Date.now() - started) / 1000).toFixed(1)
@@ -58,7 +76,8 @@ export async function handleLibraryScan(payload: JobPayload<typeof JOB.librarySc
   console.log(
     `[scan] finished "${library.name}" in ${seconds}s — ` +
       `${outcome.modelsCreated} new, ${outcome.modelsUpdated} updated, ` +
-      `${outcome.modelsMissing} missing, ${outcome.filesSeen} files seen`,
+      `${outcome.modelsMissing} missing, ${outcome.filesSeen} files seen, ` +
+      `${outcome.filesQueued} queued for rendering`,
   )
 
   if (outcome.errors.length > 0) {

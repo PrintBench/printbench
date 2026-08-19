@@ -127,3 +127,19 @@ describeDb('JobQueue', () => {
     expect(stats).toHaveProperty('failed')
   })
 })
+
+describe('JobQueue lifecycle', () => {
+  /*
+   * Regression: the worker held its own JobQueue while handlers reached for the
+   * getQueue() singleton, so enqueuing from inside a handler hit an unstarted
+   * queue. It surfaced as an unexplained scan failure rather than anything
+   * pointing at the cause.
+   */
+  it('refuses to send before it is started, with a useful message', async () => {
+    const idle = new JobQueue({ connectionString: url, schema: 'pgboss_test' })
+    await expect(
+      idle.send(JOB.fileDigest, { fileId: '11111111-1111-4111-8111-111111111111' }),
+    ).rejects.toThrow(/not been started/i)
+    await expect(idle.sendMany(JOB.fileDigest, [])).rejects.toThrow(/not been started/i)
+  })
+})

@@ -78,11 +78,29 @@ export class JobQueue {
    * `singletonKey` collapses duplicates, so pressing "Scan" three times while a
    * scan is queued does not run three scans.
    */
+  /**
+   * Fails loudly when the queue has not been started.
+   *
+   * pg-boss otherwise throws something generic from deep inside, which surfaces
+   * as an unexplained job failure. The usual cause is a process holding its own
+   * JobQueue while a handler reaches for the getQueue() singleton.
+   */
+  private assertStarted(operation: string): void {
+    if (!this.started) {
+      throw new Error(
+        `Cannot ${operation}: the job queue has not been started. ` +
+          `Call start() first, and make sure the process shares one instance — ` +
+          `handlers reach the queue through getQueue().`,
+      )
+    }
+  }
+
   async send<N extends JobName>(
     name: N,
     payload: JobPayload<N>,
     options: { singletonKey?: string; startAfterSeconds?: number } = {},
   ): Promise<string | null> {
+    this.assertStarted(`send ${name}`)
     const parsed = payloads[name].parse(payload)
     return this.boss.send(name, parsed as object, {
       priority: JOB_OPTIONS[name].priority ?? 0,
@@ -97,6 +115,7 @@ export class JobQueue {
 
   /** Batched insert. A 50k-file library sends ~100 statements, not 50k. */
   async sendMany<N extends JobName>(name: N, items: JobPayload<N>[]): Promise<void> {
+    this.assertStarted(`send ${name}`)
     const CHUNK = 500
     for (let i = 0; i < items.length; i += CHUNK) {
       const batch = items.slice(i, i + CHUNK).map((payload) => ({

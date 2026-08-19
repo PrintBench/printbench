@@ -6,7 +6,7 @@ import { getDb } from '@pm/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { formatBytes } from '@/components/model/model-card'
+import { formatBytes, formatDimensions } from '@/components/model/model-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +34,11 @@ type FileRow = {
   previewable: boolean
   presupported: boolean
   missing_at: string | null
+  thumb_state: string
+  triangle_count: number | null
+  bbox_x: string | null
+  bbox_y: string | null
+  bbox_z: string | null
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ publicId: string }> }) {
@@ -60,7 +65,8 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   if (!model) notFound()
 
   const files = await db.execute<FileRow>(sql`
-    SELECT id, filename, extension, category, size, previewable, presupported, missing_at
+    SELECT id, filename, extension, category, size, previewable, presupported, missing_at,
+           thumb_state, triangle_count, bbox_x, bbox_y, bbox_z
     FROM model_files WHERE model_id = ${model.id}
     ORDER BY category, filename
   `)
@@ -85,6 +91,18 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   }
 
   const presupportedCount = files.rows.filter((f) => f.presupported).length
+
+  // The largest rendered mesh represents the model, and its dimensions are the
+  // ones worth showing — a support-only variant is not what people measure.
+  const hero = files.rows
+    .filter((f) => f.thumb_state === 'ok' && !f.missing_at)
+    .sort((a, b) => Number(b.size) - Number(a.size))[0]
+
+  const heroDimensions = hero
+    ? formatDimensions(Number(hero.bbox_x ?? 0), Number(hero.bbox_y ?? 0), Number(hero.bbox_z ?? 0))
+    : null
+
+  const NUMBER = new Intl.NumberFormat('en-GB')
 
   return (
     <>
@@ -127,6 +145,20 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
         <div className="space-y-6">
+          {hero && (
+            <Card className="overflow-hidden">
+              <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
+                {/* Already the right size, already WebP, immutably cached. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/files/${hero.id}/thumb`}
+                  alt={`Render of ${model.name}`}
+                  className="size-full object-contain p-4"
+                />
+              </div>
+            </Card>
+          )}
+
           {CATEGORY_ORDER.filter((category) => byCategory.has(category)).map((category) => (
             <section key={category}>
               <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
@@ -156,6 +188,11 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                       </span>
                       {file.presupported && <Badge tone="accent">supported</Badge>}
                       {file.missing_at && <Badge tone="danger">missing</Badge>}
+                      {file.triangle_count != null && (
+                        <span className="hidden shrink-0 text-xs tabular-nums text-[var(--color-ink-faint)] sm:inline">
+                          {NUMBER.format(file.triangle_count)} tris
+                        </span>
+                      )}
                       <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-muted)]">
                         {formatBytes(Number(file.size))}
                       </span>
@@ -190,6 +227,15 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 </p>
               </div>
 
+              {heroDimensions && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Size
+                  </p>
+                  <p className="mt-0.5 tabular-nums">{heroDimensions}</p>
+                </div>
+              )}
+
               {presupportedCount > 0 && (
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
@@ -211,7 +257,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           </Card>
 
           <p className="text-xs text-[var(--color-ink-faint)]">
-            3D preview, downloads and editing arrive in the next phases.
+            An interactive 3D viewer and downloads arrive in the next phase.
           </p>
         </aside>
       </div>

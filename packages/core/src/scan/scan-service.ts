@@ -43,6 +43,14 @@ export interface ScanOptions {
   force?: boolean
   signal?: AbortSignal
   onProgress?: (progress: ScanProgress) => void
+  /**
+   * Called with the ids of files needing analysis, a thumbnail or a digest.
+   *
+   * A callback rather than a direct enqueue so this package stays free of any
+   * dependency on the job queue — it can then be tested without one, and the
+   * worker decides how the work is dispatched.
+   */
+  onDerivedWork?: (fileIds: string[]) => Promise<void> | void
 }
 
 export interface ScanProgress {
@@ -65,6 +73,8 @@ export interface ScanOutcome {
   filesCreated: number
   filesMissing: number
   renamesDetected: number
+  /** Files handed to the derived-work queue. */
+  filesQueued: number
   errors: { path: string; reason: string }[]
 }
 
@@ -98,6 +108,7 @@ export async function scanLibrary(
     filesCreated: 0,
     filesMissing: 0,
     renamesDetected: 0,
+    filesQueued: 0,
     errors: [],
   }
 
@@ -194,6 +205,26 @@ export async function scanLibrary(
 
     await saveFingerprints(db, library.id, walk.fingerprints, startedAt)
 
+    /*
+     * Hand off files whose derived data is missing or stale. Queried rather
+     * than tracked during the walk, so a file left pending by an earlier
+     * interrupted scan is picked up too.
+     */
+    if (options.onDerivedWork) {
+      const pending = await db.execute<{ id: string }>(sql`
+        SELECT f.id FROM model_files f
+        JOIN models m ON m.id = f.model_id
+        WHERE m.library_id = ${library.id}
+          AND f.missing_at IS NULL
+          AND f.previewable = true
+          AND (f.analysis_state = 'pending' OR f.thumb_state = 'pending' OR f.digest IS NULL)
+        LIMIT 50000
+      `)
+      const ids = pending.rows.map((row) => row.id)
+      outcome.filesQueued = ids.length
+      if (ids.length > 0) await options.onDerivedWork(ids)
+    }
+
     // Search vectors last, in batches, so the models are immediately findable.
     for (let i = 0; i < touchedModelIds.length; i += 500) {
       await refreshModelSearchVectors(db, touchedModelIds.slice(i, i + 500))
@@ -209,6 +240,7 @@ export async function scanLibrary(
         modelsCreated: outcome.modelsCreated,
         modelsUpdated: outcome.modelsUpdated,
         modelsMissing: outcome.modelsMissing,
+        filesQueued: outcome.filesQueued,
         errors: outcome.errors.length > 0 ? outcome.errors : null,
       })
       .where(eq(schema.scanRuns.id, scanRunId))

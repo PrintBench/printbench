@@ -10,8 +10,9 @@ import { createServer } from 'node:http'
 import { sql } from 'drizzle-orm'
 import { loadRootEnv } from '@pm/core'
 import { createDb } from '@pm/db'
-import { JOB, JobQueue } from '@pm/jobs'
+import { JOB, getQueue } from '@pm/jobs'
 import { handleLibraryScan } from './jobs/scan'
+import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs/analyze'
 
 // Must run before anything reads DATABASE_URL.
 loadRootEnv()
@@ -19,7 +20,16 @@ loadRootEnv()
 const PORT = Number(process.env.WORKER_PORT ?? 3001)
 
 const { pool, db } = createDb()
-const queue = new JobQueue()
+
+/*
+ * The shared singleton, NOT a fresh JobQueue.
+ *
+ * Job handlers reach the queue through getQueue() to fan out follow-up work.
+ * If this process started a different instance, that call would return an
+ * unstarted queue and every enqueue from inside a handler would throw — which
+ * is exactly what happened when the scan tried to queue thumbnail work.
+ */
+const queue = getQueue()
 
 const server = createServer((req, res) => {
   if (req.url === '/api/upload/health' || req.url === '/health') {
@@ -40,7 +50,10 @@ async function main(): Promise<void> {
   console.log('[worker] job queue ready')
 
   await queue.work(JOB.libraryScan, handleLibraryScan)
-  console.log('[worker] registered handler: library.scan')
+  await queue.work(JOB.fileAnalyze, handleFileAnalyze)
+  await queue.work(JOB.fileThumbnail, handleFileThumbnail)
+  await queue.work(JOB.fileDigest, handleFileDigest)
+  console.log('[worker] handlers: library.scan, file.analyze, file.thumbnail, file.digest')
 
   /*
    * Hourly fast scan of every enabled library, plus a weekly deep scan.

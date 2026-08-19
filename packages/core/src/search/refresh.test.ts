@@ -19,11 +19,18 @@ describeDb('refreshModelSearchVectors', () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 
-  /** Names matching the query, using the same weighted vector the app builds. */
+  /*
+   * Every query is scoped to this test's own library.
+   *
+   * Without that these assertions depend on whatever else happens to be in the
+   * database — they passed only while it was empty, and started failing the
+   * moment a real library was indexed alongside them.
+   */
   async function search(query: string): Promise<string[]> {
     const res = await db.execute<{ name: string }>(sql`
       SELECT name FROM models
-      WHERE search_vector @@ websearch_to_tsquery('pm_search', ${query})
+      WHERE library_id = ${LIB}
+        AND search_vector @@ websearch_to_tsquery('pm_search', ${query})
       ORDER BY ts_rank_cd(search_vector, websearch_to_tsquery('pm_search', ${query}), 32) DESC
     `)
     return res.rows.map((r) => r.name)
@@ -32,7 +39,8 @@ describeDb('refreshModelSearchVectors', () => {
   /** Typo-tolerant lookup. `<%` is word_similarity(query, target); `%>` is reversed. */
   async function fuzzy(query: string): Promise<string[]> {
     const res = await db.execute<{ name: string }>(sql`
-      SELECT name FROM models WHERE ${query} <% name
+      SELECT name FROM models
+      WHERE library_id = ${LIB} AND ${query} <% name
       ORDER BY word_similarity(${query}, name) DESC
     `)
     return res.rows.map((r) => r.name)
