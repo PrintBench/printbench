@@ -7,6 +7,9 @@ import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatBytes, formatDimensions } from '@/components/model/model-card'
+import { ModelViewer } from '@/components/viewer/model-viewer'
+import { DownloadModelButton } from './download-button'
+import { FileDownloadLink } from './file-download-link'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,6 +105,17 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     ? formatDimensions(Number(hero.bbox_x ?? 0), Number(hero.bbox_y ?? 0), Number(hero.bbox_z ?? 0))
     : null
 
+  /*
+   * The viewer needs a mesh we can parse in the browser, which is not
+   * necessarily the file chosen as the preview — that may well be an image the
+   * creator supplied. Largest wins: a support-only variant is rarely the one
+   * someone wants to inspect.
+   */
+  const VIEWABLE = new Set(['stl', '3mf', 'obj', 'ply'])
+  const viewable = files.rows
+    .filter((f) => !f.missing_at && VIEWABLE.has(f.extension.toLowerCase()))
+    .sort((a, b) => Number(b.size) - Number(a.size))[0]
+
   const NUMBER = new Intl.NumberFormat('en-GB')
 
   return (
@@ -121,10 +135,13 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           model.missing_at ? (
             <Badge tone="danger">Missing from disk</Badge>
           ) : (
-            <Badge tone="neutral">
-              <FileStack className="size-3" />
-              {model.file_count} files · {formatBytes(Number(model.total_size))}
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Badge tone="neutral">
+                <FileStack className="size-3" />
+                {model.file_count} files · {formatBytes(Number(model.total_size))}
+              </Badge>
+              <DownloadModelButton publicId={model.public_id} />
+            </div>
           )
         }
       />
@@ -145,18 +162,28 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
         <div className="space-y-6">
-          {hero && (
-            <Card className="overflow-hidden">
-              <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
-                {/* Already the right size, already WebP, immutably cached. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/files/${hero.id}/thumb`}
-                  alt={`Render of ${model.name}`}
-                  className="size-full object-contain p-4"
-                />
-              </div>
-            </Card>
+          {viewable ? (
+            <ModelViewer
+              fileId={viewable.id}
+              format={viewable.extension.toLowerCase() as 'stl' | '3mf' | 'obj' | 'ply'}
+              fileSize={Number(viewable.size)}
+              filename={viewable.filename.split('/').pop() ?? viewable.filename}
+              thumbnailFileId={hero?.id ?? null}
+              className="aspect-[16/10]"
+            />
+          ) : (
+            hero && (
+              <Card className="overflow-hidden">
+                <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/files/${hero.id}/thumb`}
+                    alt={`Render of ${model.name}`}
+                    className="size-full object-contain p-4"
+                  />
+                </div>
+              </Card>
+            )
           )}
 
           {CATEGORY_ORDER.filter((category) => byCategory.has(category)).map((category) => (
@@ -196,6 +223,9 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                       <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-muted)]">
                         {formatBytes(Number(file.size))}
                       </span>
+                      {!file.missing_at && (
+                        <FileDownloadLink fileId={file.id} filename={file.filename} />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -257,7 +287,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           </Card>
 
           <p className="text-xs text-[var(--color-ink-faint)]">
-            An interactive 3D viewer and downloads arrive in the next phase.
+            Drag to rotate, scroll to zoom. Search and filtering arrive next.
           </p>
         </aside>
       </div>

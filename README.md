@@ -8,7 +8,7 @@ rasterizer, so there is nothing to compile and nothing to install.
 
 ## Status
 
-Phase 3 complete — geometry analysis and thumbnails.
+Phase 4 complete — 3D viewer and downloads.
 See `docs/` and the plan for the phase roadmap.
 
 | Phase | Scope | State |
@@ -17,8 +17,8 @@ See `docs/` and the plan for the phase roadmap.
 | 1 | Auth, roles, app shell | done |
 | 2 | Libraries, scanning, browse | done |
 | 3 | Geometry parsing and thumbnails | done |
-| 4 | 3D viewer and downloads | next |
-| 5 | Search and faceted filtering | |
+| 4 | 3D viewer and downloads | done |
+| 5 | Search and faceted filtering | next |
 | 6 | Uploads and editing | |
 | 7 | Print history, open-in-slicer, send-to-printer | |
 | 8 | Library health and polish | |
@@ -61,6 +61,7 @@ npm run verify:phase1
 npm run verify:phase2      # scan pipeline and safety guards
 npm run verify:phase2:ui   # web -> queue -> worker -> pages, needs `npm run dev`
 npm run verify:phase3      # mesh parsing, rendering and serving, needs `npm run dev`
+npm run verify:phase4      # downloads, HTTP Range and ZIP archives, needs `npm run dev`
 ```
 
 After upgrading better-auth, reconcile `packages/db/src/schema/auth.ts` against
@@ -97,7 +98,11 @@ web shell is replaceable without touching the app.
   PLY, with no compiled dependencies. A slicer-exported 3MF's embedded plate
   render is used in preference to rasterising.
 - **Large downloads bypass Node** via `X-Accel-Redirect` to nginx, or a presigned
-  URL on S3.
+  URL on S3. Whole-model ZIPs are streamed from the worker process, stored
+  rather than deflated, so an 8GB archive never occupies the web tier.
+- **The 3MF parser is isomorphic** — the same code produces the server-side
+  thumbnail and the in-browser view. three's own 3MFLoader cannot run in a Web
+  Worker, because it depends on DOMParser.
 - **Metadata is written back to disk** as a `.printmanager.json` sidecar per
   model, so the database can be rebuilt by rescanning.
 - **Scanning refuses to destroy metadata.** If a scan would mark more than 20% of

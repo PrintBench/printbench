@@ -13,8 +13,19 @@ const config: NextConfig = {
   // fileURLToPath, not URL.pathname: the latter yields "/D:/..." on Windows.
   outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
   // Workspace packages are shipped as TypeScript source, not built dist output.
-  transpilePackages: ['@pm/db', '@pm/core', '@pm/auth'],
+  transpilePackages: ['@pm/db', '@pm/core', '@pm/auth', '@pm/mesh'],
   typedRoutes: true,
+
+  /*
+   * ZIP downloads are built by the worker process, not this one. In production
+   * nginx routes /api/download/ there; in development there is no proxy, so
+   * Next forwards it instead. Without this the button 404s in dev only, which
+   * is a confusing way to find out.
+   */
+  async rewrites() {
+    const worker = process.env.WORKER_URL ?? 'http://localhost:3001'
+    return [{ source: '/api/download/:path*', destination: `${worker}/api/download/:path*` }]
+  },
 }
 
 export default config

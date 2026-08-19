@@ -10,6 +10,16 @@ import {
 } from '../types'
 
 /**
+ * Decodes UTF-8 without Buffer.
+ *
+ * This parser runs in the browser as well as in Node: three's own 3MFLoader
+ * uses DOMParser, which does not exist in a Web Worker, so the viewer parses
+ * 3MF with this instead. That also means one parser produces both the
+ * thumbnail and the interactive view.
+ */
+const decodeUtf8 = (bytes: Uint8Array): string => new TextDecoder('utf-8').decode(bytes)
+
+/**
  * 3MF reader.
  *
  * A 3MF is an OPC package: a zip containing `3D/3dmodel.model` (XML geometry),
@@ -70,7 +80,7 @@ export function readThreeMf(buffer: Uint8Array, visit: TriangleVisitor): ThreeMf
     throw new MeshParseError('3MF package contains no 3dmodel.model', '3mf')
   }
 
-  const stats = parseModelXml(Buffer.from(entries[modelKey]).toString('utf8'), visit)
+  const stats = parseModelXml(decodeUtf8(entries[modelKey]), visit)
   const thumbnail = findThumbnail(entries)
   return thumbnail ? { ...stats, thumbnail } : stats
 }
@@ -200,7 +210,7 @@ function findThumbnail(
 ): { data: Uint8Array; contentType: string; path: string } | undefined {
   const relsKey = Object.keys(entries).find((key) => key.toLowerCase() === '_rels/.rels')
   if (relsKey && entries[relsKey]) {
-    const xml = Buffer.from(entries[relsKey]).toString('utf8')
+    const xml = decodeUtf8(entries[relsKey])
     const match = xml.match(
       /<Relationship[^>]*Type="[^"]*\/thumbnail"[^>]*Target="([^"]+)"/i,
     )

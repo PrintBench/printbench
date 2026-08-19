@@ -13,6 +13,7 @@ import { createDb } from '@pm/db'
 import { JOB, getQueue } from '@pm/jobs'
 import { handleLibraryScan } from './jobs/scan'
 import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs/analyze'
+import { handleZipRequest } from './http/zip'
 
 // Must run before anything reads DATABASE_URL.
 loadRootEnv()
@@ -32,12 +33,33 @@ const { pool, db } = createDb()
 const queue = getQueue()
 
 const server = createServer((req, res) => {
-  if (req.url === '/api/upload/health' || req.url === '/health') {
+  const path = (req.url ?? '').split('?')[0]
+
+  if (path === '/api/upload/health' || path === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ status: 'ok', role: 'worker' }))
     return
   }
-  // Upload (tus) and ZIP streaming routes land here from phases 4 and 6.
+
+  /*
+   * Whole-model ZIPs are built here rather than in the web process: an 8 GB
+   * archive occupies a thread for minutes, and doing that in the page-rendering
+   * process makes the UI stutter for everyone.
+   */
+  if (path === '/api/download/model') {
+    handleZipRequest(req, res).catch((error) => {
+      console.error('[zip] unhandled failure:', error)
+      if (!res.headersSent) {
+        res.writeHead(500, { 'content-type': 'text/plain' })
+        res.end('Download failed')
+      } else {
+        res.destroy()
+      }
+    })
+    return
+  }
+
+  // Resumable uploads (tus) land here in phase 6.
   res.writeHead(404, { 'content-type': 'application/json' })
   res.end(JSON.stringify({ error: 'not found' }))
 })

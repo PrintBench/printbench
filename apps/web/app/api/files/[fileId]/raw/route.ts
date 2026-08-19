@@ -1,0 +1,131 @@
+import { Readable } from 'node:stream'
+import { eq } from 'drizzle-orm'
+import { getSessionUser } from '@pm/auth'
+import {
+  LocalAdapter,
+  REVALIDATE_CACHE,
+  can,
+  contentDisposition,
+  parseRange,
+  type LibraryLocation,
+} from '@pm/core'
+import { getDb, schema } from '@pm/db'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * Serves the bytes of one file, for download or for the 3D viewer.
+ *
+ * Authorisation happens here. Delivery, in production, does not: the response
+ * carries an X-Accel-Redirect and nginx sends the file with sendfile and its
+ * own Range handling, so a multi-gigabyte download never passes through the
+ * Node event loop. Development has no proxy, so it streams — with Range
+ * implemented by hand, because the viewer and resumable downloads depend on it.
+ */
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ fileId: string }> },
+): Promise<Response> {
+  const user = await getSessionUser()
+  if (!can({ id: user?.id ?? '', role: user?.role ?? null }, 'file:download')) {
+    return new Response('Not permitted', { status: 403 })
+  }
+
+  const { fileId } = await params
+  if (!/^[0-9a-f-]{36}$/i.test(fileId)) return new Response('Not found', { status: 404 })
+
+  const rows = await getDb()
+    .select({ file: schema.modelFiles, model: schema.models, library: schema.libraries })
+    .from(schema.modelFiles)
+    .innerJoin(schema.models, eq(schema.models.id, schema.modelFiles.modelId))
+    .innerJoin(schema.libraries, eq(schema.libraries.id, schema.models.libraryId))
+    .where(eq(schema.modelFiles.id, fileId))
+    .limit(1)
+
+  const row = rows[0]
+  if (!row || row.file.missingAt) return new Response('Not found', { status: 404 })
+  if (row.library.backend !== 'local') {
+    return new Response('Unsupported storage backend', { status: 501 })
+  }
+
+  const location: LibraryLocation = {
+    id: row.library.id,
+    kind: row.library.kind,
+    backend: row.library.backend,
+    allowWrites: row.library.allowWrites,
+    path: row.library.path,
+  }
+  const storage = new LocalAdapter(location)
+
+  // A model that is a single loose file has no folder of its own.
+  const relativePath = row.model.isFileModel
+    ? row.model.path
+    : `${row.model.path}/${row.file.filename}`
+
+  // Size comes from disk rather than the database: the row may be stale between
+  // scans, and a wrong Content-Length truncates the download.
+  const info = await storage.stat(relativePath).catch(() => null)
+  if (!info) return new Response('File is no longer on disk', { status: 404 })
+
+  const filename = row.file.filename.split('/').pop() ?? 'download'
+  // The viewer fetches with ?inline=1; a browser must not offer to save that.
+  const inline = new URL(request.url).searchParams.get('inline') === '1'
+
+  const baseHeaders: Record<string, string> = {
+    'content-type': row.file.mediaType ?? 'application/octet-stream',
+    'content-disposition': contentDisposition(filename, inline ? 'inline' : 'attachment'),
+    'accept-ranges': 'bytes',
+    'cache-control': REVALIDATE_CACHE,
+    // Lets a conditional request skip the transfer entirely.
+    etag: `"${row.file.digest ?? `${info.size}-${info.mtimeMs}`}"`,
+  }
+
+  if (request.headers.get('if-none-match') === baseHeaders.etag) {
+    return new Response(null, { status: 304, headers: baseHeaders })
+  }
+
+  /*
+   * Hand off to nginx. It serves the file with sendfile and handles Range
+   * itself, so nothing here needs to parse the header — the proxy is better at
+   * this than we are, and the bytes never enter this process.
+   */
+  if (process.env.FILE_DELIVERY === 'xaccel' && location.path) {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        ...baseHeaders,
+        // Re-encoded: the path segment may contain spaces or non-ASCII.
+        'x-accel-redirect': `/_protected/${encodeURI(relativePath)}`,
+      },
+    })
+  }
+
+  const range = parseRange(request.headers.get('range'), info.size)
+
+  if (range === 'unsatisfiable') {
+    return new Response(null, {
+      status: 416,
+      headers: { ...baseHeaders, 'content-range': `bytes */${info.size}` },
+    })
+  }
+
+  if (range) {
+    const stream = await storage.createReadStream(relativePath, {
+      start: range.start,
+      end: range.end,
+    })
+    return new Response(Readable.toWeb(stream) as ReadableStream, {
+      status: 206,
+      headers: {
+        ...baseHeaders,
+        'content-range': `bytes ${range.start}-${range.end}/${info.size}`,
+        'content-length': String(range.length),
+      },
+    })
+  }
+
+  const stream = await storage.createReadStream(relativePath)
+  return new Response(Readable.toWeb(stream) as ReadableStream, {
+    headers: { ...baseHeaders, 'content-length': String(info.size) },
+  })
+}
