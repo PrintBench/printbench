@@ -13,6 +13,7 @@ import {
   Settings,
   Stethoscope,
   Tags,
+  Upload,
   Users,
 } from 'lucide-react'
 import type { Route } from 'next'
@@ -47,6 +48,7 @@ const ICONS = {
   drive: HardDrive,
   health: Stethoscope,
   settings: Settings,
+  upload: Upload,
 }
 
 export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
@@ -55,6 +57,7 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { href: '/', label: 'Dashboard', icon: 'home' },
       { href: '/search', label: 'Search', icon: 'search' },
       { href: '/models', label: 'Models', icon: 'boxes' },
+      { href: '/upload', label: 'Upload', icon: 'upload', requires: 'file:upload' },
     ],
   },
   {

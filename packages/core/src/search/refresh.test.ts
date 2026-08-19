@@ -76,8 +76,11 @@ describeDb('refreshModelSearchVectors', () => {
 
   afterAll(async () => {
     await db.execute(sql`DELETE FROM models WHERE library_id = ${LIB}`)
-    await db.execute(sql`DELETE FROM tags WHERE id = ${TAG}`)
-    await db.execute(sql`DELETE FROM creators WHERE id = ${CREATOR}`)
+    await db.execute(sql`DELETE FROM tags WHERE id = ${TAG} OR lower(name) = 'pokémon'`)
+    // By name too: the unique index is lower(name), so an id-only delete can
+    // leave a colliding row from another run.
+    await db.execute(sql`
+      DELETE FROM creators WHERE id = ${CREATOR} OR lower(name) = 'loot studios'`)
     await db.execute(sql`DELETE FROM libraries WHERE id = ${LIB}`)
     await pool.end()
   })

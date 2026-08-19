@@ -8,7 +8,7 @@ rasterizer, so there is nothing to compile and nothing to install.
 
 ## Status
 
-Phase 5 complete — search and faceted filtering.
+Phase 6 complete — uploads and editing.
 See `docs/` and the plan for the phase roadmap.
 
 | Phase | Scope | State |
@@ -19,8 +19,8 @@ See `docs/` and the plan for the phase roadmap.
 | 3 | Geometry parsing and thumbnails | done |
 | 4 | 3D viewer and downloads | done |
 | 5 | Search and faceted filtering | done |
-| 6 | Uploads and editing | next |
-| 7 | Print history, open-in-slicer, send-to-printer | |
+| 6 | Uploads and editing | done |
+| 7 | Print history, open-in-slicer, send-to-printer | next |
 | 8 | Library health and polish | |
 
 ## Quick start (Docker)
@@ -63,6 +63,7 @@ npm run verify:phase2:ui   # web -> queue -> worker -> pages, needs `npm run dev
 npm run verify:phase3      # mesh parsing, rendering and serving, needs `npm run dev`
 npm run verify:phase4      # downloads, HTTP Range and ZIP archives, needs `npm run dev`
 npm run verify:phase5      # search, facets and the command palette, needs `npm run dev`
+npm run verify:phase6      # uploads, editing and the restore drill, needs `npm run dev`
 ```
 
 After upgrading better-auth, reconcile `packages/db/src/schema/auth.ts` against
@@ -108,7 +109,11 @@ web shell is replaceable without touching the app.
   thumbnail and the in-browser view. three's own 3MFLoader cannot run in a Web
   Worker, because it depends on DOMParser.
 - **Metadata is written back to disk** as a `.printmanager.json` sidecar per
-  model, so the database can be rebuilt by rescanning.
+  model, so the database can be rebuilt by rescanning. That restore drill is
+  covered by tests, not just intent.
+- **Uploads are resumable** (tus), handled by the worker so a multi-gigabyte
+  transfer never occupies the web tier. Folder structure from a drag-and-drop
+  is preserved, because that structure is what groups files into models.
 - **Scanning refuses to destroy metadata.** If a scan would mark more than 20% of
   models missing — an unmounted NAS, say — it aborts and asks an admin.
 

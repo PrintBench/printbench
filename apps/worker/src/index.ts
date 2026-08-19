@@ -7,6 +7,8 @@
  * nor Next. Auth is a web-tier concern and is deliberately absent here.
  */
 import { createServer } from 'node:http'
+import path from 'node:path'
+import { mkdirSync } from 'node:fs'
 import { sql } from 'drizzle-orm'
 import { loadRootEnv } from '@pm/core'
 import { createDb } from '@pm/db'
@@ -14,11 +16,19 @@ import { JOB, getQueue } from '@pm/jobs'
 import { handleLibraryScan } from './jobs/scan'
 import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs/analyze'
 import { handleZipRequest } from './http/zip'
+import { handleUploadRequest } from './http/upload'
 
 // Must run before anything reads DATABASE_URL.
 loadRootEnv()
 
 const PORT = Number(process.env.WORKER_PORT ?? 3001)
+
+/*
+ * Uploads land here first and move into the library only once complete, so a
+ * scan never sees a half-written mesh.
+ */
+const STAGING_DIR = path.resolve(process.env.DATA_DIR ?? './data', 'uploads')
+mkdirSync(STAGING_DIR, { recursive: true })
 
 const { pool, db } = createDb()
 
@@ -33,9 +43,10 @@ const { pool, db } = createDb()
 const queue = getQueue()
 
 const server = createServer((req, res) => {
-  const path = (req.url ?? '').split('?')[0]
+  // Named pathname, not path: `path` is the node module imported above.
+  const pathname = (req.url ?? '').split('?')[0] ?? ''
 
-  if (path === '/api/upload/health' || path === '/health') {
+  if (pathname === '/api/upload/health' || pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ status: 'ok', role: 'worker' }))
     return
@@ -46,7 +57,7 @@ const server = createServer((req, res) => {
    * archive occupies a thread for minutes, and doing that in the page-rendering
    * process makes the UI stutter for everyone.
    */
-  if (path === '/api/download/model') {
+  if (pathname === '/api/download/model') {
     handleZipRequest(req, res).catch((error) => {
       console.error('[zip] unhandled failure:', error)
       if (!res.headersSent) {
@@ -59,7 +70,13 @@ const server = createServer((req, res) => {
     return
   }
 
-  // Resumable uploads (tus) land here in phase 6.
+  // Resumable uploads. tus owns everything under this prefix, including the
+  // per-upload URLs it hands back.
+  if (pathname.startsWith('/api/upload')) {
+    handleUploadRequest(req, res, STAGING_DIR)
+    return
+  }
+
   res.writeHead(404, { 'content-type': 'application/json' })
   res.end(JSON.stringify({ error: 'not found' }))
 })

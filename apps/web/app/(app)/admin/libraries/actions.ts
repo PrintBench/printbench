@@ -45,6 +45,8 @@ export async function previewLibrary(input: {
   path: string
   groupingMode?: 'deepest' | 'top_level' | 'flat'
   groupingDepth?: number
+  /** A managed library is allowed to start empty. */
+  allowEmpty?: boolean
 }): Promise<PreviewResult> {
   const empty: PreviewResult = {
     ok: false,
@@ -77,7 +79,7 @@ export async function previewLibrary(input: {
 
     const health = await storage.healthCheck()
     if (!health.ok) return { ...empty, error: health.reason ?? 'Folder is not readable.' }
-    if ((health.entryCount ?? 0) === 0) {
+    if ((health.entryCount ?? 0) === 0 && !input.allowEmpty) {
       return { ...empty, error: 'That folder is empty.' }
     }
 
@@ -139,6 +141,17 @@ export async function createLibrary(input: {
     const path = input.path.trim()
     if (!name) return { ok: false, error: 'Give the library a name.' }
     if (!path) return { ok: false, error: 'Enter a folder path.' }
+
+    /*
+     * A managed library owns its folder, so create it if it is not there yet —
+     * asking someone to go and mkdir before they can upload is a pointless
+     * step. An in-place library must already exist: being pointed at a typo and
+     * silently creating an empty directory is worse than an error.
+     */
+    if (input.kind === 'managed') {
+      const { mkdir } = await import('node:fs/promises')
+      await mkdir(path, { recursive: true })
+    }
 
     const storage = new LocalAdapter({
       id: 'validate',

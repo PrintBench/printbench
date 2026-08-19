@@ -1,14 +1,18 @@
 import Link from 'next/link'
+import type { Route } from 'next'
 import { notFound } from 'next/navigation'
 import { sql } from 'drizzle-orm'
 import { Box, FileStack, FolderOpen, HardDrive, Layers } from 'lucide-react'
 import { getDb } from '@pm/db'
+import { getSessionUser } from '@pm/auth'
+import { can } from '@pm/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatBytes, formatDimensions } from '@/components/model/model-card'
 import { ModelViewer } from '@/components/viewer/model-viewer'
 import { DownloadModelButton } from './download-button'
+import { ModelEditor } from './model-editor'
 import { FileDownloadLink } from './file-download-link'
 
 export const dynamic = 'force-dynamic'
@@ -95,6 +99,24 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const presupportedCount = files.rows.filter((f) => f.presupported).length
 
+  const meta = await db.execute<{
+    creator: string | null
+    creator_id: string | null
+    tags: string[] | null
+  }>(sql`
+    SELECT c.name AS creator, c.id AS creator_id,
+           (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
+              JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
+    FROM models m LEFT JOIN creators c ON c.id = m.creator_id
+    WHERE m.id = ${model.id}
+  `)
+  const creator = meta.rows[0]?.creator ?? null
+  const creatorId = meta.rows[0]?.creator_id ?? null
+  const tags = meta.rows[0]?.tags ?? []
+
+  const user = await getSessionUser()
+  const canEdit = can({ id: user?.id ?? '', role: user?.role ?? null }, 'model:edit')
+
   // The largest rendered mesh represents the model, and its dimensions are the
   // ones worth showing — a support-only variant is not what people measure.
   const hero = files.rows
@@ -140,6 +162,17 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 <FileStack className="size-3" />
                 {model.file_count} files · {formatBytes(Number(model.total_size))}
               </Badge>
+              <ModelEditor
+                publicId={model.public_id}
+                canEdit={canEdit}
+                initial={{
+                  name: model.name,
+                  notes: model.notes,
+                  license: model.license,
+                  creator,
+                  tags,
+                }}
+              />
               <DownloadModelButton publicId={model.public_id} />
             </div>
           )
@@ -272,6 +305,38 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                     Supports
                   </p>
                   <p className="mt-0.5">{presupportedCount} pre-supported files</p>
+                </div>
+              )}
+
+              {creator && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Creator
+                  </p>
+                  <Link
+                    href={`/search?creator=${encodeURIComponent(creatorId ?? '')}` as Route}
+                    className="mt-0.5 block text-[var(--color-accent)] hover:underline"
+                  >
+                    {creator}
+                  </Link>
+                </div>
+              )}
+
+              {tags.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Tags
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-[var(--color-ink-muted)]"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
 

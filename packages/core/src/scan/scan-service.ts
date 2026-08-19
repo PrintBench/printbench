@@ -20,6 +20,7 @@ import { walkLibrary, type DirFingerprint } from '../library/walker'
 import { lookup } from '../library/media-types'
 import { basename, slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
+import { readSidecar } from '../sidecar/sidecar'
 import type { LibraryLocation, StorageAdapter } from '../storage/types'
 
 /**
@@ -75,6 +76,8 @@ export interface ScanOutcome {
   renamesDetected: number
   /** Files handed to the derived-work queue. */
   filesQueued: number
+  /** Models whose metadata was restored from an on-disk sidecar. */
+  sidecarsRestored: number
   errors: { path: string; reason: string }[]
 }
 
@@ -109,6 +112,7 @@ export async function scanLibrary(
     filesMissing: 0,
     renamesDetected: 0,
     filesQueued: 0,
+    sidecarsRestored: 0,
     errors: [],
   }
 
@@ -191,8 +195,24 @@ export async function scanLibrary(
     for (const model of grouped.models) {
       const result = await upsertModel(db, library.id, model, startedAt)
       touchedModelIds.push(result.modelId)
-      if (result.created) outcome.modelsCreated++
-      else outcome.modelsUpdated++
+      if (result.created) {
+        outcome.modelsCreated++
+        /*
+         * Restore metadata from the sidecar, but only for a model being seen
+         * for the first time.
+         *
+         * This is what makes the database rebuildable: drop Postgres, rescan,
+         * and tags, creator, licence and notes come back. Applying it on every
+         * scan instead would let a stale file on disk overwrite an edit made in
+         * the app — the database is authoritative once a model is known.
+         */
+        if (!model.isFileModel) {
+          const restored = await restoreFromSidecar(db, storage, result.modelId, model.path)
+          if (restored) outcome.sidecarsRestored++
+        }
+      } else {
+        outcome.modelsUpdated++
+      }
       outcome.filesCreated += result.filesCreated
       outcome.renamesDetected += result.renamesDetected
     }
@@ -567,3 +587,68 @@ async function saveFingerprints(
 }
 
 export { markMissing as __markMissingForTests, countModelsNotIn as __countModelsNotInForTests }
+
+/**
+ * Applies a sidecar's metadata to a newly discovered model.
+ *
+ * Only ever called for a model created by this scan. Creators and tags are
+ * created as needed, so a library moved to a fresh instance rebuilds its whole
+ * taxonomy from the folders themselves.
+ */
+async function restoreFromSidecar(
+  db: Database,
+  storage: StorageAdapter,
+  modelId: string,
+  modelPath: string,
+): Promise<boolean> {
+  const { data, error } = await readSidecar(storage, modelPath)
+  if (error) {
+    console.warn(`[scan] ignoring sidecar for ${modelPath}: ${error}`)
+    return false
+  }
+  if (!data) return false
+
+  const updates: string[] = []
+  if (data.name) updates.push('name')
+  if (data.notes !== undefined) updates.push('notes')
+  if (data.license !== undefined) updates.push('license')
+
+  await db.execute(sql`
+    UPDATE models SET
+      name = coalesce(${data.name ?? null}, name),
+      slug = coalesce(${data.name ? slugify(data.name) : null}, slug),
+      notes = coalesce(${data.notes ?? null}, notes),
+      license = coalesce(${data.license ?? null}, license)
+    WHERE id = ${modelId}
+  `)
+
+  if (data.creator) {
+    const creator = await db.execute<{ id: string }>(sql`
+      INSERT INTO creators (name, slug, public_id)
+      VALUES (${data.creator}, ${slugify(data.creator) || 'creator'}, ${nanoid(12)})
+      ON CONFLICT (slug) DO UPDATE SET name = creators.name
+      RETURNING id
+    `)
+    await db.execute(sql`
+      UPDATE models SET creator_id = ${creator.rows[0]!.id} WHERE id = ${modelId}
+    `)
+    updates.push('creator')
+  }
+
+  if (data.tags?.length) {
+    for (const name of data.tags) {
+      const tag = await db.execute<{ id: string }>(sql`
+        INSERT INTO tags (name, slug) VALUES (${name}, ${slugify(name) || 'tag'})
+        ON CONFLICT (slug) DO UPDATE SET name = tags.name
+        RETURNING id
+      `)
+      await db.execute(sql`
+        INSERT INTO model_tags (model_id, tag_id) VALUES (${modelId}, ${tag.rows[0]!.id})
+        ON CONFLICT DO NOTHING
+      `)
+    }
+    updates.push(`${data.tags.length} tags`)
+  }
+
+  return updates.length > 0
+}

@@ -127,8 +127,18 @@ describeDb('searchModels', () => {
 
   async function cleanup() {
     await db.execute(sql`DELETE FROM libraries WHERE id IN (${LIB_A}, ${LIB_B})`)
-    await db.execute(sql`DELETE FROM creators WHERE id IN (${CREATOR_LOOT}, ${CREATOR_FUNC})`)
-    await db.execute(sql`DELETE FROM tags WHERE id IN (${TAG_DRAGON}, ${TAG_TERRAIN})`)
+    /*
+     * Deleted by NAME as well as id. The unique index on creators is
+     * lower(name), so a row left behind by another run collides on insert even
+     * though its id differs — which is exactly how this suite started failing
+     * once something else in the app created a "Loot Studios".
+     */
+    await db.execute(sql`
+      DELETE FROM creators WHERE id IN (${CREATOR_LOOT}, ${CREATOR_FUNC})
+         OR lower(name) IN ('loot studios', 'functional prints')`)
+    await db.execute(sql`
+      DELETE FROM tags WHERE id IN (${TAG_DRAGON}, ${TAG_TERRAIN})
+         OR lower(name) IN ('dragon', 'terrain')`)
   }
 
   describe('relevance', () => {

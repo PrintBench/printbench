@@ -24,7 +24,13 @@ const config: NextConfig = {
    */
   async rewrites() {
     const worker = process.env.WORKER_URL ?? 'http://localhost:3001'
-    return [{ source: '/api/download/:path*', destination: `${worker}/api/download/:path*` }]
+    return [
+      { source: '/api/download/:path*', destination: `${worker}/api/download/:path*` },
+      // tus owns everything under /api/upload, including the per-upload URLs it
+      // hands back, so both the collection and its children are forwarded.
+      { source: '/api/upload', destination: `${worker}/api/upload` },
+      { source: '/api/upload/:path*', destination: `${worker}/api/upload/:path*` },
+    ]
   },
 }
 
