@@ -167,7 +167,7 @@ export function humanizeName(input: string): string {
     .split(/\s+[-–—]\s+/)
     .map((part) =>
       part
-        .replace(/[_+\-]+/g, ' ')
+        .replace(/[_+-]+/g, ' ')
         .replace(/(?<=\p{Ll})(?=\p{Lu})/gu, ' ') // camelCase -> camel Case
         .replace(/\s+/g, ' ')
         .trim(),

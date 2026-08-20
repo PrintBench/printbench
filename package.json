@@ -32,15 +32,21 @@
     "verify:phase4": "tsx scripts/verify-phase4.mts",
     "verify:phase5": "tsx scripts/verify-phase5.mts",
     "verify:phase6": "tsx scripts/verify-phase6.mts",
-    "verify:phase7": "tsx scripts/verify-phase7.mts"
+    "verify:phase7": "tsx scripts/verify-phase7.mts",
+    "verify:phase8": "tsx scripts/verify-phase8.mts",
+    "backup": "tsx scripts/backup.mts"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.3.1",
     "@types/node": "^24.13.3",
     "concurrently": "^10.0.5",
     "eslint": "^10.8.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.9.6",
     "tsx": "^4.20.6",
     "typescript": "5.9.3",
+    "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.11",
     "wait-on": "^9.1.0"
   }

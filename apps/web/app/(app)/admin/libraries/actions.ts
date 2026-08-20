@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { LocalAdapter, groupModels, slugify, walkLibrary, type LibraryLocation } from '@pm/core'
-import { assertCan, PolicyError } from '@pm/core'
+import { assertCan, cronProblem, PolicyError } from '@pm/core'
 import { requireUser } from '@pm/auth'
 import { getDb, schema } from '@pm/db'
 import { getQueue, JOB } from '@pm/jobs'
@@ -213,6 +213,41 @@ export async function triggerScan(
   } catch (error) {
     if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
     return { ok: false, error: 'Could not queue the scan.' }
+  }
+}
+
+/**
+ * Changes how and when a library is scanned.
+ *
+ * The schedule is stored as cron and evaluated by a sweep in the worker, so a
+ * change here takes effect at the next sweep with nothing to re-register.
+ */
+export async function updateLibrarySchedule(
+  libraryId: string,
+  input: { scanCron: string; scanEnabled: boolean },
+): Promise<Result> {
+  try {
+    await assertAdmin()
+
+    const cron = input.scanCron.trim()
+    const problem = cronProblem(cron)
+    if (problem) return { ok: false, error: problem }
+
+    await getDb()
+      .update(schema.libraries)
+      .set({
+        // Empty string and NULL both mean "no schedule"; store one of them.
+        scanCron: cron === '' ? null : cron,
+        scanEnabled: input.scanEnabled,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.libraries.id, libraryId))
+
+    revalidatePath('/admin/libraries')
+    return { ok: true }
+  } catch (error) {
+    if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
+    return { ok: false, error: 'Could not save the schedule.' }
   }
 }
 

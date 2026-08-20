@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { sql } from 'drizzle-orm'
-import { Boxes, HardDrive, History, Printer, Users, Wrench } from 'lucide-react'
+import { Boxes, HardDrive, History, Printer, Wrench } from 'lucide-react'
 import { can, printStats } from '@pm/core'
 import { getSessionUser } from '@pm/auth'
 import { getDb } from '@pm/db'

@@ -11,7 +11,7 @@
  * the library looks empty and every model appears deleted.
  */
 
-import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, eq, isNull, lt, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import type { Database } from '@pm/db'
 import { schema } from '@pm/db'
@@ -348,7 +348,7 @@ async function upsertFiles(
 ): Promise<{ filesCreated: number; renamesDetected: number }> {
   const prefix = model.isFileModel ? '' : `${model.path}/`
   let filesCreated = 0
-  let renamesDetected = 0
+  const renamesDetected = 0
 
   const existing = await db
     .select({

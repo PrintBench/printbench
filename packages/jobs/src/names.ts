@@ -15,6 +15,8 @@ export const JOB = {
   fileAnalyze: 'file.analyze',
   fileThumbnail: 'file.thumbnail',
   searchRefresh: 'search.refresh',
+  healthDetect: 'health.detect',
+  scheduleSweep: 'library.schedule',
   maintReconcile: 'maint.reconcile',
   maintArchive: 'maint.archive',
 } as const
@@ -33,6 +35,14 @@ export const payloads = {
   [JOB.fileAnalyze]: z.object({ fileId: z.string().uuid() }),
   [JOB.fileThumbnail]: z.object({ fileId: z.string().uuid() }),
   [JOB.searchRefresh]: z.object({ modelIds: z.array(z.string().uuid()).max(1000) }),
+  [JOB.healthDetect]: z
+    .object({
+      /** Absent means every library. */
+      libraryId: z.string().uuid().optional(),
+      skipCosmetic: z.boolean().default(false),
+    })
+    .default({ skipCosmetic: false }),
+  [JOB.scheduleSweep]: z.object({}).default({}),
   [JOB.maintReconcile]: z.object({}).default({}),
   [JOB.maintArchive]: z.object({}).default({}),
 } as const
@@ -73,6 +83,18 @@ export const JOB_OPTIONS: Record<
   // Digests only feed dedupe and rename detection; they can wait.
   [JOB.fileDigest]: { concurrency: 4, priority: 2, policy: 'standard' },
   [JOB.searchRefresh]: { concurrency: 2, priority: 7, policy: 'standard' },
+  /*
+   * Lowest priority and one at a time. Health detection runs nine full-table
+   * statements, so two concurrent passes would contend for the same rows to
+   * produce the same answer — and nothing user-facing is waiting on it.
+   */
+  [JOB.healthDetect]: { concurrency: 1, priority: 1, policy: 'stately' },
+  /*
+   * One sweep at a time. Two concurrent sweeps would both see the same library
+   * as due and enqueue it twice — harmless, because library.scan is `stately`
+   * and collapses them, but pointless work.
+   */
+  [JOB.scheduleSweep]: { concurrency: 1, policy: 'stately' },
   // Only ever one maintenance sweep in flight.
   [JOB.maintReconcile]: { concurrency: 1, policy: 'stately' },
   [JOB.maintArchive]: { concurrency: 1, policy: 'stately' },

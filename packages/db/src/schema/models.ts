@@ -58,6 +58,16 @@ export const models = pgTable(
     /** Soft delete. Set when a scan no longer finds it; hard-deleted after a grace period. */
     missingAt: timestamp('missing_at', { withTimezone: true }),
 
+    /**
+     * Set when this model is shared by link, cleared to revoke.
+     *
+     * A separate secret from publicId, which is already the internal URL
+     * segment and so is known to everyone who can see the model at all.
+     */
+    shareToken: text('share_token'),
+    sharedAt: timestamp('shared_at', { withTimezone: true }),
+    sharedBy: text('shared_by'),
+
     searchVector: tsvector('search_vector'),
     /** When search_vector was last rebuilt; drives the nightly drift sweep. */
     indexedAt: timestamp('indexed_at', { withTimezone: true }),

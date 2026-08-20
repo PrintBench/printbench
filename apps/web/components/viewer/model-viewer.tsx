@@ -22,6 +22,11 @@ import type { MeshFormat, MeshLoadResponse } from '@/workers/mesh-loader.worker'
 /** Above this, the user must ask. Chosen to sit well inside a tab's budget. */
 export const AUTO_LOAD_LIMIT = 150 * 1024 * 1024
 
+/** The authenticated routes, which is what almost every caller wants. */
+function defaultUrlFor(fileId: string, kind: 'raw' | 'thumb'): string {
+  return kind === 'thumb' ? `/api/files/${fileId}/thumb` : `/api/files/${fileId}/raw?inline=1`
+}
+
 export interface ModelViewerProps {
   fileId: string
   format: MeshFormat
@@ -29,6 +34,15 @@ export interface ModelViewerProps {
   filename: string
   /** Shown before load and as the fallback for a file too large to auto-load. */
   thumbnailFileId?: string | null
+  /** From settings. Falls back to the built-in limit when not supplied. */
+  maxBytes?: number
+  /**
+   * Where to fetch bytes and thumbnails from.
+   *
+   * The share page serves the same files through a token-scoped route, because
+   * an anonymous visitor has no session for the normal one to check.
+   */
+  urlFor?: (fileId: string, kind: 'raw' | 'thumb') => string
   className?: string
 }
 
@@ -40,6 +54,8 @@ export function ModelViewer({
   fileSize,
   filename,
   thumbnailFileId,
+  maxBytes = AUTO_LOAD_LIMIT,
+  urlFor = defaultUrlFor,
   className,
 }: ModelViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -55,7 +71,7 @@ export function ModelViewer({
   const [showGrid, setShowGrid] = useState(true)
   const [wireframe, setWireframe] = useState(false)
 
-  const tooLarge = fileSize > AUTO_LOAD_LIMIT
+  const tooLarge = fileSize > maxBytes
 
   /*
    * Only start work once the viewer is on screen — with a fallback.
@@ -138,7 +154,7 @@ export function ModelViewer({
 
     worker.postMessage({
       type: 'load',
-      url: `/api/files/${fileId}/raw?inline=1`,
+      url: urlFor(fileId, 'raw'),
       format,
     })
 
@@ -296,7 +312,7 @@ export function ModelViewer({
           {thumbnailFileId && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={`/api/files/${thumbnailFileId}/thumb`}
+              src={urlFor(thumbnailFileId, 'thumb')}
               alt=""
               aria-hidden
               className="absolute inset-0 size-full object-contain p-6 opacity-30"

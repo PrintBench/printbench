@@ -8,7 +8,7 @@ rasterizer, so there is nothing to compile and nothing to install.
 
 ## Status
 
-Phase 7 complete — print workflow.
+All eight phases complete.
 See `docs/` and the plan for the phase roadmap.
 
 | Phase | Scope | State |
@@ -21,7 +21,7 @@ See `docs/` and the plan for the phase roadmap.
 | 5 | Search and faceted filtering | done |
 | 6 | Uploads and editing | done |
 | 7 | Print history, open-in-slicer, send-to-printer | done |
-| 8 | Library health and polish | next |
+| 8 | Library health, settings, schedules, sharing, S3 | done |
 
 ## Quick start (Docker)
 
@@ -36,6 +36,9 @@ Then open <http://localhost:8080>.
 
 Your library is mounted **read-only**. The app indexes it and never moves,
 renames or deletes anything in it.
+
+For Coolify, S3, NAS mounts, backups and upgrades, see
+[docs/deployment.md](docs/deployment.md).
 
 ## Local development
 
@@ -64,6 +67,14 @@ npm run verify:phase3      # mesh parsing, rendering and serving, needs `npm run
 npm run verify:phase4      # downloads, HTTP Range and ZIP archives, needs `npm run dev`
 npm run verify:phase5      # search, facets and the command palette, needs `npm run dev`
 npm run verify:phase6      # uploads, editing and the restore drill, needs `npm run dev`
+npm run verify:phase7      # print history, slicer links and a stubbed printer, needs `npm run dev`
+npm run verify:phase8      # health, settings, schedules, sharing and prune, needs `npm run dev`
+```
+
+Lint the workspace:
+
+```bash
+npm run lint
 ```
 
 After upgrading better-auth, reconcile `packages/db/src/schema/auth.ts` against
@@ -115,7 +126,14 @@ web shell is replaceable without touching the app.
   transfer never occupies the web tier. Folder structure from a drag-and-drop
   is preserved, because that structure is what groups files into models.
 - **Scanning refuses to destroy metadata.** If a scan would mark more than 20% of
-  models missing — an unmounted NAS, say — it aborts and asks an admin.
+  models missing — an unmounted NAS, say — it aborts and asks an admin. The
+  nightly prune additionally refuses to touch a library where *every* model is
+  missing, whatever the grace period says, because that is an unplugged drive
+  rather than a deletion.
+- **Scan schedules are evaluated, not registered.** pg-boss keeps one schedule
+  per queue name, so per-library crons are decided by a sweep comparing the last
+  fire time against the last scan. A schedule change takes effect at once, and a
+  scan missed while the worker was down is picked up rather than skipped.
 - **Slicers are handed the file, not driven.** Every modern slicer registers a
   URL scheme, so `Open in…` covers Bambu Studio, Orca, PrusaSlicer, Cura and
   Lychee at once, and works for printers with no network API. This is also the
@@ -147,6 +165,36 @@ web shell is replaceable without touching the app.
   Test the connection from the same page — it reports what is actually wrong
   ("Could not resolve …", "The printer rejected the API key") rather than
   "fetch failed".
+
+## Library health
+
+`/admin/health` reports nine kinds of problem — missing files, empty folders,
+duplicate bytes, unreadable meshes, models nested inside other models, and
+metadata gaps. Every detector clears its own problems: fix the thing and it
+disappears at the next pass, which runs after every scan and again overnight.
+Anything you do not care about can be ignored in bulk without pretending it
+was fixed.
+
+## Sharing
+
+A model can be shared by link. The token is separate from the internal id, so
+revoking it actually revokes something, and a shared link grants exactly one
+model — not the library, not search. Sharing is off instance-wide by default;
+turning it off closes every existing link at once.
+
+## Backup and restore
+
+See [docs/deployment.md](docs/deployment.md). In short: your files are never
+modified so back them up as you already do, `pg_dump` covers the database, and
+
+```bash
+npm run backup export backup.json
+npm run backup import backup.json -- --dry-run
+```
+
+writes a readable metadata export that restores into a rebuilt database by
+matching paths rather than ids. The sidecars are the real safety net — drop the
+database, migrate, rescan, and metadata comes back from disk.
 
 ## Notes on `reference/`
 

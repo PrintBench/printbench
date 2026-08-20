@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '@pm/db'
-import { LocalAdapter, scanLibrary, type LibraryLocation } from '@pm/core'
+import { LocalAdapter, S3Adapter, scanLibrary, type LibraryLocation } from '@pm/core'
 import type { JobPayload } from '@pm/jobs'
 import { JOB, getQueue } from '@pm/jobs'
 
@@ -83,6 +83,17 @@ export async function handleLibraryScan(payload: JobPayload<typeof JOB.librarySc
   if (outcome.errors.length > 0) {
     console.warn(`[scan] ${outcome.errors.length} directories could not be read`)
   }
+
+  /*
+   * Re-examine health now the library has changed. Enqueued rather than run
+   * inline so a slow pass cannot hold the scan queue, and scoped to this
+   * library so one scan does not re-examine the whole instance.
+   *
+   * Not after an abort: an aborted scan means the library is in an unknown
+   * state — very likely an unmounted drive — and reporting every model as
+   * missing is exactly the panic the abort exists to prevent.
+   */
+  await getQueue().send(JOB.healthDetect, { libraryId: library.id, skipCosmetic: false })
 }
 
 function toLocation(library: typeof schema.libraries.$inferSelect): LibraryLocation {
@@ -107,8 +118,7 @@ function createAdapter(location: LibraryLocation) {
     case 'local':
       return new LocalAdapter(location)
     case 's3':
-      // Phase 8. Failing loudly beats silently indexing nothing.
-      throw new Error('S3 libraries are not supported yet')
+      return new S3Adapter(location)
     default:
       throw new Error(`Unknown storage backend: ${String(location.backend)}`)
   }

@@ -34,7 +34,8 @@ let passed = 0
 let failed = 0
 const check = (name: string, ok: boolean, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`)
-  ok ? passed++ : failed++
+  if (ok) passed++
+  else failed++
 }
 const section = (title: string) => console.log(`\n== ${title} ==`)
 

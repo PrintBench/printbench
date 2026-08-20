@@ -200,7 +200,9 @@ function readBinaryBody(
 
   const readScalar = (type: string): number => {
     const size = SCALAR_SIZE[type] ?? 4
-    let value = 0
+    // No initialiser: the switch has a default, so every path assigns, and the
+    // compiler checks that rather than a placeholder hiding a missed branch.
+    let value: number
     switch (type) {
       case 'char': case 'int8': value = buffer.readInt8(offset); break
       case 'uchar': case 'uint8': value = buffer.readUInt8(offset); break

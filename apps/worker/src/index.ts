@@ -15,6 +15,9 @@ import { createDb } from '@pm/db'
 import { JOB, getQueue } from '@pm/jobs'
 import { handleLibraryScan } from './jobs/scan'
 import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs/analyze'
+import { handleHealthDetect } from './jobs/health'
+import { handleMaintArchive, handleMaintReconcile } from './jobs/maintenance'
+import { handleScheduleSweep } from './jobs/schedule'
 import { handleZipRequest } from './http/zip'
 import { handleUploadRequest } from './http/upload'
 
@@ -92,17 +95,48 @@ async function main(): Promise<void> {
   await queue.work(JOB.fileAnalyze, handleFileAnalyze)
   await queue.work(JOB.fileThumbnail, handleFileThumbnail)
   await queue.work(JOB.fileDigest, handleFileDigest)
-  console.log('[worker] handlers: library.scan, file.analyze, file.thumbnail, file.digest')
+  await queue.work(JOB.healthDetect, handleHealthDetect)
+  await queue.work(JOB.maintReconcile, handleMaintReconcile)
+  await queue.work(JOB.maintArchive, handleMaintArchive)
+  await queue.work(JOB.scheduleSweep, handleScheduleSweep)
+  console.log(
+    '[worker] handlers: library.scan, file.analyze, file.thumbnail, file.digest, ' +
+      'health.detect, library.schedule, maint.reconcile, maint.archive',
+  )
 
   /*
-   * Hourly fast scan of every enabled library, plus a weekly deep scan.
-   *
-   * The split matters: a fast scan trusts directory mtimes, which do not change
-   * when an existing file's bytes are edited in place. The deep scan re-examines
-   * everything and catches those.
+   * Re-enqueues derived work that was lost — a worker killed mid-render leaves
+   * a file pending forever otherwise, and the symptom is a thumbnail that
+   * simply never appears.
    */
   await queue.schedule(JOB.maintReconcile, '*/15 * * * *', {})
   console.log('[worker] scheduled: maintenance sweep every 15 minutes')
+
+  /*
+   * Per-library scan schedules are evaluated here rather than registered with
+   * pg-boss, which keeps only one schedule per queue name. Every five minutes
+   * is fine granularity for a schedule measured in hours, and means a change
+   * made in the UI takes effect almost at once.
+   */
+  await queue.schedule(JOB.scheduleSweep, '*/5 * * * *', {})
+  console.log('[worker] scheduled: library schedule sweep every 5 minutes')
+
+  /*
+   * A nightly health pass, so problems that appear without a scan — a digest
+   * finishing and revealing a duplicate, metadata edited away — are still
+   * found. 03:20 rather than exactly 03:00: every self-hosted cron in the
+   * world fires on the hour.
+   */
+  await queue.schedule(JOB.healthDetect, '20 3 * * *', { skipCosmetic: false })
+  console.log('[worker] scheduled: library health nightly at 03:20')
+
+  /*
+   * The archive sweep, which is the only scheduled job that deletes anything.
+   * Deliberately after the health pass: if health has just found every model in
+   * a library missing, that is exactly the case prune() refuses to act on.
+   */
+  await queue.schedule(JOB.maintArchive, '45 3 * * *', {})
+  console.log('[worker] scheduled: archive sweep nightly at 03:45')
 
   await new Promise<void>((resolve) => server.listen(PORT, resolve))
   console.log(`[worker] listening on :${PORT}`)

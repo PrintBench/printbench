@@ -1,11 +1,20 @@
 import Link from 'next/link'
 import type { Route } from 'next'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { sql } from 'drizzle-orm'
 import { Box, FileStack, FolderOpen, HardDrive, Layers } from 'lucide-react'
 import { getDb } from '@pm/db'
 import { getSessionUser } from '@pm/auth'
-import { can, canSendToPrinter, listPrints, printStats, printSuggestions, slicersFor } from '@pm/core'
+import {
+  can,
+  canSendToPrinter,
+  getSettings,
+  listPrints,
+  printStats,
+  printSuggestions,
+  slicersFor,
+} from '@pm/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +26,7 @@ import { FileDownloadLink } from './file-download-link'
 import { OpenInSlicer } from './open-in-slicer'
 import { SendToPrinter } from './send-to-printer'
 import { PrintHistory } from './print-history'
+import { ShareButton } from './share-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +41,7 @@ type ModelDetail = {
   total_size: string
   is_file_model: boolean
   missing_at: string | null
+  share_token: string | null
   library_name: string
   library_path: string
 }
@@ -65,7 +76,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const models = await db.execute<ModelDetail>(sql`
     SELECT m.id, m.public_id, m.name, m.path, m.notes, m.license,
-           m.file_count, m.total_size, m.is_file_model, m.missing_at,
+           m.file_count, m.total_size, m.is_file_model, m.missing_at, m.share_token,
            l.name AS library_name, l.path AS library_path
     FROM models m JOIN libraries l ON l.id = m.library_id
     WHERE m.public_id = ${publicId} LIMIT 1
@@ -123,10 +134,11 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const canLogPrints = can(policyUser, 'print:log')
   const canSend = can(policyUser, 'printhost:send')
 
-  const [prints, stats, suggestions] = await Promise.all([
+  const [prints, stats, suggestions, settings] = await Promise.all([
     listPrints(db, { modelId: model.id, limit: 50 }),
     printStats(db, model.id),
     printSuggestions(db),
+    getSettings(db),
   ])
 
   // The largest rendered mesh represents the model, and its dimensions are the
@@ -152,6 +164,18 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const NUMBER = new Intl.NumberFormat('en-GB')
 
+  /*
+   * Built here rather than in the client component: only the server knows the
+   * configured public address, and a link built from window.location would be
+   * wrong behind a proxy.
+   */
+  const requestHeaders = await headers()
+  const appOrigin =
+    process.env.APP_URL?.replace(/\/+$/, '') ??
+    `${requestHeaders.get('x-forwarded-proto') ?? 'http'}://${
+      requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host') ?? 'localhost:3000'
+    }`
+
   return (
     <>
       <nav className="mb-4 flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)]">
@@ -174,6 +198,15 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 <FileStack className="size-3" />
                 {model.file_count} files · {formatBytes(Number(model.total_size))}
               </Badge>
+              {settings.publicSharing && canEdit && (
+                <ShareButton
+                  publicId={model.public_id}
+                  shared={model.share_token != null}
+                  shareUrl={
+                    model.share_token ? `${appOrigin}/share/${model.share_token}` : null
+                  }
+                />
+              )}
               <ModelEditor
                 publicId={model.public_id}
                 canEdit={canEdit}
@@ -214,6 +247,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               fileSize={Number(viewable.size)}
               filename={viewable.filename.split('/').pop() ?? viewable.filename}
               thumbnailFileId={hero?.id ?? null}
+              maxBytes={settings.viewerMaxBytes}
               className="aspect-[16/10]"
             />
           ) : (

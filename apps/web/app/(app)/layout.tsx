@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@pm/auth'
+import { getSettings } from '@pm/core'
+import { getDb } from '@pm/db'
 import { needsFirstRunSetup } from '@/lib/setup'
 import { Sidebar } from '@/components/shell/sidebar'
 
@@ -16,9 +18,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
+  const { siteName } = await getSettings(getDb())
+
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
       <Sidebar
+        siteName={siteName}
         user={{
           id: user.id,
           role: user.role ?? 'viewer',

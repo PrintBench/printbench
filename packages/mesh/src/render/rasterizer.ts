@@ -203,10 +203,10 @@ export class Rasterizer {
     const area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
     if (area === 0 || !Number.isFinite(area)) return
 
-    let minX = Math.max(0, Math.floor(Math.min(x0, x1, x2)))
-    let maxX = Math.min(this.width - 1, Math.ceil(Math.max(x0, x1, x2)))
-    let minY = Math.max(0, Math.floor(Math.min(y0, y1, y2)))
-    let maxY = Math.min(this.height - 1, Math.ceil(Math.max(y0, y1, y2)))
+    const minX = Math.max(0, Math.floor(Math.min(x0, x1, x2)))
+    const maxX = Math.min(this.width - 1, Math.ceil(Math.max(x0, x1, x2)))
+    const minY = Math.max(0, Math.floor(Math.min(y0, y1, y2)))
+    const maxY = Math.min(this.height - 1, Math.ceil(Math.max(y0, y1, y2)))
     if (minX > maxX || minY > maxY) return
 
     const shade = this.shadeFace(t)
@@ -218,9 +218,9 @@ export class Rasterizer {
         const px = x + 0.5
 
         // Barycentric coordinates via edge functions.
-        let w0 = ((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py)) * inverseArea
-        let w1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2 - py)) * inverseArea
-        let w2 = ((x0 - px) * (y1 - py) - (x1 - px) * (y0 - py)) * inverseArea
+        const w0 = ((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py)) * inverseArea
+        const w1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2 - py)) * inverseArea
+        const w2 = ((x0 - px) * (y1 - py) - (x1 - px) * (y0 - py)) * inverseArea
         if (w0 < 0 || w1 < 0 || w2 < 0) continue
 
         const z = w0 * z0 + w1 * z1 + w2 * z2

@@ -24,7 +24,8 @@ let failed = 0
 
 function check(name: string, ok: boolean, detail = '') {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`)
-  ok ? passed++ : failed++
+  if (ok) passed++
+  else failed++
 }
 
 function section(title: string) {

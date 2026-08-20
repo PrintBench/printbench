@@ -10,7 +10,14 @@ import { NAV_SECTIONS, NavLink } from './nav'
 import { UserMenu } from './user-menu'
 import { CommandTrigger } from './command-menu'
 
-export function Sidebar({ user }: { user: PolicyUser & { name: string; email: string } }) {
+export function Sidebar({
+  user,
+  siteName,
+}: {
+  user: PolicyUser & { name: string; email: string }
+  /** From settings, so an instance can be named for the shop it serves. */
+  siteName: string
+}) {
   const [open, setOpen] = useState(false)
 
   // The nav is filtered by the same can() the server enforces with, so a link
@@ -36,7 +43,7 @@ export function Sidebar({ user }: { user: PolicyUser & { name: string; email: st
           <span className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-ink)]">
             <Boxes className="size-4" />
           </span>
-          Print Manager
+          {siteName}
         </Link>
         <div className="ml-auto">
           <UserMenu user={user} />
@@ -62,7 +69,7 @@ export function Sidebar({ user }: { user: PolicyUser & { name: string; email: st
             <span className="flex size-8 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-accent)] text-[var(--color-accent-ink)]">
               <Boxes className="size-[18px]" />
             </span>
-            Print Manager
+            {siteName}
           </Link>
           <button
             type="button"

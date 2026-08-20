@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { desc, eq, sql } from 'drizzle-orm'
+import { desc, sql } from 'drizzle-orm'
 import { FolderPlus, HardDrive, Lock } from 'lucide-react'
 import { getSessionUser } from '@pm/auth'
-import { can } from '@pm/core'
+import { can, nextRun } from '@pm/core'
 import { getDb, schema } from '@pm/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ScanButton } from './scan-button'
+import { SchedulePicker } from './schedule-picker'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Libraries' }
@@ -41,6 +42,7 @@ export default async function LibrariesPage() {
       kind: schema.libraries.kind,
       groupingMode: schema.libraries.groupingMode,
       scanEnabled: schema.libraries.scanEnabled,
+      scanCron: schema.libraries.scanCron,
       createdAt: schema.libraries.createdAt,
     })
     .from(schema.libraries)
@@ -141,6 +143,28 @@ export default async function LibrariesPage() {
                       {NUMBER.format(stat?.files ?? 0)} files ·{' '}
                       {formatBytes(Number(stat?.total_size ?? 0))}
                     </p>
+
+                    <div className="mt-2">
+                      <SchedulePicker
+                        libraryId={library.id}
+                        cron={library.scanCron ?? ''}
+                        enabled={library.scanEnabled}
+                        nextRunLabel={
+                          /*
+                           * Formatted on the server so the label and the
+                           * schedule agree about the timezone — cron is read in
+                           * the server's local time, not the browser's.
+                           */
+                          library.scanEnabled
+                            ? (nextRun(library.scanCron)?.toLocaleString('en-GB', {
+                                weekday: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              }) ?? null)
+                            : null
+                        }
+                      />
+                    </div>
 
                     {run && (
                       <p
