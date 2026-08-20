@@ -26,6 +26,7 @@ interface Props {
 
 export function OpenInSlicer({ fileId, filename }: Props) {
   const [links, setLinks] = useState<{ id: string; label: string; url: string; hint: string }[]>([])
+  const [note, setNote] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,6 +42,19 @@ export function OpenInSlicer({ fileId, filename }: Props) {
       return
     }
     setLinks(result.links)
+
+    /*
+     * Said out loud, because the slicer will show a .3mf and the file on this
+     * page is an STL. Bambu Studio refuses anything else before it downloads,
+     * so the conversion is not optional — but it should not be a surprise.
+     */
+    setNote(
+      result.lossy
+        ? 'Sent as 3MF. Geometry is preserved; colours and materials are not.'
+        : result.converted
+          ? 'Sent as 3MF — the only format Bambu Studio accepts over a link.'
+          : null,
+    )
   }
 
   return (
@@ -79,9 +93,10 @@ export function OpenInSlicer({ fileId, filename }: Props) {
         ))}
 
         {links.length > 0 && (
-          <p className="border-t border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-ink-faint)]">
-            Nothing happens? The slicer is not installed, or your browser blocked the link.
-          </p>
+          <div className="border-t border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-ink-faint)]">
+            {note && <p className="mb-1">{note}</p>}
+            <p>Nothing happens? The slicer is not installed, or your browser blocked the link.</p>
+          </div>
         )}
       </PopoverContent>
     </Popover>

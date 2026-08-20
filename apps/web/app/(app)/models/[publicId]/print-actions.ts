@@ -141,7 +141,14 @@ export async function removePrint(publicId: string, printId: string): Promise<Re
 const SLICER_TOKEN_TTL_MS = 15 * 60 * 1000
 
 type SlicerLinks =
-  | { ok: true; links: { id: string; label: string; url: string; hint: string }[] }
+  | {
+      ok: true
+      links: { id: string; label: string; url: string; hint: string }[]
+      /** True when the mesh is repackaged as 3MF on the way out. */
+      converted?: boolean
+      /** True when that repackaging drops something — colour, materials. */
+      lossy?: boolean
+    }
   | { ok: false; error: string }
 
 /**
@@ -187,25 +194,33 @@ export async function createSlicerLinks(fileId: string): Promise<SlicerLinks> {
     const { token, expires } = signToken(secret, 'file', fileId, SLICER_TOKEN_TTL_MS)
 
     /*
-     * The filename is in the PATH, not just the headers.
+     * Handed over as 3MF, at a URL ending in ".3mf".
      *
-     * Slicers work out what they have been handed from the URL. Given a path
-     * ending in "/raw", Bambu Studio downloads the file and then reports an
-     * unknown or corrupt format — for a file that is perfectly valid, with a
-     * correct Content-Type and Content-Disposition, which it ignores.
+     * Bambu Studio's URL handler checks the extension BEFORE downloading:
      *
-     * Only the last segment, because a file inside a model folder has a
+     *   if (!extension.Contains(".3mf") && !extension.Contains(".3MF")) {
+     *     msg = _L("Download failed, unknown file format."); return; }
+     *
+     * so a link to an STL is refused without a single request reaching us,
+     * however correct the file and its headers are. Converting on the way out
+     * is the only thing that makes this work, and every other slicer reads 3MF
+     * too — so one URL serves them all.
+     *
+     * Only the last path segment, because a file inside a model folder has a
      * filename like "stl/body.stl" and the slashes would change the path.
      */
-    const leaf = (file.filename.split('/').pop() ?? 'model').trim()
-    const name = encodeURIComponent(leaf || `model.${file.extension}`)
+    const leaf = (file.filename.split('/').pop() ?? 'model').replace(/\.[^.]+$/, '')
+    const name = encodeURIComponent(`${leaf || 'model'}.3mf`)
 
     const fileUrl =
-      `${origin.replace(/\/+$/, '')}/api/files/${fileId}/raw/${name}` +
+      `${origin.replace(/\/+$/, '')}/api/files/${fileId}/slicer/${name}` +
       `?token=${token}&expires=${expires}`
 
     return {
       ok: true,
+      converted: file.extension.toLowerCase() !== '3mf',
+      // Colour and materials do not survive the conversion; geometry does.
+      lossy: ['obj', 'ply'].includes(file.extension.toLowerCase()),
       links: slicers.map((slicer) => ({
         id: slicer.id,
         label: slicer.label,

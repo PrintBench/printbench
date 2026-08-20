@@ -134,6 +134,11 @@ web shell is replaceable without touching the app.
   per queue name, so per-library crons are decided by a sweep comparing the last
   fire time against the last scan. A schedule change takes effect at once, and a
   scan missed while the worker was down is picked up rather than skipped.
+- **Slicer hand-off converts to 3MF.** Bambu Studio's URL handler refuses any
+  extension but `.3mf`, and checks *before* downloading — so a link to an STL
+  fails without a request ever reaching the server. Meshes are repackaged as
+  3MF on the way out, which every other slicer reads too. Geometry is
+  preserved; colour on an OBJ or PLY is not, and the UI says so.
 - **Slicers are handed the file, not driven.** Every modern slicer registers a
   URL scheme, so `Open in…` covers Bambu Studio, Orca, PrusaSlicer, Cura and
   Lychee at once, and works for printers with no network API. This is also the

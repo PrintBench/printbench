@@ -10,6 +10,22 @@
  * simple HTTP upload, and pushing to them means FTPS plus MQTT with LAN mode
  * enabled. Handing the file to Bambu Studio, which already knows how to talk to
  * them, is both simpler and more reliable.
+ *
+ * **The file has to be a 3MF.** Bambu Studio's handler contains
+ *
+ *   if (!extension.Contains(".3mf") && !extension.Contains(".3MF")) {
+ *     msg = _L("Download failed, unknown file format."); return; }
+ *
+ * and it runs that check before downloading, so a link to an STL is refused
+ * without a request ever reaching the server. Callers convert on the way out;
+ * see serve-as-3mf. The `accepts` lists below describe what each slicer can
+ * open once it has the bytes, which is what decides whether to offer the link
+ * at all.
+ *
+ * Expect a "this file is not from a trusted site" prompt too: the handler
+ * allowlists makerworld, public-cdn.bblmw.com, amazonaws.com and aliyuncs.com,
+ * and a self-hosted instance is none of those. There is nothing to be done
+ * about that from this end.
  */
 
 export type SlicerId = 'bambustudio' | 'orcaslicer' | 'prusaslicer' | 'cura' | 'lychee'
