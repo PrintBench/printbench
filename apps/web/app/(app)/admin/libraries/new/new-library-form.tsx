@@ -2,18 +2,20 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Boxes, Check, FolderSearch, HardDrive, Loader2, Upload } from 'lucide-react'
+import { AlertTriangle, Boxes, Check, Cloud, FolderSearch, HardDrive, Loader2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
-import { createLibrary, previewLibrary, uploadLocation, type PreviewResult } from '../actions'
+import { createLibrary, previewLibrary, uploadLocation, type PreviewResult, type S3Config } from '../actions'
 import { FolderPicker } from './folder-picker'
+import { S3Fields } from './s3-fields'
 
 type GroupingMode = 'deepest' | 'top_level' | 'flat'
 type Kind = 'in_place' | 'managed'
+type Backend = 'local' | 's3'
 
 const MODES: { value: GroupingMode; label: string; description: string }[] = [
   {
@@ -50,8 +52,10 @@ export function NewLibraryForm() {
   const router = useRouter()
 
   const [kind, setKind] = useState<Kind | null>(null)
+  const [backend, setBackend] = useState<Backend | null>(null)
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
+  const [s3, setS3] = useState<S3Config>({ bucket: '' })
   const [mode, setMode] = useState<GroupingMode>('deepest')
   const [depth, setDepth] = useState(1)
   const [writeSidecar, setWriteSidecar] = useState(true)
@@ -68,24 +72,30 @@ export function NewLibraryForm() {
   }, [kind, uploadRoot])
 
   async function runPreview(nextMode: GroupingMode = mode, nextDepth: number = depth) {
-    if (!path) {
+    if (backend === 's3') {
+      if (!s3.bucket.trim()) {
+        setError('Give the bucket a name first.')
+        return
+      }
+    } else if (!path) {
       setError('Choose a folder first.')
       return
     }
+
     setError(null)
     setPreviewing(true)
     try {
-      const result = await previewLibrary({
-        path,
-        groupingMode: nextMode,
-        groupingDepth: nextDepth,
-      })
+      const result = await previewLibrary(
+        backend === 's3'
+          ? { s3, groupingMode: nextMode, groupingDepth: nextDepth }
+          : { path, groupingMode: nextMode, groupingDepth: nextDepth },
+      )
       setPreview(result)
       if (!result.ok && result.error) setError(result.error)
-      // Seed the name from the folder once we know the path is real.
+      // Seed the name once we know the location is real.
       if (result.ok && !name.trim()) {
-        const folder = path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()
-        if (folder) setName(folder)
+        const seed = backend === 's3' ? s3.bucket : path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()
+        if (seed) setName(seed)
       }
     } finally {
       setPreviewing(false)
@@ -103,7 +113,8 @@ export function NewLibraryForm() {
       const result = await createLibrary({
         name,
         // An uploads library derives its own folder; there is nothing to send.
-        path: kind === 'in_place' ? path : undefined,
+        path: kind === 'in_place' && backend !== 's3' ? path : undefined,
+        s3: kind === 'in_place' && backend === 's3' ? s3 : undefined,
         kind: kind ?? 'in_place',
         groupingMode: mode,
         groupingDepth: mode === 'flat' ? depth : undefined,
@@ -168,6 +179,48 @@ export function NewLibraryForm() {
     )
   }
 
+  /* ------------------------------------------ step 1b: where it lives */
+
+  if (kind === 'in_place' && backend === null) {
+    return (
+      <div className="max-w-3xl space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-[var(--color-ink-muted)]">Where are these files?</p>
+          <Button variant="ghost" size="sm" onClick={() => setKind(null)}>
+            Back
+          </Button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setBackend('local')}
+            className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left transition-shadow hover:shadow-[var(--shadow-card)]"
+          >
+            <HardDrive className="size-5 text-[var(--color-accent)]" />
+            <p className="mt-3 font-medium">On this server</p>
+            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+              A local disk or a mounted NAS share. Chosen by browsing what is there.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setBackend('s3')}
+            className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-left transition-shadow hover:shadow-[var(--shadow-card)]"
+          >
+            <Cloud className="size-5 text-[var(--color-accent)]" />
+            <p className="mt-3 font-medium">S3-compatible storage</p>
+            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+              A bucket you already have files in — AWS S3, MinIO, Backblaze, or anything speaking
+              the same API.
+            </p>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   /* ------------------------------------- step 2a: a library for uploads */
 
   if (kind === 'managed') {
@@ -218,33 +271,50 @@ export function NewLibraryForm() {
     )
   }
 
-  /* ------------------------------ step 2b: point at an existing folder */
+  /* ------------------ step 2b: point at an existing folder, or a bucket */
+
+  const ready = backend === 's3' ? Boolean(s3.bucket.trim()) : Boolean(path)
 
   return (
     <div className="max-w-3xl space-y-6">
       <Card>
         <CardContent className="space-y-4 p-5">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Choose the folder holding your models</p>
-            <Button variant="ghost" size="sm" onClick={() => setKind(null)}>
+            <p className="text-sm font-medium">
+              {backend === 's3' ? 'Connect the bucket' : 'Choose the folder holding your models'}
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => setBackend(null)}>
               Back
             </Button>
           </div>
 
-          <FolderPicker
-            value={path}
-            onChange={(next) => {
-              setPath(next)
-              setPreview(null)
-              setError(null)
-            }}
-          />
+          {backend === 's3' ? (
+            <S3Fields
+              value={s3}
+              onChange={(next) => {
+                setS3(next)
+                setPreview(null)
+                setError(null)
+              }}
+            />
+          ) : (
+            <>
+              <FolderPicker
+                value={path}
+                onChange={(next) => {
+                  setPath(next)
+                  setPreview(null)
+                  setError(null)
+                }}
+              />
 
-          {path && (
-            <p className="truncate font-mono text-xs text-[var(--color-ink-muted)]">{path}</p>
+              {path && (
+                <p className="truncate font-mono text-xs text-[var(--color-ink-muted)]">{path}</p>
+              )}
+            </>
           )}
 
-          <Button variant="secondary" disabled={previewing || !path} onClick={() => void runPreview()}>
+          <Button variant="secondary" disabled={previewing || !ready} onClick={() => void runPreview()}>
             {previewing ? <Loader2 className="animate-spin" /> : <FolderSearch />}
             {previewing ? 'Looking…' : 'Preview what will be indexed'}
           </Button>

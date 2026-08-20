@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { eq, isNull, and } from 'drizzle-orm'
 import { ZipArchive, type ArchiverError } from 'archiver'
 import { getDb, schema } from '@pm/db'
-import { LocalAdapter, contentDisposition, type LibraryLocation } from '@pm/core'
+import { contentDisposition, createStorageAdapter, libraryLocationFromRow } from '@pm/core'
 
 /**
  * Streams a whole model as a ZIP.
@@ -77,7 +77,7 @@ export async function handleZipRequest(
     .limit(1)
 
   const row = rows[0]
-  if (!row || row.library.backend !== 'local') {
+  if (!row) {
     response.writeHead(404, { 'content-type': 'text/plain' })
     response.end('Not found')
     return
@@ -94,14 +94,7 @@ export async function handleZipRequest(
     return
   }
 
-  const location: LibraryLocation = {
-    id: row.library.id,
-    kind: row.library.kind,
-    backend: row.library.backend,
-    allowWrites: row.library.allowWrites,
-    path: row.library.path,
-  }
-  const storage = new LocalAdapter(location)
+  const storage = createStorageAdapter(libraryLocationFromRow(row.library))
 
   const safeName = row.model.name.replace(/[/\\]/g, '-') || 'model'
 

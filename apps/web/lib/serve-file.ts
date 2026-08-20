@@ -2,15 +2,15 @@ import { Readable } from 'node:stream'
 import { eq } from 'drizzle-orm'
 import { getSessionUser } from '@pm/auth'
 import {
-  LocalAdapter,
   REVALIDATE_CACHE,
   can,
   accelMounts,
   accelRedirectPath,
   contentDisposition,
+  createStorageAdapter,
+  libraryLocationFromRow,
   parseRange,
   verifyToken,
-  type LibraryLocation,
 } from '@pm/core'
 import { getDb, schema } from '@pm/db'
 
@@ -47,18 +47,9 @@ export async function serveFile(request: Request, fileId: string): Promise<Respo
 
   const row = rows[0]
   if (!row || row.file.missingAt) return new Response('Not found', { status: 404 })
-  if (row.library.backend !== 'local') {
-    return new Response('Unsupported storage backend', { status: 501 })
-  }
 
-  const location: LibraryLocation = {
-    id: row.library.id,
-    kind: row.library.kind,
-    backend: row.library.backend,
-    allowWrites: row.library.allowWrites,
-    path: row.library.path,
-  }
-  const storage = new LocalAdapter(location)
+  const location = libraryLocationFromRow(row.library)
+  const storage = createStorageAdapter(location)
 
   // A model that is a single loose file has no folder of its own.
   const relativePath = row.model.isFileModel
@@ -85,6 +76,20 @@ export async function serveFile(request: Request, fileId: string): Promise<Respo
 
   if (request.headers.get('if-none-match') === baseHeaders.etag) {
     return new Response(null, { status: 304, headers: baseHeaders })
+  }
+
+  /*
+   * S3: a presigned URL, so the bytes go straight from the bucket and never
+   * pass through this process. This is the entire reason S3 is worth
+   * supporting for a large library — without it every download would still
+   * work (createReadStream falls through below) but would burn a Node
+   * connection re-streaming what S3 would have served directly.
+   */
+  if (location.backend === 's3') {
+    const delivery = await storage.downloadUrl(relativePath, filename)
+    if (delivery.kind === 'redirect') {
+      return new Response(null, { status: 302, headers: { location: delivery.url } })
+    }
   }
 
   /*

@@ -2,12 +2,12 @@ import { Readable } from 'node:stream'
 import { eq } from 'drizzle-orm'
 import { getSessionUser } from '@pm/auth'
 import {
-  LocalAdapter,
   can,
   canOpenInSlicer,
   contentDisposition,
+  createStorageAdapter,
+  libraryLocationFromRow,
   verifyToken,
-  type LibraryLocation,
 } from '@pm/core'
 import { readObj, readPly, readStl, writeThreeMf } from '@pm/mesh/parse'
 import { getDb, schema } from '@pm/db'
@@ -58,18 +58,15 @@ export async function serveAs3mf(
 
   const row = rows[0]
   if (!row || row.file.missingAt) return new Response('Not found', { status: 404 })
-  if (row.library.backend !== 'local') {
-    return new Response('Unsupported storage backend', { status: 501 })
-  }
 
-  const location: LibraryLocation = {
-    id: row.library.id,
-    kind: row.library.kind,
-    backend: row.library.backend,
-    allowWrites: row.library.allowWrites,
-    path: row.library.path,
-  }
-  const storage = new LocalAdapter(location)
+  /*
+   * Always streamed through here, even for S3 — never a redirect to a
+   * presigned URL. Bambu Studio names the saved file after the URL's last
+   * path segment, and a presigned URL's query string is full of "?" and "&" —
+   * exactly the illegal-Windows-filename bug this hand-off was already fixed
+   * for once (see createSlicerLinks in print-actions.ts).
+   */
+  const storage = createStorageAdapter(libraryLocationFromRow(row.library))
 
   const relativePath = row.model.isFileModel
     ? row.model.path

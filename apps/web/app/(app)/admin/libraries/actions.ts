@@ -1,11 +1,13 @@
 'use server'
 
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import {
   LocalAdapter,
   RootError,
   browseDirectories,
+  createStorageAdapter,
+  encryptSecret,
   groupModels,
   libraryRoots,
   managedRoot,
@@ -59,6 +61,33 @@ export async function uploadLocation(): Promise<{ root: string; browsable: strin
   }
 }
 
+export interface S3Config {
+  bucket: string
+  prefix?: string
+  region?: string
+  endpoint?: string
+  accessKeyId?: string
+  secretAccessKey?: string
+  forcePathStyle?: boolean
+}
+
+/** Builds the location the storage layer needs from the form's S3 fields. */
+function s3Location(id: string, kind: 'in_place' | 'managed', s3: S3Config): LibraryLocation {
+  return {
+    id,
+    kind,
+    backend: 's3',
+    allowWrites: kind === 'managed',
+    s3Bucket: s3.bucket,
+    s3Prefix: s3.prefix || null,
+    s3Region: s3.region || null,
+    s3Endpoint: s3.endpoint || null,
+    s3AccessKeyId: s3.accessKeyId || null,
+    s3SecretAccessKey: s3.secretAccessKey || null,
+    s3ForcePathStyle: s3.forcePathStyle ?? Boolean(s3.endpoint),
+  }
+}
+
 export interface PreviewSample {
   path: string
   name: string
@@ -85,7 +114,10 @@ export interface PreviewResult {
  * junk rows.
  */
 export async function previewLibrary(input: {
-  path: string
+  /** Local backend. Either this or `s3` is required. */
+  path?: string
+  /** S3 backend. */
+  s3?: S3Config
   groupingMode?: 'deepest' | 'top_level' | 'flat'
   groupingDepth?: number
   /** A managed library is allowed to start empty. */
@@ -106,29 +138,29 @@ export async function previewLibrary(input: {
     return { ...empty, error: 'Not permitted.' }
   }
 
-  /*
-   * Validated against the roots for the same reason createLibrary is: this
-   * walks a directory and reports its contents, so an unchecked path here
-   * would be a way to enumerate the host.
-   */
-  const validated = await validateLibraryPath(input.path)
-  if (!validated.ok) return { ...empty, error: validated.error }
+  let location: LibraryLocation
 
-  const location: LibraryLocation = {
-    id: 'preview',
-    kind: 'in_place',
-    backend: 'local',
-    allowWrites: false,
-    path: validated.path,
+  if (input.s3) {
+    if (!input.s3.bucket.trim()) return { ...empty, error: 'Give the bucket a name.' }
+    location = s3Location('preview', 'in_place', input.s3)
+  } else {
+    /*
+     * Validated against the roots for the same reason createLibrary is: this
+     * walks a directory and reports its contents, so an unchecked path here
+     * would be a way to enumerate the host.
+     */
+    const validated = await validateLibraryPath(input.path ?? '')
+    if (!validated.ok) return { ...empty, error: validated.error }
+    location = { id: 'preview', kind: 'in_place', backend: 'local', allowWrites: false, path: validated.path }
   }
 
   try {
-    const storage = new LocalAdapter(location)
+    const storage = createStorageAdapter(location)
 
     const health = await storage.healthCheck()
-    if (!health.ok) return { ...empty, error: health.reason ?? 'Folder is not readable.' }
+    if (!health.ok) return { ...empty, error: health.reason ?? 'That location is not readable.' }
     if ((health.entryCount ?? 0) === 0 && !input.allowEmpty) {
-      return { ...empty, error: 'That folder is empty.' }
+      return { ...empty, error: 'That location is empty.' }
     }
 
     // Bounded: a preview must stay responsive even on a huge library.
@@ -176,8 +208,10 @@ export async function previewLibrary(input: {
 
 export async function createLibrary(input: {
   name: string
-  /** Required for an existing folder; ignored for an uploads library. */
+  /** Required for an existing folder; ignored for an uploads library or S3. */
   path?: string
+  /** An existing S3 bucket. Only offered for `in_place` — see the form. */
+  s3?: S3Config
   kind: 'in_place' | 'managed'
   groupingMode: 'deepest' | 'top_level' | 'flat'
   groupingDepth?: number
@@ -188,6 +222,62 @@ export async function createLibrary(input: {
 
     const name = input.name.trim()
     if (!name) return { ok: false, error: 'Give the library a name.' }
+
+    if (input.s3) {
+      /*
+       * Not offered by the form, but checked here too: an uploads library
+       * writing into someone's existing bucket is a very different, much
+       * larger feature (multipart writes through the tus pipeline) than
+       * reading one that already has files in it.
+       */
+      if (input.kind === 'managed') {
+        return { ok: false, error: 'An uploads library cannot be backed by S3 yet.' }
+      }
+      if (!input.s3.bucket.trim()) return { ok: false, error: 'Give the bucket a name.' }
+
+      const storage = createStorageAdapter(s3Location('validate', 'in_place', input.s3))
+      const health = await storage.healthCheck()
+      if (!health.ok) return { ok: false, error: health.reason ?? 'That bucket is not readable.' }
+
+      const db = getDb()
+      const prefix = input.s3.prefix?.trim() || null
+      const existing = await db
+        .select({ id: schema.libraries.id })
+        .from(schema.libraries)
+        .where(
+          and(
+            eq(schema.libraries.backend, 's3'),
+            eq(schema.libraries.s3Bucket, input.s3.bucket.trim()),
+            prefix ? eq(schema.libraries.s3Prefix, prefix) : isNull(schema.libraries.s3Prefix),
+          ),
+        )
+        .limit(1)
+      if (existing[0]) return { ok: false, error: 'A library already points at that bucket.' }
+
+      const [created] = await db
+        .insert(schema.libraries)
+        .values({
+          name,
+          kind: 'in_place',
+          backend: 's3',
+          allowWrites: false,
+          s3Bucket: input.s3.bucket.trim(),
+          s3Prefix: prefix,
+          s3Region: input.s3.region?.trim() || null,
+          s3Endpoint: input.s3.endpoint?.trim() || null,
+          s3AccessKeyId: input.s3.accessKeyId?.trim() || null,
+          // Encrypted at rest, like every other stored credential — see printers.
+          s3SecretAccessKey: input.s3.secretAccessKey ? encryptSecret(input.s3.secretAccessKey) : null,
+          s3ForcePathStyle: input.s3.forcePathStyle ?? Boolean(input.s3.endpoint),
+          groupingMode: input.groupingMode,
+          groupingDepth: input.groupingDepth ?? null,
+          writeSidecar: input.writeSidecar,
+        })
+        .returning({ id: schema.libraries.id })
+
+      revalidatePath('/admin/libraries')
+      return { ok: true, data: { id: created!.id } }
+    }
 
     let path: string
 

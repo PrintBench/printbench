@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '@pm/db'
-import { LocalAdapter, S3Adapter, scanLibrary, type LibraryLocation } from '@pm/core'
+import { createStorageAdapter, libraryLocationFromRow, scanLibrary, type LibraryLocation } from '@pm/core'
 import type { JobPayload } from '@pm/jobs'
 import { JOB, getQueue } from '@pm/jobs'
 
@@ -33,8 +33,8 @@ export async function handleLibraryScan(payload: JobPayload<typeof JOB.librarySc
     return
   }
 
-  const location = toLocation(library)
-  const storage = createAdapter(location)
+  const location = libraryLocationFromRow(library)
+  const storage = createStorageAdapter(location)
 
   console.log(`[scan] starting ${payload.mode} scan of "${library.name}"`)
   const started = Date.now()
@@ -96,30 +96,3 @@ export async function handleLibraryScan(payload: JobPayload<typeof JOB.librarySc
   await getQueue().send(JOB.healthDetect, { libraryId: library.id, skipCosmetic: false })
 }
 
-function toLocation(library: typeof schema.libraries.$inferSelect): LibraryLocation {
-  return {
-    id: library.id,
-    kind: library.kind,
-    backend: library.backend,
-    allowWrites: library.allowWrites,
-    path: library.path,
-    s3Bucket: library.s3Bucket,
-    s3Prefix: library.s3Prefix,
-    s3Endpoint: library.s3Endpoint,
-    s3Region: library.s3Region,
-    s3AccessKeyId: library.s3AccessKeyId,
-    s3SecretAccessKey: library.s3SecretAccessKey,
-    s3ForcePathStyle: library.s3ForcePathStyle,
-  }
-}
-
-function createAdapter(location: LibraryLocation) {
-  switch (location.backend) {
-    case 'local':
-      return new LocalAdapter(location)
-    case 's3':
-      return new S3Adapter(location)
-    default:
-      throw new Error(`Unknown storage backend: ${String(location.backend)}`)
-  }
-}
