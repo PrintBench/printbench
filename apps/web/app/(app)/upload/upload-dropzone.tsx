@@ -201,6 +201,8 @@ export function UploadDropzone({ targets }: { targets: UploadTarget[] }) {
         <p className="text-sm font-medium">Drop files or folders here</p>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
           Folder structure is kept, so a model with its own stl and images folders stays together.
+          A .zip is extracted rather than stored whole, so a downloaded pack unpacks straight into
+          its own folder.
         </p>
 
         <div className="mt-4 flex justify-center gap-2">

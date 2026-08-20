@@ -124,7 +124,9 @@ web shell is replaceable without touching the app.
   covered by tests, not just intent.
 - **Uploads are resumable** (tus), handled by the worker so a multi-gigabyte
   transfer never occupies the web tier. Folder structure from a drag-and-drop
-  is preserved, because that structure is what groups files into models.
+  is preserved, because that structure is what groups files into models. A
+  `.zip` is extracted server-side rather than stored whole, with a zip-slip
+  guard on every entry, so a downloaded pack can be dropped in as one file.
 - **Scanning refuses to destroy metadata.** If a scan would mark more than 20% of
   models missing — an unmounted NAS, say — it aborts and asks an admin. The
   nightly prune additionally refuses to touch a library where *every* model is

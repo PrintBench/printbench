@@ -6,8 +6,18 @@ import { eq } from 'drizzle-orm'
 import { Server } from '@tus/server'
 import { FileStore } from '@tus/file-store'
 import { getDb, schema } from '@pm/db'
-import { isSafeRelativePath, normalizePath, isIgnoredName, isIndexable } from '@pm/core'
+import {
+  dirname,
+  extensionOf,
+  isSafeRelativePath,
+  normalizePath,
+  isIgnoredName,
+  isIndexable,
+  joinPath,
+  stemOf,
+} from '@pm/core'
 import { JOB, getQueue } from '@pm/jobs'
+import { extractZipIntoLibrary, ZipIngestError } from './zip-ingest'
 
 /**
  * Resumable uploads, via the tus protocol.
@@ -22,6 +32,10 @@ import { JOB, getQueue } from '@pm/jobs'
  *
  * Files land in a staging directory first and are moved into the library only
  * once complete, so a half-uploaded mesh is never visible to a scan.
+ *
+ * A .zip is the one exception to "moved as-is": it is extracted rather than
+ * stored whole, via zip-ingest.ts. Everything else — resumability, the staging
+ * directory, the scan trigger on completion — is identical either way.
  */
 
 const UPLOAD_TOKEN_TTL_MS = 6 * 60 * 60 * 1000
@@ -182,6 +196,39 @@ async function ingest(
     return
   }
 
+  const staged = path.join(stagingDir, uploadId)
+
+  /*
+   * A zip is unpacked, never stored whole — nobody can browse into an opaque
+   * archive sitting in their library, and this is the only way to bulk-upload
+   * a Thingiverse-style download or an existing collection without unzipping
+   * it locally first. The extractor owns its own zip-slip guard; this call
+   * site only decides WHERE the result goes.
+   */
+  if (extensionOf(relativePath) === 'zip') {
+    const destRelativePath = joinPath(dirname(relativePath), stemOf(relativePath))
+    try {
+      const result = await extractZipIntoLibrary(staged, library.path, destRelativePath)
+      console.log(
+        `[upload] extracted ${result.filesExtracted} file(s) from ${relativePath} into "${library.name}"`,
+      )
+    } catch (error) {
+      const reason = error instanceof ZipIngestError ? error.message : String(error)
+      console.warn(`[upload] could not extract ${relativePath}: ${reason}`)
+      return
+    } finally {
+      await rm(staged, { force: true })
+      await rm(`${staged}.json`, { force: true })
+    }
+
+    await getQueue().send(
+      JOB.libraryScan,
+      { libraryId: library.id, mode: 'fast', force: false },
+      { singletonKey: `scan:${library.id}` },
+    )
+    return
+  }
+
   const destination = path.join(library.path, relativePath)
   const resolved = path.resolve(destination)
   const root = path.resolve(library.path)
@@ -195,7 +242,6 @@ async function ingest(
 
   await mkdir(path.dirname(resolved), { recursive: true })
 
-  const staged = path.join(stagingDir, uploadId)
   try {
     await rename(staged, resolved)
   } catch (error) {
