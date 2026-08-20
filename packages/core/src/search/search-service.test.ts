@@ -243,6 +243,48 @@ describeDb('searchModels', () => {
     })
   })
 
+  /*
+   * The relevance suite proper: real queries someone would type, checked
+   * against the top 3 results rather than rank 1. Top-3 is the honest bar —
+   * two dragons legitimately tie on "loot studios dragon", and asserting a
+   * single winner there would make the suite fail on the next tied query
+   * rather than on an actual regression. What must never happen is the
+   * expected model falling out of the visible results entirely.
+   */
+  describe('relevance suite', () => {
+    const cases: [string, string][] = [
+      ['red dragon', 'Red Dragon Miniature'],
+      ['blue dragon', 'Blue Dragon Wyrmling'],
+      ['troll', 'Forest Troll'],
+      ['benchy', 'Benchy'],
+      ['cable clip', 'Cable Clip'],
+      ['hinged box', 'Hinged Storage Box'],
+      ['bridge', 'Stone Bridge Terrain'],
+      ['pokemon', 'Pokémon Gym Playset'],
+      ['wyrmling', 'Blue Dragon Wyrmling'],
+      ['storage', 'Hinged Storage Box'],
+      ['playset', 'Pokémon Gym Playset'],
+      ['dragon miniature', 'Red Dragon Miniature'],
+      ['loot studios dragon', 'Red Dragon Miniature'],
+      ['functional prints clip', 'Cable Clip'],
+      ['terrain', 'Stone Bridge Terrain'],
+      ['beast', 'Beast Mount'],
+      ['gym', 'Pokémon Gym Playset'],
+      ['box', 'Hinged Storage Box'],
+      ['clip', 'Cable Clip'],
+      ['mount', 'Beast Mount'],
+      ['benchi', 'Benchy'],
+      ['draggon', 'Red Dragon Miniature'],
+    ]
+
+    for (const [query, expected] of cases) {
+      it(`"${query}" places ${expected} in the top 3`, async () => {
+        const result = await names({ query })
+        expect(result.slice(0, 3), `got: ${result.join(', ')}`).toContain(expected)
+      })
+    }
+  })
+
   describe('filters', () => {
     it('filters by library', async () => {
       const result = await names({ libraryIds: [LIB_B] })
