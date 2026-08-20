@@ -194,27 +194,28 @@ export async function createSlicerLinks(fileId: string): Promise<SlicerLinks> {
     const { token, expires } = signToken(secret, 'file', fileId, SLICER_TOKEN_TTL_MS)
 
     /*
-     * Handed over as 3MF, at a URL ending in ".3mf".
+     * Handed over as a 3MF, at a URL whose LAST PATH SEGMENT is a clean
+     * filename, with nothing in the query string.
      *
-     * Bambu Studio's URL handler checks the extension BEFORE downloading:
+     * Two separate Bambu Studio behaviours force this shape:
      *
+     * It checks the extension before downloading —
      *   if (!extension.Contains(".3mf") && !extension.Contains(".3MF")) {
      *     msg = _L("Download failed, unknown file format."); return; }
+     * so the path has to end in .3mf and what arrives has to be one.
      *
-     * so a link to an STL is refused without a single request reaching us,
-     * however correct the file and its headers are. Converting on the way out
-     * is the only thing that makes this work, and every other slicer reads 3MF
-     * too — so one URL serves them all.
-     *
-     * Only the last path segment, because a file inside a model folder has a
-     * filename like "stl/body.stl" and the slashes would change the path.
+     * And it names the downloaded file after the last path segment. With the
+     * signature in a query string that segment is "Model.3mf?token=...", and
+     * `?` and `&` are illegal in Windows filenames — the transfer reports
+     * "Project downloaded 100%" and then nothing loads, because the file could
+     * never be written under that name. So the signature rides in the path
+     * instead.
      */
     const leaf = (file.filename.split('/').pop() ?? 'model').replace(/\.[^.]+$/, '')
-    const name = encodeURIComponent(`${leaf || 'model'}.3mf`)
+    const name = encodeURIComponent(`${safeFilename(leaf)}.3mf`)
 
     const fileUrl =
-      `${origin.replace(/\/+$/, '')}/api/files/${fileId}/slicer/${name}` +
-      `?token=${token}&expires=${expires}`
+      `${origin.replace(/\/+$/, '')}/api/files/${fileId}/slicer/${expires}-${token}/${name}`
 
     return {
       ok: true,
@@ -232,6 +233,28 @@ export async function createSlicerLinks(fileId: string): Promise<SlicerLinks> {
     return { ok: false, error: describe(error, 'Could not prepare the slicer link.') }
   }
 }
+
+/**
+ * A name a desktop application can safely write to disk.
+ *
+ * The slicer saves the download under this, so anything Windows refuses in a
+ * filename has to go — otherwise the transfer succeeds and the save quietly
+ * does not.
+ */
+function safeFilename(name: string): string {
+  const cleaned = [...name]
+    .map((char) => (ILLEGAL_IN_FILENAME.test(char) || char < ' ' ? '_' : char))
+    .join('')
+    // Windows silently strips a trailing dot or space, so a name ending in one
+    // is saved under a different name than the one requested.
+    .replace(/[. ]+$/, '')
+    .trim()
+
+  return cleaned.slice(0, 100) || 'model'
+}
+
+/** The characters Windows refuses outright. POSIX only objects to "/". */
+const ILLEGAL_IN_FILENAME = /[<>:"/\\|?*]/
 
 async function originFromRequest(): Promise<string | null> {
   const headerList = await headers()

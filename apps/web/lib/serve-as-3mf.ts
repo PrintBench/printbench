@@ -33,12 +33,17 @@ import { getDb, schema } from '@pm/db'
 /** Converting holds the whole mesh in memory, so this is not for a 2GB scan. */
 const MAX_SOURCE_BYTES = 256 * 1024 * 1024
 
-export async function serveAs3mf(request: Request, fileId: string): Promise<Response> {
+export async function serveAs3mf(
+  request: Request,
+  fileId: string,
+  /** "<expires>-<token>" when the signature travels in the path. */
+  credential?: string,
+): Promise<Response> {
   if (!/^[0-9a-f-]{36}$/i.test(fileId)) return new Response('Not found', { status: 404 })
 
   // Same two ways in as the raw route: a session, or a signed link — the
   // slicer is a separate application with none of our cookies.
-  if (!(await isAuthorised(request, fileId))) {
+  if (!(await isAuthorised(request, fileId, credential))) {
     return new Response('Not permitted', { status: 403 })
   }
 
@@ -142,14 +147,33 @@ export async function serveAs3mf(request: Request, fileId: string): Promise<Resp
   }
 }
 
-async function isAuthorised(request: Request, fileId: string): Promise<boolean> {
+async function isAuthorised(
+  request: Request,
+  fileId: string,
+  credential?: string,
+): Promise<boolean> {
+  const secret = process.env.BETTER_AUTH_SECRET
   const url = new URL(request.url)
-  const token = url.searchParams.get('token')
 
-  if (token) {
-    const secret = process.env.BETTER_AUTH_SECRET
+  /*
+   * From the path first. The hyphen splits on the FIRST one only: the expiry
+   * is decimal digits and the token is hex, so neither contains one, but
+   * splitting greedily would break the moment either changed encoding.
+   */
+  if (secret && credential) {
+    const divider = credential.indexOf('-')
+    if (divider > 0) {
+      const expires = Number(credential.slice(0, divider))
+      const token = credential.slice(divider + 1)
+      if (verifyToken(secret, 'file', fileId, token, expires)) return true
+    }
+  }
+
+  // The query-string form, still used by anything built before the path form.
+  const queryToken = url.searchParams.get('token')
+  if (secret && queryToken) {
     const expires = Number(url.searchParams.get('expires'))
-    if (secret && verifyToken(secret, 'file', fileId, token, expires)) return true
+    if (verifyToken(secret, 'file', fileId, queryToken, expires)) return true
   }
 
   const user = await getSessionUser()
