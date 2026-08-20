@@ -65,10 +65,10 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
     title: 'Browse',
     items: [
-      { href: '/creators', label: 'Creators', icon: 'users', soon: true },
-      { href: '/collections', label: 'Collections', icon: 'folder', soon: true },
-      { href: '/tags', label: 'Tags', icon: 'tags', soon: true },
-      { href: '/lists', label: 'Liked', icon: 'heart', soon: true },
+      { href: '/creators', label: 'Creators', icon: 'users' },
+      { href: '/collections', label: 'Collections', icon: 'folder' },
+      { href: '/tags', label: 'Tags', icon: 'tags' },
+      { href: '/lists', label: 'Liked', icon: 'heart' },
       { href: '/prints', label: 'Print history', icon: 'history' },
     ],
   },

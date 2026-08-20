@@ -166,6 +166,24 @@ web shell is replaceable without touching the app.
   ("Could not resolve …", "The printer rejected the API key") rather than
   "fetch failed".
 
+## Browsing
+
+Beyond search there are four ways in, all reachable from the sidebar:
+
+- **Creators** — who made what, with everything of theirs you own.
+- **Tags** — with the management that keeps them usable: rename, recolour,
+  delete, and **merge**, which is the one that matters. Tags arrive from
+  filenames, sidecars and typing, so a library reliably grows "dragon",
+  "Dragon" and "dragons" meaning the same thing.
+- **Collections** — nestable, because a Kickstarter pledge is genuinely a
+  collection of collections. A model can be in as many as you like, and
+  deleting one never touches the models or the collections inside it.
+- **Liked** — a private per-user list. Press the heart on any model.
+
+Counts everywhere exclude models missing from disk: a creator page promising
+forty models when eight are on an unplugged drive sends you looking for
+something that is not there.
+
 ## Library health
 
 `/admin/health` reports nine kinds of problem — missing files, empty folders,

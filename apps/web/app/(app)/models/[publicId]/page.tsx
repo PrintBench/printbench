@@ -9,7 +9,10 @@ import { getSessionUser } from '@pm/auth'
 import {
   can,
   canSendToPrinter,
+  collectionsForModel,
   getSettings,
+  isLiked,
+  listCollections,
   listPrints,
   printStats,
   printSuggestions,
@@ -27,6 +30,8 @@ import { OpenInSlicer } from './open-in-slicer'
 import { SendToPrinter } from './send-to-printer'
 import { PrintHistory } from './print-history'
 import { ShareButton } from './share-button'
+import { LikeButton } from './like-button'
+import { CollectionPicker } from './collection-picker'
 
 export const dynamic = 'force-dynamic'
 
@@ -134,12 +139,17 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const canLogPrints = can(policyUser, 'print:log')
   const canSend = can(policyUser, 'printhost:send')
 
-  const [prints, stats, suggestions, settings] = await Promise.all([
+  const [prints, stats, suggestions, settings, memberships, liked] = await Promise.all([
     listPrints(db, { modelId: model.id, limit: 50 }),
     printStats(db, model.id),
     printSuggestions(db),
     getSettings(db),
+    collectionsForModel(db, model.id),
+    user ? isLiked(db, user.id, model.id) : Promise.resolve(false),
   ])
+
+  const canCollect = can(policyUser, 'collection:edit')
+  const allCollections = canCollect ? await listCollections(db) : []
 
   // The largest rendered mesh represents the model, and its dimensions are the
   // ones worth showing — a support-only variant is not what people measure.
@@ -198,6 +208,14 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 <FileStack className="size-3" />
                 {model.file_count} files · {formatBytes(Number(model.total_size))}
               </Badge>
+              {user && <LikeButton publicId={model.public_id} liked={liked} />}
+              {canCollect && (
+                <CollectionPicker
+                  publicId={model.public_id}
+                  collections={allCollections.map((c) => ({ id: c.id, name: c.name }))}
+                  memberOf={memberships.map((c) => c.id)}
+                />
+              )}
               {settings.publicSharing && canEdit && (
                 <ShareButton
                   publicId={model.public_id}
@@ -396,6 +414,25 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 </div>
               )}
 
+              {memberships.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Collections
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {memberships.map((collection) => (
+                      <Link
+                        key={collection.id}
+                        href={`/collections/${collection.slug}` as Route}
+                        className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                      >
+                        {collection.name}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {tags.length > 0 && (
                 <div>
                   <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
@@ -403,12 +440,13 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {tags.map((tag) => (
-                      <span
+                      <Link
                         key={tag}
-                        className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-[var(--color-ink-muted)]"
+                        href={`/search?q=${encodeURIComponent(tag)}` as Route}
+                        className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
                       >
                         {tag}
-                      </span>
+                      </Link>
                     ))}
                   </div>
                 </div>
