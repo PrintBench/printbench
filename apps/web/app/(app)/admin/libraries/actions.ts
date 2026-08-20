@@ -6,7 +6,7 @@ import { LocalAdapter, groupModels, slugify, walkLibrary, type LibraryLocation }
 import { assertCan, cronProblem, PolicyError } from '@pm/core'
 import { requireUser } from '@pm/auth'
 import { getDb, schema } from '@pm/db'
-import { getQueue, JOB } from '@pm/jobs'
+import { getStartedQueue, JOB } from '@pm/jobs'
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string }
 
@@ -200,9 +200,16 @@ export async function triggerScan(
     const user = await requireUser()
     assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'scan:trigger')
 
-    // `stately` policy plus this key means repeated presses collapse instead of
-    // queueing a scan each time.
-    await getQueue().send(
+    /*
+     * getStartedQueue, not getQueue. The web process never boots the queue
+     * itself — it only sends — so an unstarted singleton threw here and the
+     * catch below reported it as "could not queue the scan".
+     *
+     * `stately` policy plus this key means repeated presses collapse instead of
+     * queueing a scan each time.
+     */
+    const queue = await getStartedQueue()
+    await queue.send(
       JOB.libraryScan,
       { libraryId, mode: options.mode ?? 'fast', force: options.force ?? false },
       { singletonKey: `scan:${libraryId}` },
@@ -212,7 +219,10 @@ export async function triggerScan(
     return { ok: true }
   } catch (error) {
     if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
-    return { ok: false, error: 'Could not queue the scan.' }
+    // Logged, because swallowing this is how the queue never being started
+    // stayed invisible.
+    console.error('[scan] could not enqueue:', error)
+    return { ok: false, error: 'Could not queue the scan. Check the worker logs.' }
   }
 }
 

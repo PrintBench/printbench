@@ -22,6 +22,8 @@ export type JobHandler<N extends JobName> = (payload: JobPayload<N>) => Promise<
 export class JobQueue {
   private boss: PgBoss
   private started = false
+  /** In-flight start, so concurrent callers await one bootstrap, not several. */
+  private starting: Promise<void> | undefined
 
   constructor(options: QueueOptions = {}) {
     const connectionString = options.connectionString ?? process.env.DATABASE_URL
@@ -41,6 +43,22 @@ export class JobQueue {
 
   async start(): Promise<void> {
     if (this.started) return
+    /*
+     * Two server actions arriving together would otherwise both bootstrap
+     * pg-boss and both run createQueue for every job name. Harmless but slow,
+     * and it makes the logs look like something is wrong.
+     */
+    if (this.starting) return this.starting
+
+    this.starting = this.bootstrap()
+    try {
+      await this.starting
+    } finally {
+      this.starting = undefined
+    }
+  }
+
+  private async bootstrap(): Promise<void> {
     await this.boss.start()
     /*
      * Queues must exist before work can be sent to them.
@@ -165,4 +183,20 @@ let shared: JobQueue | undefined
 export function getQueue(): JobQueue {
   shared ??= new JobQueue()
   return shared
+}
+
+/**
+ * The shared queue, started.
+ *
+ * The worker starts the queue during boot because it also consumes. The web
+ * process only ever sends, has no boot step of its own, and so had no obvious
+ * place to start it — which meant every enqueue from a server action threw and
+ * was reported as a generic failure. Any web-tier caller should use this.
+ *
+ * start() is idempotent and races safely, so the cost is paid once per process.
+ */
+export async function getStartedQueue(): Promise<JobQueue> {
+  const queue = getQueue()
+  await queue.start()
+  return queue
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import { JOB } from './names'
-import { JobQueue } from './queue'
+import { JobQueue, getQueue, getStartedQueue } from './queue'
 
 /**
  * Proves the queue actually round-trips through Postgres. Everything in phase 2
@@ -141,5 +141,49 @@ describe('JobQueue lifecycle', () => {
       idle.send(JOB.fileDigest, { fileId: '11111111-1111-4111-8111-111111111111' }),
     ).rejects.toThrow(/not been started/i)
     await expect(idle.sendMany(JOB.fileDigest, [])).rejects.toThrow(/not been started/i)
+  })
+
+  it('starts only once, however many callers arrive together', async () => {
+    // Two server actions landing at the same moment must not both bootstrap
+    // pg-boss and re-run createQueue for every job name.
+    const queue = new JobQueue({ connectionString: url, schema: 'pgboss_test' })
+    await Promise.all([queue.start(), queue.start(), queue.start()])
+
+    await expect(
+      queue.send(JOB.fileDigest, { fileId: '22222222-2222-4222-8222-222222222222' }),
+    ).resolves.toBeTruthy()
+
+    await queue.stop()
+  }, 120_000)
+})
+
+/*
+ * Regression, and the more expensive one: the web process only ever sends and
+ * has no boot step, so nothing started the shared queue. Every enqueue from a
+ * server action threw and was reported to the user as a generic failure — the
+ * Scan button could not work at all.
+ */
+describeDb('getStartedQueue', () => {
+  /*
+   * Proved with stats() rather than send(): this touches the real job schema,
+   * and enqueuing a job for a file id that does not exist would leave the
+   * running worker something broken to chew on.
+   */
+  it('returns a queue that is actually started', async () => {
+    const queue = await getStartedQueue()
+    await expect(queue.stats(JOB.fileDigest)).resolves.toHaveProperty('queued')
+  }, 120_000)
+
+  it('hands back the same instance as getQueue', async () => {
+    expect(await getStartedQueue()).toBe(getQueue())
+  })
+
+  it('is safe to call repeatedly', async () => {
+    const [a, b] = await Promise.all([getStartedQueue(), getStartedQueue()])
+    expect(a).toBe(b)
+  })
+
+  afterAll(async () => {
+    await getQueue().stop()
   })
 })
