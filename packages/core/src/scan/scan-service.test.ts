@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
@@ -400,6 +400,166 @@ describeDb('scanLibrary', () => {
 
     it('threshold is the documented value', () => {
       expect(MASS_DISAPPEARANCE_THRESHOLD).toBe(0.2)
+    })
+  })
+
+  describe('folder renames', () => {
+    async function modelId(modelPath: string): Promise<string | undefined> {
+      const row = await db.execute<{ id: string }>(
+        sql`SELECT id FROM models WHERE path = ${modelPath} AND library_id = ${LIBRARY_ID}`,
+      )
+      return row.rows[0]?.id
+    }
+
+    it('keeps the same row when a model folder is renamed', async () => {
+      await scan()
+      const before = await modelId('Terrain/Bridge')
+
+      await rename(
+        path.join(root, 'Terrain', 'Bridge'),
+        path.join(root, 'Terrain', 'Overpass'),
+      )
+      const outcome = await scan()
+
+      expect(outcome.modelsRenamed).toBe(1)
+      expect(outcome.modelsCreated).toBe(0)
+      expect(outcome.modelsMissing).toBe(0)
+      expect(await missingModelCount()).toBe(0)
+
+      const after = await modelId('Terrain/Overpass')
+      expect(after).toBe(before)
+      expect((await liveModels()).map((m) => m.path)).not.toContain('Terrain/Bridge')
+    })
+
+    it('keeps the same row when a model folder moves to a different parent', async () => {
+      await scan()
+      const before = await modelId('Dragons/Blue Dragon')
+
+      await rename(
+        path.join(root, 'Dragons', 'Blue Dragon'),
+        path.join(root, 'Terrain', 'Blue Dragon'),
+      )
+      const outcome = await scan()
+
+      expect(outcome.modelsRenamed).toBe(1)
+      const after = await modelId('Terrain/Blue Dragon')
+      expect(after).toBe(before)
+    })
+
+    it('preserves tags, notes and print history across the rename', async () => {
+      await scan()
+      const id = await modelId('Terrain/Bridge')
+      await db.execute(sql`
+        INSERT INTO tags (name, slug) VALUES ('scenery', 'scenery-fx')
+        ON CONFLICT (slug) DO NOTHING`)
+      await db.execute(sql`
+        INSERT INTO model_tags (model_id, tag_id)
+        SELECT ${id}, id FROM tags WHERE slug = 'scenery-fx'`)
+      await db.execute(sql`UPDATE models SET notes = 'hand written' WHERE id = ${id}`)
+      await db.execute(sql`INSERT INTO print_runs (model_id, status) VALUES (${id}, 'success')`)
+
+      await rename(
+        path.join(root, 'Terrain', 'Bridge'),
+        path.join(root, 'Terrain', 'Overpass'),
+      )
+      await scan()
+
+      const row = await db.execute<{ notes: string; tag_count: number; print_count: number }>(sql`
+        SELECT m.notes,
+          (SELECT count(*)::int FROM model_tags WHERE model_id = m.id) AS tag_count,
+          (SELECT count(*)::int FROM print_runs WHERE model_id = m.id) AS print_count
+        FROM models m WHERE m.id = ${id}`)
+      expect(row.rows[0]?.notes).toBe('hand written')
+      expect(row.rows[0]?.tag_count).toBe(1)
+      expect(row.rows[0]?.print_count).toBe(1)
+    })
+
+    it('preserves thumbnail and analysis state on the unmoved files', async () => {
+      await scan()
+      await db.execute(sql`
+        UPDATE model_files SET digest = 'known-digest', thumb_state = 'ok', thumb_key = 'ab/cd/known.webp',
+          analysis_state = 'ok'
+        FROM models m WHERE m.id = model_files.model_id AND m.path = 'Terrain/Bridge'`)
+
+      await rename(
+        path.join(root, 'Terrain', 'Bridge'),
+        path.join(root, 'Terrain', 'Overpass'),
+      )
+      await scan()
+
+      // The file's own relative path never changed — only its model's — so
+      // nothing about it should have been touched, let alone reset to pending.
+      const file = await db.execute<{ thumb_state: string; digest: string | null }>(sql`
+        SELECT f.thumb_state, f.digest FROM model_files f
+        JOIN models m ON m.id = f.model_id WHERE m.path = 'Terrain/Overpass'`)
+      expect(file.rows[0]?.thumb_state).toBe('ok')
+      expect(file.rows[0]?.digest).toBe('known-digest')
+    })
+
+    it('does not fold an ambiguous rename between two identical-looking models', async () => {
+      await rm(root, { recursive: true, force: true })
+      await mkdir(path.join(root, 'Spares', 'Screw'), { recursive: true })
+      await mkdir(path.join(root, 'Spares', 'Bolt'), { recursive: true })
+      // Same filename, same size, in two different models — indistinguishable
+      // by fingerprint alone.
+      await writeFile(path.join(root, 'Spares', 'Screw', 'item.stl'), 'x'.repeat(50))
+      await writeFile(path.join(root, 'Spares', 'Bolt', 'item.stl'), 'x'.repeat(50))
+      await scan()
+
+      // Both renamed away in the same pass, so both are "missing" candidates
+      // with the identical fingerprint when the new folder is scanned.
+      await rename(path.join(root, 'Spares', 'Screw'), path.join(root, 'Spares', 'Screw v2'))
+      await rename(path.join(root, 'Spares', 'Bolt'), path.join(root, 'Spares', 'Washer'))
+      const outcome = await scan()
+
+      // Refused to guess: nothing folded, both old rows missing, both new
+      // folders created as their own models.
+      expect(outcome.modelsRenamed).toBe(0)
+      expect(outcome.modelsMissing).toBe(2)
+      expect(outcome.modelsCreated).toBe(2)
+    })
+
+    it('does not attempt to fold a loose file model', async () => {
+      await scan()
+      const before = await modelId('benchy.stl')
+
+      await rename(path.join(root, 'benchy.stl'), path.join(root, 'boat.stl'))
+      const outcome = await scan()
+
+      // Shows up as one missing, one created — same as any other file rename
+      // before the digest job has a chance to fold it, which is the existing,
+      // separately-tested behaviour for loose files.
+      expect(outcome.modelsRenamed).toBe(0)
+      expect(outcome.modelsMissing).toBe(1)
+      expect(outcome.modelsCreated).toBe(1)
+      const after = await modelId('boat.stl')
+      expect(after).not.toBe(before)
+    })
+
+    it('does not fold onto a model the user has removed', async () => {
+      await scan()
+      const bridgeId = await modelId('Terrain/Bridge')
+
+      await db.execute(sql`
+        INSERT INTO model_exclusions (library_id, path, name)
+        VALUES (${LIBRARY_ID}, 'Terrain/Overpass', 'Overpass')`)
+
+      await rename(
+        path.join(root, 'Terrain', 'Bridge'),
+        path.join(root, 'Terrain', 'Overpass'),
+      )
+      const outcome = await scan()
+
+      expect(outcome.modelsRenamed).toBe(0)
+      // The old row is simply missing, not silently relocated onto a path the
+      // user asked never to be indexed.
+      expect(await missingModelCount()).toBeGreaterThanOrEqual(1)
+      const stillBridge = await db.execute<{ path: string }>(
+        sql`SELECT path FROM models WHERE id = ${bridgeId}`,
+      )
+      expect(stillBridge.rows[0]?.path).toBe('Terrain/Bridge')
+
+      await db.execute(sql`DELETE FROM model_exclusions WHERE library_id = ${LIBRARY_ID}`)
     })
   })
 

@@ -11,7 +11,7 @@
  * the library looks empty and every model appears deleted.
  */
 
-import { and, eq, isNull, lt, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { excludedPaths } from '../services/delete-service'
 import type { Database } from '@pm/db'
@@ -74,6 +74,8 @@ export interface ScanOutcome {
   modelsExcluded: number
   modelsUpdated: number
   modelsMissing: number
+  /** A model whose folder moved or was renamed, recognised by its files rather than re-created. */
+  modelsRenamed: number
   filesCreated: number
   filesMissing: number
   /** Files handed to the derived-work queue. */
@@ -111,6 +113,7 @@ export async function scanLibrary(
     modelsExcluded: 0,
     modelsUpdated: 0,
     modelsMissing: 0,
+    modelsRenamed: 0,
     filesCreated: 0,
     filesMissing: 0,
     filesQueued: 0,
@@ -202,6 +205,18 @@ export async function scanLibrary(
     if (excluded.size > 0) {
       outcome.modelsExcluded = grouped.models.filter((model) => excluded.has(model.path)).length
     }
+
+    /*
+     * Folder renames and moves, resolved before a single model gets created or
+     * marked missing. Unlike a file rename, this needs no digest and no second
+     * pass: a model's files carry paths relative to the model's OWN directory,
+     * so renaming or moving that directory changes nothing about them. The
+     * model row's `path` column is the only thing that goes stale, and a full
+     * set of (filename, size) pairs is already a much stronger signal than any
+     * single file — matching wrongly would need a coincidental byte-for-byte
+     * duplicate of an entire model under a different name, not just one file.
+     */
+    outcome.modelsRenamed = await foldRenamedModels(db, library.id, grouped.models, excluded)
 
     const touchedModelIds: string[] = []
     for (const model of grouped.models) {
@@ -442,6 +457,107 @@ async function upsertFiles(
 function extensionFrom(filename: string): string {
   const dot = filename.lastIndexOf('.')
   return dot > 0 ? filename.slice(dot + 1).toLowerCase() : ''
+}
+
+/**
+ * Recognises a renamed or moved model folder by its files, and updates its
+ * `path` in place so the ordinary upsert below finds it and treats it as the
+ * model it already is — with the same id, tags, notes, creator, licence,
+ * print history and collections it had before, none of it re-created from
+ * scratch under a fresh id.
+ *
+ * Deliberately skips `isFileModel`: a loose file's "folder" IS the file, so a
+ * rename there is a rename of the one file's own name — a fingerprint that is
+ * just that one file's size is exactly the low-confidence, easily-confused
+ * match the file-level rename detector in the worker refuses to attempt
+ * without a digest. Folder models get a much stronger signal for free (their
+ * whole file set), which is what makes doing this synchronously, during the
+ * scan itself, safe.
+ */
+async function foldRenamedModels(
+  db: Database,
+  libraryId: string,
+  models: GroupedModel[],
+  excluded: Set<string>,
+): Promise<number> {
+  const live = await db
+    .select({ id: schema.models.id, path: schema.models.path, isFileModel: schema.models.isFileModel })
+    .from(schema.models)
+    .where(and(eq(schema.models.libraryId, libraryId), isNull(schema.models.missingAt)))
+
+  const seenPaths = new Set(models.map((model) => model.path))
+  const knownPaths = new Set(live.map((row) => row.path))
+
+  // About to be marked missing this scan, unless one of them turns out to be
+  // the other side of a rename found below.
+  const missing = live.filter((row) => !row.isFileModel && !seenPaths.has(row.path))
+  if (missing.length === 0) return 0
+
+  const missingFiles = await db
+    .select({
+      modelId: schema.modelFiles.modelId,
+      filename: schema.modelFiles.filename,
+      size: schema.modelFiles.size,
+    })
+    .from(schema.modelFiles)
+    .where(
+      and(
+        inArray(schema.modelFiles.modelId, missing.map((row) => row.id)),
+        isNull(schema.modelFiles.missingAt),
+      ),
+    )
+
+  const filesByModel = new Map<string, { filename: string; size: number }[]>()
+  for (const file of missingFiles) {
+    const bucket = filesByModel.get(file.modelId) ?? []
+    bucket.push({ filename: file.filename, size: file.size })
+    filesByModel.set(file.modelId, bucket)
+  }
+
+  // Fingerprint -> the one missing model with it. A bucket that would gain a
+  // second entry is deleted instead: two different models with an identical
+  // file set is a coincidence too risky to guess between, so neither is
+  // matched rather than picking one arbitrarily.
+  const byFingerprint = new Map<string, string | null>()
+  for (const row of missing) {
+    const fingerprint = fingerprintOf(filesByModel.get(row.id) ?? [])
+    if (!fingerprint) continue
+    byFingerprint.set(fingerprint, byFingerprint.has(fingerprint) ? null : row.id)
+  }
+
+  let renamed = 0
+  for (const model of models) {
+    if (model.isFileModel) continue
+    if (knownPaths.has(model.path)) continue // an existing model, not a new one
+    if (excluded.has(model.path)) continue // the user removed whatever lands here
+
+    const prefix = `${model.path}/`
+    const fingerprint = fingerprintOf(
+      model.files.map((file) => ({
+        filename: file.path.startsWith(prefix) ? file.path.slice(prefix.length) : basename(file.path),
+        size: file.size,
+      })),
+    )
+    if (!fingerprint) continue
+
+    const modelId = byFingerprint.get(fingerprint)
+    if (!modelId) continue // no candidate, or the match was ambiguous
+
+    await db.update(schema.models).set({ path: model.path }).where(eq(schema.models.id, modelId))
+    byFingerprint.delete(fingerprint) // claimed, so it cannot also match a second folder
+    renamed++
+  }
+
+  return renamed
+}
+
+/** A stable identity for a model's contents: every (filename, size) pair, sorted. */
+function fingerprintOf(files: { filename: string; size: number }[]): string {
+  if (files.length === 0) return ''
+  return files
+    .map((file) => `${file.filename} ${file.size}`)
+    .sort()
+    .join('\n')
 }
 
 /** Denormalised counts and the preview pick, both used by the grid. */

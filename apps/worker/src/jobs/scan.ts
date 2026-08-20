@@ -76,8 +76,8 @@ export async function handleLibraryScan(payload: JobPayload<typeof JOB.librarySc
   console.log(
     `[scan] finished "${library.name}" in ${seconds}s — ` +
       `${outcome.modelsCreated} new, ${outcome.modelsUpdated} updated, ` +
-      `${outcome.modelsMissing} missing, ${outcome.filesSeen} files seen, ` +
-      `${outcome.filesQueued} queued for rendering`,
+      `${outcome.modelsRenamed} renamed, ${outcome.modelsMissing} missing, ` +
+      `${outcome.filesSeen} files seen, ${outcome.filesQueued} queued for rendering`,
   )
 
   if (outcome.errors.length > 0) {
