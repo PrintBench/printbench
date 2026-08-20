@@ -8,7 +8,7 @@ import {
   verifyToken,
   type LibraryLocation,
 } from '@pm/core'
-import { readObj, readPly, readStl, readThreeMf, writeThreeMf } from '@pm/mesh/parse'
+import { readObj, readPly, readStl, writeThreeMf } from '@pm/mesh/parse'
 import { getDb, schema } from '@pm/db'
 
 /**
@@ -78,6 +78,27 @@ export async function serveAs3mf(request: Request, fileId: string): Promise<Resp
   const extension = row.file.extension.toLowerCase()
   const source = () => storage.createReadStream(relativePath) as Promise<Readable>
 
+  /*
+   * Already a 3MF: hand over the original bytes.
+   *
+   * Re-containerising would strip everything a project file carries beyond
+   * geometry — plates, painted supports, filament assignments, per-object
+   * settings — and hand back a bare mesh. The point of this route is to give
+   * the slicer something it will accept, and an untouched 3MF is both
+   * acceptable and better.
+   */
+  if (extension === '3mf') {
+    const filename = row.file.filename.split('/').pop() ?? 'model.3mf'
+    return new Response(Readable.toWeb(await source()) as ReadableStream, {
+      headers: {
+        'content-type': 'model/3mf',
+        'content-disposition': contentDisposition(filename, 'attachment'),
+        'content-length': String(info.size),
+        'cache-control': 'private, no-store',
+      },
+    })
+  }
+
   try {
     const converted = await writeThreeMf({
       each: async (visit) => {
@@ -91,13 +112,6 @@ export async function serveAs3mf(request: Request, fileId: string): Promise<Resp
           case 'ply':
             await readPly(source, visit)
             return
-          case '3mf': {
-            // Already a 3MF, but re-containerised so the caller gets one
-            // predictable shape whatever it asked about.
-            const buffer = await collect(await source())
-            readThreeMf(buffer, visit)
-            return
-          }
           default:
             throw new Error(`Cannot convert .${extension} to 3MF`)
         }
@@ -126,12 +140,6 @@ export async function serveAs3mf(request: Request, fileId: string): Promise<Resp
       { status: 422 },
     )
   }
-}
-
-async function collect(stream: Readable): Promise<Uint8Array> {
-  const chunks: Buffer[] = []
-  for await (const chunk of stream) chunks.push(chunk as Buffer)
-  return new Uint8Array(Buffer.concat(chunks))
 }
 
 async function isAuthorised(request: Request, fileId: string): Promise<boolean> {
