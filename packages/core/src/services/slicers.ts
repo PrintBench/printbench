@@ -35,7 +35,12 @@ export interface Slicer {
   label: string
   /** URL scheme the desktop application registers. */
   scheme: string
-  /** Extensions this slicer will accept. */
+  /**
+   * What this slicer opens natively.
+   *
+   * Documentation, and the 3MF check in slicersFor — it is NOT what decides
+   * which files get a link, because every hand-off is delivered as 3MF.
+   */
   accepts: readonly string[]
   /** Shown when the link does nothing, which means the app is not installed. */
   hint: string
@@ -79,9 +84,37 @@ export const SLICERS: readonly Slicer[] = [
   },
 ] as const
 
+/**
+ * Formats we can hand to a slicer.
+ *
+ * Not "what slicers can open" — what WE can deliver. Everything goes over as
+ * 3MF because Bambu Studio accepts nothing else, so the question is whether we
+ * can produce a 3MF from it: the four formats packages/mesh can read, one of
+ * which is already 3MF.
+ *
+ * STEP is deliberately absent. It is a CAD kernel format, and reading it would
+ * mean OpenCASCADE — the native dependency this project exists to avoid. A
+ * slicer may well open a STEP file happily; we simply cannot get it there.
+ */
+export const CONVERTIBLE_TO_3MF: readonly string[] = ['stl', '3mf', 'obj', 'ply']
+
+export function canOpenInSlicer(extension: string): boolean {
+  return CONVERTIBLE_TO_3MF.includes(extension.toLowerCase().replace(/^\./, ''))
+}
+
+/**
+ * Which slicers to offer for a file.
+ *
+ * Gated on whether we can deliver the file at all, not on each slicer's native
+ * format list. Those two came apart once everything started going over as 3MF:
+ * STEP was offered and could never be sent, while PLY was convertible and never
+ * offered. Showing a link that cannot work is worse than showing none.
+ */
 export function slicersFor(extension: string): Slicer[] {
-  const lower = extension.toLowerCase().replace(/^\./, '')
-  return SLICERS.filter((slicer) => slicer.accepts.includes(lower))
+  if (!canOpenInSlicer(extension)) return []
+  // Every slicer here reads 3MF, but check rather than assume, so adding one
+  // that does not cannot silently produce a broken link.
+  return SLICERS.filter((slicer) => slicer.accepts.includes('3mf'))
 }
 
 /**

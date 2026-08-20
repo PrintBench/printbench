@@ -137,8 +137,14 @@ web shell is replaceable without touching the app.
 - **Slicer hand-off converts to 3MF.** Bambu Studio's URL handler refuses any
   extension but `.3mf`, and checks *before* downloading — so a link to an STL
   fails without a request ever reaching the server. Meshes are repackaged as
-  3MF on the way out, which every other slicer reads too. Geometry is
-  preserved; colour on an OBJ or PLY is not, and the UI says so.
+  3MF on the way out, which every other slicer reads too. An existing 3MF is
+  passed through untouched, so a project keeps its plates and painted supports.
+  Geometry is preserved; colour on an OBJ or PLY is not, and the UI says so.
+- **The link only appears where it can work.** Because delivery is always 3MF,
+  the question is what *we* can convert (STL, OBJ, PLY, 3MF) rather than what
+  each slicer reads. STEP is the difference: slicers open it happily, we cannot
+  produce a 3MF from it without a CAD kernel, so no link is offered. The offer
+  and the converter share one list precisely so they cannot drift.
 - **Slicers are handed the file, not driven.** Every modern slicer registers a
   URL scheme, so `Open in…` covers Bambu Studio, Orca, PrusaSlicer, Cura and
   Lychee at once, and works for printers with no network API. This is also the

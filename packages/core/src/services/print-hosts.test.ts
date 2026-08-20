@@ -6,7 +6,14 @@ import {
   sendToPrinter,
   type PrintHostConfig,
 } from './print-hosts'
-import { SLICERS, isReachableByDesktop, slicerUrl, slicersFor } from './slicers'
+import {
+  CONVERTIBLE_TO_3MF,
+  SLICERS,
+  canOpenInSlicer,
+  isReachableByDesktop,
+  slicerUrl,
+  slicersFor,
+} from './slicers'
 
 /**
  * Printer adapters, against a stubbed fetch.
@@ -326,25 +333,63 @@ describe('errors people can act on', () => {
 })
 
 describe('slicer handoff', () => {
-  it('offers the slicers that accept a mesh', () => {
+  it('offers every slicer for a mesh we can deliver', () => {
+    // All of them read 3MF, and 3MF is what every hand-off is delivered as.
     const forStl = slicersFor('stl').map((s) => s.id)
     expect(forStl).toContain('bambustudio')
     expect(forStl).toContain('orcaslicer')
     expect(forStl).toContain('prusaslicer')
     expect(forStl).toContain('cura')
+    expect(forStl).toContain('lychee')
   })
 
-  it('offers only the slicers that accept a format', () => {
-    // Cura and Lychee do not read STEP.
-    const forStep = slicersFor('step').map((s) => s.id)
-    expect(forStep).toContain('prusaslicer')
-    expect(forStep).not.toContain('cura')
-    expect(forStep).not.toContain('lychee')
+  /*
+   * STEP is the case that made this rule necessary. Slicers read it, so it was
+   * offered — but delivery goes over as 3MF and we cannot produce one from a
+   * CAD kernel format, so every one of those links failed at the server. A
+   * link that cannot work is worse than no link.
+   */
+  it('offers nothing for a format it cannot convert, however well slicers read it', () => {
+    expect(slicersFor('step')).toEqual([])
+    expect(slicersFor('stp')).toEqual([])
+    expect(slicersFor('amf')).toEqual([])
+
+    expect(canOpenInSlicer('step')).toBe(false)
   })
 
-  it('offers nothing for a format no slicer opens', () => {
+  // The inverse: PLY converts perfectly and used to be offered by nobody,
+  // because no slicer lists it natively.
+  it('offers a format it can convert even when no slicer reads it natively', () => {
+    expect(slicersFor('ply').length).toBeGreaterThan(0)
+    expect(canOpenInSlicer('ply')).toBe(true)
+  })
+
+  it('passes an existing 3MF straight through', () => {
+    expect(slicersFor('3mf').length).toBeGreaterThan(0)
+  })
+
+  it('offers nothing for a file that is not a mesh at all', () => {
     expect(slicersFor('png')).toEqual([])
     expect(slicersFor('gcode')).toEqual([])
+    expect(slicersFor('')).toEqual([])
+  })
+
+  it('ignores a leading dot and case', () => {
+    expect(canOpenInSlicer('.STL')).toBe(true)
+    expect(slicersFor('.Obj').length).toBeGreaterThan(0)
+  })
+
+  /*
+   * The offer and the converter have to agree. They came apart once already,
+   * in both directions at the same time.
+   */
+  it('never offers a slicer for something the converter would refuse', () => {
+    for (const extension of ['step', 'stp', 'amf', 'gcode', 'png', 'zip']) {
+      expect(slicersFor(extension), extension).toEqual([])
+    }
+    for (const extension of CONVERTIBLE_TO_3MF) {
+      expect(slicersFor(extension).length, extension).toBeGreaterThan(0)
+    }
   })
 
   it('builds a handoff link with the file URL encoded', () => {

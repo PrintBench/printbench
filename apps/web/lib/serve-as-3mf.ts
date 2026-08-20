@@ -4,6 +4,7 @@ import { getSessionUser } from '@pm/auth'
 import {
   LocalAdapter,
   can,
+  canOpenInSlicer,
   contentDisposition,
   verifyToken,
   type LibraryLocation,
@@ -81,6 +82,16 @@ export async function serveAs3mf(
   }
 
   const extension = row.file.extension.toLowerCase()
+
+  /*
+   * The same gate the UI uses to decide whether to show a link at all, so the
+   * two cannot drift. They did once: STEP was offered and always failed here,
+   * while PLY converted fine and was never offered.
+   */
+  if (!canOpenInSlicer(extension)) {
+    return new Response(`Cannot hand a .${extension} file to a slicer`, { status: 415 })
+  }
+
   const source = () => storage.createReadStream(relativePath) as Promise<Readable>
 
   /*
@@ -118,6 +129,7 @@ export async function serveAs3mf(
             await readPly(source, visit)
             return
           default:
+            // Unreachable: canOpenInSlicer has already vetted the extension.
             throw new Error(`Cannot convert .${extension} to 3MF`)
         }
       },
