@@ -34,10 +34,17 @@ export async function setUserRole(userId: string, role: string): Promise<Result>
       }
     }
 
-    await db
+    const updated = await db
       .update(schema.user)
       .set({ role, updatedAt: new Date() })
       .where(and(eq(schema.user.id, userId), ne(schema.user.id, actor.id)))
+
+    /*
+     * An UPDATE matching nothing is not success. Without this the UI reports a
+     * role change that never happened — which is what you get when the account
+     * was removed in another tab.
+     */
+    if (updated.rowCount === 0) return { ok: false, error: 'That account no longer exists.' }
 
     revalidatePath('/admin/users')
     return { ok: true }

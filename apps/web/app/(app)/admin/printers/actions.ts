@@ -89,7 +89,12 @@ export async function updatePrintHost(id: string, input: PrintHostInput): Promis
       updates.credentials = input.apiKey ? encryptSecret(input.apiKey) : null
     }
 
-    await getDb().update(schema.printHosts).set(updates).where(eq(schema.printHosts.id, id))
+    const updated = await getDb()
+      .update(schema.printHosts)
+      .set(updates)
+      .where(eq(schema.printHosts.id, id))
+
+    if (updated.rowCount === 0) return { ok: false, error: 'That printer no longer exists.' }
 
     revalidatePath('/admin/printers')
     return { ok: true }
@@ -102,7 +107,10 @@ export async function updatePrintHost(id: string, input: PrintHostInput): Promis
 export async function deletePrintHost(id: string): Promise<Result> {
   try {
     await requireAdmin()
-    await getDb().delete(schema.printHosts).where(eq(schema.printHosts.id, id))
+    const removed = await getDb().delete(schema.printHosts).where(eq(schema.printHosts.id, id))
+
+    if (removed.rowCount === 0) return { ok: false, error: 'That printer no longer exists.' }
+
     revalidatePath('/admin/printers')
     return { ok: true }
   } catch (error) {

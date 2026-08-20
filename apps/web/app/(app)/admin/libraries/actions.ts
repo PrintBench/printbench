@@ -243,7 +243,7 @@ export async function updateLibrarySchedule(
     const problem = cronProblem(cron)
     if (problem) return { ok: false, error: problem }
 
-    await getDb()
+    const updated = await getDb()
       .update(schema.libraries)
       .set({
         // Empty string and NULL both mean "no schedule"; store one of them.
@@ -252,6 +252,10 @@ export async function updateLibrarySchedule(
         updatedAt: new Date(),
       })
       .where(eq(schema.libraries.id, libraryId))
+
+    // Matching no rows is not success; saying otherwise reports a saved
+    // schedule that was not saved.
+    if (updated.rowCount === 0) return { ok: false, error: 'That library no longer exists.' }
 
     revalidatePath('/admin/libraries')
     return { ok: true }
@@ -265,7 +269,12 @@ export async function deleteLibrary(libraryId: string): Promise<Result> {
   try {
     await assertAdmin()
     // Removes the index only. The user's files are never touched.
-    await getDb().delete(schema.libraries).where(eq(schema.libraries.id, libraryId))
+    const removed = await getDb()
+      .delete(schema.libraries)
+      .where(eq(schema.libraries.id, libraryId))
+
+    if (removed.rowCount === 0) return { ok: false, error: 'That library no longer exists.' }
+
     revalidatePath('/admin/libraries')
     return { ok: true }
   } catch (error) {
