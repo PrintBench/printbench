@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Box, Grid3x3, Loader2, RotateCcw, TriangleAlert } from 'lucide-react'
+import { Box, Grid3x3, Loader2, RotateCcw, RulerDimensionLine, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { formatDimensions } from '@/components/model/model-card'
 import { cn } from '@/lib/cn'
 import type { MeshFormat, MeshLoadResponse } from '@/workers/mesh-loader.worker'
 
@@ -67,9 +68,11 @@ export function ModelViewer({
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [triangles, setTriangles] = useState(0)
+  const [dimensions, setDimensions] = useState<string | null>(null)
   const [visible, setVisible] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
   const [wireframe, setWireframe] = useState(false)
+  const [showBounds, setShowBounds] = useState(false)
 
   const tooLarge = fileSize > maxBytes
 
@@ -214,6 +217,19 @@ export function ModelViewer({
     grid.visible = showGrid
     scene.add(grid)
 
+    /*
+     * A box the exact size of the mesh's own bounding box, centred at the
+     * origin like the mesh already is. Added to `group` rather than `scene`
+     * so it picks up the same Z-up rotation as the mesh — otherwise the box
+     * and the model it is meant to outline would visibly disagree.
+     */
+    const bounds = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(maxX - minX, maxY - minY, maxZ - minZ)),
+      new THREE.LineBasicMaterial({ color: 0x4f8cff, transparent: true, opacity: 0.85 }),
+    )
+    bounds.visible = showBounds
+    group.add(bounds)
+
     scene.add(new THREE.HemisphereLight(0xdfe6ff, 0x2a2f3a, 2.1))
     const key = new THREE.DirectionalLight(0xffffff, 2.2)
     key.position.set(1, 1.4, 1)
@@ -263,17 +279,20 @@ export function ModelViewer({
       controls.dispose()
       geometry.dispose()
       material.dispose()
+      bounds.geometry.dispose()
+      bounds.material.dispose()
       // Frees the GPU context. Browsers allow only a handful of them, so
       // leaking one per model page visit breaks the viewer after a few.
       renderer.dispose()
     }
 
     // Kept on the element so the toggles can reach them without re-rendering.
-    Object.assign(canvas, { __pmGrid: grid, __pmMaterial: material })
+    Object.assign(canvas, { __pmGrid: grid, __pmMaterial: material, __pmBounds: bounds })
 
     setTriangles(result.triangleCount)
+    setDimensions(formatDimensions(maxX - minX, maxY - minY, maxZ - minZ))
     setPhase('ready')
-  }, [fileId, format, phase, showGrid])
+  }, [fileId, format, phase, showGrid, showBounds])
 
   // Auto-start once visible, unless the file is large enough to need a decision.
   useEffect(() => {
@@ -286,6 +305,11 @@ export function ModelViewer({
     const canvas = canvasRef.current as (HTMLCanvasElement & { __pmGrid?: { visible: boolean } }) | null
     if (canvas?.__pmGrid) canvas.__pmGrid.visible = showGrid
   }, [showGrid])
+
+  useEffect(() => {
+    const canvas = canvasRef.current as (HTMLCanvasElement & { __pmBounds?: { visible: boolean } }) | null
+    if (canvas?.__pmBounds) canvas.__pmBounds.visible = showBounds
+  }, [showBounds])
 
   useEffect(() => {
     const canvas = canvasRef.current as
@@ -379,11 +403,25 @@ export function ModelViewer({
             >
               <Box />
             </ViewerButton>
+            <ViewerButton
+              label={showBounds ? 'Hide dimensions' : 'Show dimensions'}
+              active={showBounds}
+              onClick={() => setShowBounds((v) => !v)}
+            >
+              <RulerDimensionLine />
+            </ViewerButton>
           </div>
 
-          <p className="pointer-events-none absolute bottom-3 left-3 rounded bg-black/40 px-2 py-1 text-[11px] tabular-nums text-white/80 backdrop-blur-sm">
-            {new Intl.NumberFormat('en-GB').format(triangles)} triangles
-          </p>
+          <div className="pointer-events-none absolute bottom-3 left-3 flex flex-col items-start gap-1">
+            <p className="rounded bg-black/40 px-2 py-1 text-[11px] tabular-nums text-white/80 backdrop-blur-sm">
+              {new Intl.NumberFormat('en-GB').format(triangles)} triangles
+            </p>
+            {showBounds && dimensions && (
+              <p className="rounded bg-black/40 px-2 py-1 text-[11px] tabular-nums text-white/80 backdrop-blur-sm">
+                {dimensions}
+              </p>
+            )}
+          </div>
         </>
       )}
     </div>

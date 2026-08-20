@@ -7,7 +7,7 @@ import { SCHEDULE_PRESETS } from '@pm/core/schedule'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { updateLibrarySchedule } from './actions'
+import { updateLibrarySchedule, updateLibraryWatch } from './actions'
 
 /**
  * When a library scans itself.
@@ -15,18 +15,29 @@ import { updateLibrarySchedule } from './actions'
  * Presets rather than a cron field, because "every 6 hours" is what people
  * actually want and `0 *\/6 * * *` is what they get wrong. The expression is
  * still reachable for anyone who wants it.
+ *
+ * Live watching is a second, independent mechanism shown in the same panel:
+ * it is off by default and a schedule is still the reliable fallback, but
+ * turning it on means an edit shows up within seconds rather than at the
+ * next scheduled scan. Only offered for a local library — there is no
+ * filesystem to watch on S3.
  */
 export function SchedulePicker({
   libraryId,
   cron,
   enabled,
   nextRunLabel,
+  watchable,
+  watching,
 }: {
   libraryId: string
   cron: string
   enabled: boolean
   /** Rendered on the server, so the two never disagree about the timezone. */
   nextRunLabel: string | null
+  /** False for an S3-backed library, which has no filesystem to watch. */
+  watchable: boolean
+  watching: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -35,6 +46,7 @@ export function SchedulePicker({
     cron !== '' && !SCHEDULE_PRESETS.some((preset) => preset.cron === cron),
   )
   const [scanEnabled, setScanEnabled] = useState(enabled)
+  const [watchEnabled, setWatchEnabled] = useState(watching)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -51,6 +63,13 @@ export function SchedulePicker({
       if (!result.ok) {
         setError(result.error)
         return
+      }
+      if (watchable && watchEnabled !== watching) {
+        const watchResult = await updateLibraryWatch(libraryId, watchEnabled)
+        if (!watchResult.ok) {
+          setError(watchResult.error)
+          return
+        }
       }
       setOpen(false)
       router.refresh()
@@ -69,6 +88,7 @@ export function SchedulePicker({
         {enabled && nextRunLabel && (
           <span className="text-[var(--color-ink-faint)]">· next {nextRunLabel}</span>
         )}
+        {watching && <span className="text-[var(--color-ink-faint)]">· watching live</span>}
       </button>
     )
   }
@@ -120,6 +140,25 @@ export function SchedulePicker({
             directory timestamps. Run a deep scan by hand when you have edited files in place.
           </p>
         </>
+      )}
+
+      {watchable && (
+        <label className="flex items-start gap-2 border-t border-[var(--color-border)] pt-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={watchEnabled}
+            onChange={(e) => setWatchEnabled(e.target.checked)}
+          />
+          <span>
+            Watch for changes live
+            <span className="mt-0.5 block text-xs text-[var(--color-ink-faint)]">
+              Scans within seconds of a file appearing, on top of the schedule above. Off by
+              default: a very large library can use up the operating system&apos;s limit on how
+              many folders it can watch at once.
+            </span>
+          </span>
+        </label>
       )}
 
       {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}

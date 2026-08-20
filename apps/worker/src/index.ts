@@ -20,6 +20,7 @@ import { handleMaintArchive, handleMaintReconcile } from './jobs/maintenance'
 import { handleScheduleSweep } from './jobs/schedule'
 import { handleZipRequest } from './http/zip'
 import { handleUploadRequest } from './http/upload'
+import { activeWatchCount, startWatchReconciler } from './watch/watcher'
 
 // Must run before anything reads DATABASE_URL.
 loadRootEnv()
@@ -138,6 +139,14 @@ async function main(): Promise<void> {
   await queue.schedule(JOB.maintArchive, '45 3 * * *', {})
   console.log('[worker] scheduled: archive sweep nightly at 03:45')
 
+  /*
+   * Optional, per-library, off by default. Reconciled on the same "sweep and
+   * compare to the database" pattern as the scan schedule above, rather than
+   * reacting to library changes directly — see watch/watcher.ts.
+   */
+  stopWatching = startWatchReconciler()
+  console.log('[worker] watch reconciler started, sweeping every 60s')
+
   await new Promise<void>((resolve) => server.listen(PORT, resolve))
   console.log(`[worker] listening on :${PORT}`)
   console.log('[worker] ready')
@@ -149,6 +158,7 @@ async function main(): Promise<void> {
  * and drain first.
  */
 let shuttingDown = false
+let stopWatching: (() => Promise<void>) | undefined
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return
   shuttingDown = true
@@ -161,6 +171,8 @@ async function shutdown(signal: string): Promise<void> {
   timer.unref()
 
   try {
+    console.log(`[worker] closing ${activeWatchCount()} filesystem watcher(s)`)
+    await stopWatching?.()
     await new Promise<void>((resolve) => server.close(() => resolve()))
     await queue.stop()
     await pool.end()

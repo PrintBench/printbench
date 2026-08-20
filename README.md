@@ -136,6 +136,12 @@ web shell is replaceable without touching the app.
   per queue name, so per-library crons are decided by a sweep comparing the last
   fire time against the last scan. A schedule change takes effect at once, and a
   scan missed while the worker was down is picked up rather than skipped.
+- **Live watching is optional and off by default**, per library, on top of the
+  schedule. Recursive watching costs one inotify watch per directory and can
+  exceed the OS limit on a very large library, so it's opt-in rather than
+  assumed. The worker reconciles its active watchers against the database on
+  the same kind of sweep as the scan schedule, so turning it on or off in the
+  UI takes effect within a minute with nothing to restart.
 - **Slicer hand-off converts to 3MF.** Bambu Studio's URL handler refuses any
   extension but `.3mf`, and checks *before* downloading — so a link to an STL
   fails without a request ever reaching the server. Meshes are repackaged as

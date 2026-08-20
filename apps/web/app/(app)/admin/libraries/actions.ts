@@ -419,6 +419,33 @@ export async function updateLibrarySchedule(
   }
 }
 
+/**
+ * Turns live filesystem watching on or off for one library.
+ *
+ * Takes effect within a minute: the worker reconciles its active watchers
+ * against the database on a sweep (apps/worker/src/watch/watcher.ts) rather
+ * than this action reaching into the worker process directly — the two
+ * processes share nothing but the database, on purpose.
+ */
+export async function updateLibraryWatch(libraryId: string, watchEnabled: boolean): Promise<Result> {
+  try {
+    await assertAdmin()
+
+    const updated = await getDb()
+      .update(schema.libraries)
+      .set({ watchEnabled, updatedAt: new Date() })
+      .where(eq(schema.libraries.id, libraryId))
+
+    if (updated.rowCount === 0) return { ok: false, error: 'That library no longer exists.' }
+
+    revalidatePath('/admin/libraries')
+    return { ok: true }
+  } catch (error) {
+    if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
+    return { ok: false, error: 'Could not change watching for that library.' }
+  }
+}
+
 export async function deleteLibrary(libraryId: string): Promise<Result> {
   try {
     await assertAdmin()

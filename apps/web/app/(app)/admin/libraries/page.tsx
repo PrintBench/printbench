@@ -43,9 +43,11 @@ export default async function LibrariesPage() {
       name: schema.libraries.name,
       path: schema.libraries.path,
       kind: schema.libraries.kind,
+      backend: schema.libraries.backend,
       groupingMode: schema.libraries.groupingMode,
       scanEnabled: schema.libraries.scanEnabled,
       scanCron: schema.libraries.scanCron,
+      watchEnabled: schema.libraries.watchEnabled,
       createdAt: schema.libraries.createdAt,
     })
     .from(schema.libraries)
@@ -152,6 +154,8 @@ export default async function LibrariesPage() {
                         libraryId={library.id}
                         cron={library.scanCron ?? ''}
                         enabled={library.scanEnabled}
+                        watchable={library.backend === 'local'}
+                        watching={library.watchEnabled}
                         nextRunLabel={
                           /*
                            * Formatted on the server so the label and the

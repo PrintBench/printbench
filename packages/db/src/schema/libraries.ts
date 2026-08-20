@@ -50,6 +50,14 @@ export const libraries = pgTable(
     scanCron: text('scan_cron'),
     lastScanId: uuid('last_scan_id'),
 
+    /**
+     * Live filesystem watching, on top of the scan schedule. Off by default:
+     * recursive watching burns one inotify watch per directory and can exceed
+     * fs.inotify.max_user_watches on a large library. Local backend only —
+     * there is no filesystem to watch on S3.
+     */
+    watchEnabled: boolean('watch_enabled').notNull().default(false),
+
     groupingMode: groupingMode('grouping_mode').notNull().default('deepest'),
     groupingDepth: integer('grouping_depth'),
 
