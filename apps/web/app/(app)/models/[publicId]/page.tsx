@@ -30,6 +30,7 @@ import { OpenInSlicer } from './open-in-slicer'
 import { SendToPrinter } from './send-to-printer'
 import { PrintHistory } from './print-history'
 import { ShareButton } from './share-button'
+import { DeleteButton } from './delete-button'
 import { LikeButton } from './like-button'
 import { CollectionPicker } from './collection-picker'
 
@@ -49,6 +50,8 @@ type ModelDetail = {
   share_token: string | null
   library_name: string
   library_path: string
+  /** Only a library this app owns may have its files deleted. */
+  library_writable: boolean
 }
 
 type FileRow = {
@@ -82,7 +85,8 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const models = await db.execute<ModelDetail>(sql`
     SELECT m.id, m.public_id, m.name, m.path, m.notes, m.license,
            m.file_count, m.total_size, m.is_file_model, m.missing_at, m.share_token,
-           l.name AS library_name, l.path AS library_path
+           l.name AS library_name, l.path AS library_path,
+           (l.kind = 'managed' OR l.allow_writes) AS library_writable
     FROM models m JOIN libraries l ON l.id = m.library_id
     WHERE m.public_id = ${publicId} LIMIT 1
   `)
@@ -223,6 +227,15 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   shareUrl={
                     model.share_token ? `${appOrigin}/share/${model.share_token}` : null
                   }
+                />
+              )}
+              {can(policyUser, 'model:delete') && (
+                <DeleteButton
+                  publicId={model.public_id}
+                  name={model.name}
+                  libraryName={model.library_name}
+                  fileCount={model.file_count}
+                  canDeleteFiles={model.library_writable}
                 />
               )}
               <ModelEditor

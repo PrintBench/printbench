@@ -13,6 +13,7 @@
 
 import { and, eq, isNull, lt, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import { excludedPaths } from '../services/delete-service'
 import type { Database } from '@pm/db'
 import { schema } from '@pm/db'
 import { groupModels, looksPresupported, pickPreviewFile, type GroupedModel } from '../library/grouping'
@@ -69,6 +70,8 @@ export interface ScanOutcome {
   dirsWalked: number
   filesSeen: number
   modelsCreated: number
+  /** Folders skipped because the user removed the model. */
+  modelsExcluded: number
   modelsUpdated: number
   modelsMissing: number
   filesCreated: number
@@ -106,6 +109,7 @@ export async function scanLibrary(
     dirsWalked: 0,
     filesSeen: 0,
     modelsCreated: 0,
+    modelsExcluded: 0,
     modelsUpdated: 0,
     modelsMissing: 0,
     filesCreated: 0,
@@ -191,8 +195,20 @@ export async function scanLibrary(
     // ---- Reconcile ---------------------------------------------------------
     options.onProgress?.({ phase: 'reconciling', modelsSeen: grouped.models.length })
 
+    /*
+     * Models the user has removed. Their folders are still on disk, so without
+     * this the scan finds them and recreates them — which looks exactly like
+     * the delete button not having worked.
+     */
+    const excluded = await excludedPaths(db, library.id)
+    if (excluded.size > 0) {
+      outcome.modelsExcluded = grouped.models.filter((model) => excluded.has(model.path)).length
+    }
+
     const touchedModelIds: string[] = []
     for (const model of grouped.models) {
+      if (excluded.has(model.path)) continue
+
       const result = await upsertModel(db, library.id, model, startedAt)
       touchedModelIds.push(result.modelId)
       if (result.created) {

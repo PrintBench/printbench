@@ -195,6 +195,21 @@ Counts everywhere exclude models missing from disk: a creator page promising
 forty models when eight are on an unplugged drive sends you looking for
 something that is not there.
 
+## Removing models
+
+Two different things share the word "delete", so they are two buttons:
+
+- **Remove from library** forgets the model and leaves every file where it is.
+  A scan will not bring it back — the removal is recorded — and it can be undone
+  from Manage → Libraries. This is the only option for a library pointed at
+  folders you already had.
+- **Delete the files** actually erases them, and appears only for a library this
+  app owns and writes to. It asks you to type the model's name, because it is
+  the one irreversible action in the application.
+
+Restoring rebuilds the model from the files and its sidecar at the next scan, so
+notes and tags come back only if they were written to one.
+
 ## Library health
 
 `/admin/health` reports nine kinds of problem — missing files, empty folders,

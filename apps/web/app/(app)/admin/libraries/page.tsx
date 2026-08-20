@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { desc, sql } from 'drizzle-orm'
 import { FolderPlus, HardDrive, Lock } from 'lucide-react'
 import { getSessionUser } from '@pm/auth'
-import { can, nextRun } from '@pm/core'
+import { can, listExclusions, nextRun } from '@pm/core'
 import { getDb, schema } from '@pm/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ScanButton } from './scan-button'
 import { SchedulePicker } from './schedule-picker'
+import { RemovedModels } from './removed-models'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Libraries' }
@@ -33,6 +34,8 @@ export default async function LibrariesPage() {
   }
 
   const db = getDb()
+
+  const removed = await listExclusions(db)
 
   const libraries = await db
     .select({
@@ -198,6 +201,16 @@ export default async function LibrariesPage() {
           })}
         </div>
       )}
+
+      <RemovedModels
+        removed={removed.map((entry) => ({
+          libraryId: entry.libraryId,
+          libraryName: entry.libraryName,
+          path: entry.path,
+          name: entry.name,
+          excludedAt: entry.excludedAt.toISOString(),
+        }))}
+      />
     </>
   )
 }

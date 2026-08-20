@@ -6,6 +6,7 @@ import {
   integer,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -138,4 +139,28 @@ export const modelFiles = pgTable(
     uniqueIndex('model_files_model_filename_uq').on(t.modelId, t.filename),
     index('model_files_category_idx').on(t.modelId, t.category),
   ],
+)
+
+/**
+ * A model the user removed from a library.
+ *
+ * Deleting the model row alone is not enough: the files are still on disk, so
+ * the next scan finds the folder and recreates it. This records the decision.
+ *
+ * Keyed on the path rather than the model id precisely because that row is
+ * gone. Restoring means deleting from here, after which the next scan picks
+ * the folder up as if it were new.
+ */
+export const modelExclusions = pgTable(
+  'model_exclusions',
+  {
+    libraryId: uuid('library_id').notNull(),
+    /** POSIX, relative to the library root — the same form models.path uses. */
+    path: text('path').notNull(),
+    /** Kept for the restore list, so it is not a wall of bare paths. */
+    name: text('name'),
+    excludedAt: timestamp('excluded_at', { withTimezone: true }).notNull().defaultNow(),
+    excludedBy: text('excluded_by'),
+  },
+  (t) => [primaryKey({ columns: [t.libraryId, t.path] })],
 )
