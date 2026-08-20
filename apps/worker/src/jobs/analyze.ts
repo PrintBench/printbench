@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import { getDb, schema } from '@pm/db'
 import {
-  LocalAdapter,
+  createStorageAdapter,
   getPreviewStore,
+  libraryLocationFromRow,
   previewKey,
-  type LibraryLocation,
   type StorageAdapter,
 } from '@pm/core'
 import {
@@ -57,21 +57,16 @@ async function loadFile(fileId: string): Promise<FileContext | null> {
   // Deleted from disk since the job was queued; nothing to do.
   if (row.file.missingAt) return null
 
-  const location: LibraryLocation = {
-    id: row.library.id,
-    kind: row.library.kind,
-    backend: row.library.backend,
-    allowWrites: row.library.allowWrites,
-    path: row.library.path,
-  }
-  if (location.backend !== 'local') return null
-
   // A model that is a single loose file has no folder of its own.
   const relativePath = row.model.isFileModel
     ? row.model.path
     : `${row.model.path}/${row.file.filename}`
 
-  return { file: row.file, storage: new LocalAdapter(location), relativePath }
+  return {
+    file: row.file,
+    storage: createStorageAdapter(libraryLocationFromRow(row.library)),
+    relativePath,
+  }
 }
 
 /** Geometry: bounding box, triangle count, units. Cheap, and drives UI badges. */
@@ -183,8 +178,8 @@ export async function handleFileThumbnail(
  *
  * Streamed, so a 6 GB STL hashes in constant memory. Lowest priority of the
  * three jobs: nothing user-facing depends on it. It exists to power duplicate
- * detection and, from phase 6, rename detection — which is what lets someone
- * reorganise their library without losing tags and thumbnails.
+ * detection and rename detection — which is what lets someone reorganise
+ * their library without losing tags and thumbnails.
  */
 export async function handleFileDigest(payload: JobPayload<typeof JOB.fileDigest>): Promise<void> {
   const context = await loadFile(payload.fileId)
@@ -202,9 +197,84 @@ export async function handleFileDigest(payload: JobPayload<typeof JOB.fileDigest
       .update(schema.modelFiles)
       .set({ digest })
       .where(eq(schema.modelFiles.id, file.id))
+
+    // Only a file that had no digest before is a candidate: one whose content
+    // changed already had a digest, and re-matching it against something
+    // "missing" would misfile an edit as a rename.
+    if (file.digest === null) {
+      await resolveRename(file, digest)
+    }
   } catch (error) {
     console.warn(`[digest] ${file.filename}: ${message(error)}`)
   }
+}
+
+/**
+ * Matches a brand-new file row against a missing one in the same model with
+ * identical (size, digest), and folds them into a single row.
+ *
+ * The scan can't do this itself: at scan time the new file has no digest yet
+ * — only mtime and size, which are exactly the values that collide across the
+ * many identically-sized parts a print library contains (a plate of the same
+ * screw, presupported and unsupported variants of the same body). Content
+ * hashing is the only signal precise enough to trust, and it only exists once
+ * this job has run.
+ *
+ * The MISSING row survives — it already carries a real thumbnail, analysis
+ * and digest — and adopts the new row's current name and path-derived fields.
+ * The just-inserted row is discarded once its identity has been folded in.
+ * Two matches means an ambiguous rename (say, two identical spare parts
+ * renamed at once) and is left alone rather than guessed at.
+ */
+async function resolveRename(
+  fresh: typeof schema.modelFiles.$inferSelect,
+  digest: string,
+): Promise<void> {
+  const db = getDb()
+
+  const candidates = await db
+    .select()
+    .from(schema.modelFiles)
+    .where(
+      and(
+        eq(schema.modelFiles.modelId, fresh.modelId),
+        isNotNull(schema.modelFiles.missingAt),
+        eq(schema.modelFiles.digest, digest),
+        eq(schema.modelFiles.size, fresh.size),
+      ),
+    )
+    .limit(2)
+
+  if (candidates.length !== 1) return
+  const previous = candidates[0]!
+
+  await db.transaction(async (tx) => {
+    /*
+     * Deleted first, not second: (model_id, filename) is unique, and until
+     * this row is gone the update below — giving `previous` that same
+     * filename — would collide with the row it is about to replace.
+     */
+    await tx.delete(schema.modelFiles).where(eq(schema.modelFiles.id, fresh.id))
+
+    await tx
+      .update(schema.modelFiles)
+      .set({
+        filename: fresh.filename,
+        extension: fresh.extension,
+        mediaType: fresh.mediaType,
+        category: fresh.category,
+        previewable: fresh.previewable,
+        presupported: fresh.presupported,
+        size: fresh.size,
+        mtimeMs: fresh.mtimeMs,
+        etag: fresh.etag,
+        lastSeenAt: fresh.lastSeenAt,
+        missingAt: null,
+      })
+      .where(eq(schema.modelFiles.id, previous.id))
+  })
+
+  console.log(`[digest] treated "${fresh.filename}" as a rename of a missing file, id kept`)
 }
 
 async function recordFailure(

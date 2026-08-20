@@ -76,7 +76,6 @@ export interface ScanOutcome {
   modelsMissing: number
   filesCreated: number
   filesMissing: number
-  renamesDetected: number
   /** Files handed to the derived-work queue. */
   filesQueued: number
   /** Models whose metadata was restored from an on-disk sidecar. */
@@ -114,7 +113,6 @@ export async function scanLibrary(
     modelsMissing: 0,
     filesCreated: 0,
     filesMissing: 0,
-    renamesDetected: 0,
     filesQueued: 0,
     sidecarsRestored: 0,
     errors: [],
@@ -230,7 +228,6 @@ export async function scanLibrary(
         outcome.modelsUpdated++
       }
       outcome.filesCreated += result.filesCreated
-      outcome.renamesDetected += result.renamesDetected
     }
 
     // ---- Prune -------------------------------------------------------------
@@ -307,7 +304,6 @@ interface UpsertResult {
   modelId: string
   created: boolean
   filesCreated: number
-  renamesDetected: number
 }
 
 async function upsertModel(
@@ -350,10 +346,10 @@ async function upsertModel(
     created = true
   }
 
-  const { filesCreated, renamesDetected } = await upsertFiles(db, modelId, model, seenAt)
+  const { filesCreated } = await upsertFiles(db, modelId, model, seenAt)
   await updateModelRollups(db, modelId, model)
 
-  return { modelId, created, filesCreated, renamesDetected }
+  return { modelId, created, filesCreated }
 }
 
 async function upsertFiles(
@@ -361,10 +357,9 @@ async function upsertFiles(
   modelId: string,
   model: GroupedModel,
   seenAt: Date,
-): Promise<{ filesCreated: number; renamesDetected: number }> {
+): Promise<{ filesCreated: number }> {
   const prefix = model.isFileModel ? '' : `${model.path}/`
   let filesCreated = 0
-  const renamesDetected = 0
 
   const existing = await db
     .select({
@@ -427,19 +422,21 @@ async function upsertFiles(
   }
 
   /*
-   * Rename detection is deliberately NOT done here yet.
+   * Rename detection is deliberately NOT done here.
    *
    * Matching a vanished file against a newly-appeared one needs a content
-   * digest, and digests are computed by the file.digest job in phase 3. Doing
-   * it on (size, mtime) alone would mis-pair the many identically-sized files
-   * a print library contains, silently transplanting one file's tags and
-   * thumbnail onto another — worse than not doing it at all.
+   * digest, and at scan time a freshly-appeared file has none yet — only size
+   * and mtime, which are exactly what collides across the many identically-
+   * sized files a print library contains. Doing it here on that alone would
+   * mis-pair them, silently transplanting one file's thumbnail onto another —
+   * worse than not doing it at all.
    *
-   * Until then a rename shows up as one file missing and one added. The missing
-   * row is soft-deleted with a 30-day grace period, so nothing is lost in the
-   * meantime.
+   * So for one scan cycle a rename shows up as one file missing and one
+   * added, same as ever. handleFileDigest in the worker (apps/worker/src/jobs
+   * /analyze.ts) folds the two back into one row once it has a real digest to
+   * match on — see resolveRename there.
    */
-  return { filesCreated, renamesDetected }
+  return { filesCreated }
 }
 
 function extensionFrom(filename: string): string {
