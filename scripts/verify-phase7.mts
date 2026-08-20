@@ -236,14 +236,34 @@ try {
 
   const secret = process.env.BETTER_AUTH_SECRET!
   const { token, expires } = signToken(secret, 'file', stl!.id, 15 * 60 * 1000)
-  const fileUrl = `${BASE}/api/files/${stl!.id}/raw?token=${token}&expires=${expires}`
+
+  /*
+   * The filename is in the path, not just the headers. Slicers work out what
+   * they have been handed from the URL: given a path ending in "/raw", Bambu
+   * Studio downloads a perfectly valid STL and reports an unknown or corrupt
+   * format.
+   */
+  const fileUrl =
+    `${BASE}/api/files/${stl!.id}/raw/cube.stl?token=${token}&expires=${expires}`
   const link = slicerUrl(forStl[0]!, fileUrl)
   check('handoff link is a slicer scheme', link.startsWith('bambustudio://open?file='))
   check('file URL is encoded into it', link.includes('%3Ftoken%3D'))
+  check(
+    'the URL path ends in the real extension',
+    new URL(fileUrl).pathname.toLowerCase().endsWith('.stl'),
+    new URL(fileUrl).pathname,
+  )
 
   // The decisive test: a slicer has no cookie, so the signature must carry it.
   const withToken = await fetch(fileUrl)
   check('signed link serves the file without a session', withToken.status === 200)
+
+  const served = new Uint8Array(await withToken.arrayBuffer())
+  check('and serves the file unaltered', served.byteLength === 84, `${served.byteLength} bytes`)
+
+  // The plain form still works: the viewer and the download links use it.
+  const plain = await fetch(`${BASE}/api/files/${stl!.id}/raw?token=${token}&expires=${expires}`)
+  check('the plain /raw form still serves the file', plain.status === 200)
 
   const tampered = await fetch(fileUrl.replace(token, token.replace(/^./, 'f')))
   check('a tampered signature is refused', tampered.status === 403, `${tampered.status}`)

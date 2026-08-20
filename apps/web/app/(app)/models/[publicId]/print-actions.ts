@@ -164,7 +164,7 @@ export async function createSlicerLinks(fileId: string): Promise<SlicerLinks> {
     if (!secret) return { ok: false, error: 'Signed links are not configured on this server.' }
 
     const rows = await getDb()
-      .select({ extension: schema.modelFiles.extension })
+      .select({ extension: schema.modelFiles.extension, filename: schema.modelFiles.filename })
       .from(schema.modelFiles)
       .where(eq(schema.modelFiles.id, fileId))
       .limit(1)
@@ -185,7 +185,24 @@ export async function createSlicerLinks(fileId: string): Promise<SlicerLinks> {
     if (!origin) return { ok: false, error: 'Set APP_URL so slicer links can be built.' }
 
     const { token, expires } = signToken(secret, 'file', fileId, SLICER_TOKEN_TTL_MS)
-    const fileUrl = `${origin.replace(/\/+$/, '')}/api/files/${fileId}/raw?token=${token}&expires=${expires}`
+
+    /*
+     * The filename is in the PATH, not just the headers.
+     *
+     * Slicers work out what they have been handed from the URL. Given a path
+     * ending in "/raw", Bambu Studio downloads the file and then reports an
+     * unknown or corrupt format — for a file that is perfectly valid, with a
+     * correct Content-Type and Content-Disposition, which it ignores.
+     *
+     * Only the last segment, because a file inside a model folder has a
+     * filename like "stl/body.stl" and the slashes would change the path.
+     */
+    const leaf = (file.filename.split('/').pop() ?? 'model').trim()
+    const name = encodeURIComponent(leaf || `model.${file.extension}`)
+
+    const fileUrl =
+      `${origin.replace(/\/+$/, '')}/api/files/${fileId}/raw/${name}` +
+      `?token=${token}&expires=${expires}`
 
     return {
       ok: true,
