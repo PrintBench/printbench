@@ -31,7 +31,8 @@
     "verify:phase3": "tsx scripts/verify-phase3.mts",
     "verify:phase4": "tsx scripts/verify-phase4.mts",
     "verify:phase5": "tsx scripts/verify-phase5.mts",
-    "verify:phase6": "tsx scripts/verify-phase6.mts"
+    "verify:phase6": "tsx scripts/verify-phase6.mts",
+    "verify:phase7": "tsx scripts/verify-phase7.mts"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

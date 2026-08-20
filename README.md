@@ -8,7 +8,7 @@ rasterizer, so there is nothing to compile and nothing to install.
 
 ## Status
 
-Phase 6 complete — uploads and editing.
+Phase 7 complete — print workflow.
 See `docs/` and the plan for the phase roadmap.
 
 | Phase | Scope | State |
@@ -20,8 +20,8 @@ See `docs/` and the plan for the phase roadmap.
 | 4 | 3D viewer and downloads | done |
 | 5 | Search and faceted filtering | done |
 | 6 | Uploads and editing | done |
-| 7 | Print history, open-in-slicer, send-to-printer | next |
-| 8 | Library health and polish | |
+| 7 | Print history, open-in-slicer, send-to-printer | done |
+| 8 | Library health and polish | next |
 
 ## Quick start (Docker)
 
@@ -116,6 +116,37 @@ web shell is replaceable without touching the app.
   is preserved, because that structure is what groups files into models.
 - **Scanning refuses to destroy metadata.** If a scan would mark more than 20% of
   models missing — an unmounted NAS, say — it aborts and asks an admin.
+- **Slicers are handed the file, not driven.** Every modern slicer registers a
+  URL scheme, so `Open in…` covers Bambu Studio, Orca, PrusaSlicer, Cura and
+  Lychee at once, and works for printers with no network API. This is also the
+  honest answer for Bambu specifically: pushing to their printers means FTPS
+  plus MQTT with LAN mode enabled, where Bambu Studio already knows how.
+- **Slicer links are signed.** A desktop slicer fetches the URL as a separate
+  application with none of our cookies, so the link carries a short-lived HMAC
+  naming that one file, rather than the endpoint being opened up.
+- **Printer credentials are encrypted at rest** (AES-256-GCM, keyed from
+  `BETTER_AUTH_SECRET`), because an API key has to be replayed to the printer
+  and so cannot be hashed. A database dump alone does not hand over the
+  printers.
+- **A success rate is null, not zero, until something settles.** A model whose
+  only print is still running has no verdict yet, and showing 0% reads as a
+  failure.
+
+## Print workflow
+
+- **Log a print** from any model page: printer, material, colour, layer height,
+  nozzle, start and finish times, filament used, a 1–5 rating and notes. The
+  duration is worked out from the timestamps unless you type one. `/prints`
+  is the library-wide log, filterable by outcome, and search has a
+  **never printed** facet.
+- **Open in…** appears on any file a slicer reads, and launches it with the
+  file loaded.
+- **Send** appears on sliced files (`gcode`, `bgcode`, `sl1`, `ctb`, `3mf`) once
+  an admin has added a printer under **Manage → Printers**. OctoPrint,
+  Moonraker and PrusaLink are supported, with an optional "start on arrival".
+  Test the connection from the same page — it reports what is actually wrong
+  ("Could not resolve …", "The printer rejected the API key") rather than
+  "fetch failed".
 
 ## Notes on `reference/`
 

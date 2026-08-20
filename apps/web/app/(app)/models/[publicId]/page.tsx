@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm'
 import { Box, FileStack, FolderOpen, HardDrive, Layers } from 'lucide-react'
 import { getDb } from '@pm/db'
 import { getSessionUser } from '@pm/auth'
-import { can } from '@pm/core'
+import { can, canSendToPrinter, listPrints, printStats, printSuggestions, slicersFor } from '@pm/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,9 @@ import { ModelViewer } from '@/components/viewer/model-viewer'
 import { DownloadModelButton } from './download-button'
 import { ModelEditor } from './model-editor'
 import { FileDownloadLink } from './file-download-link'
+import { OpenInSlicer } from './open-in-slicer'
+import { SendToPrinter } from './send-to-printer'
+import { PrintHistory } from './print-history'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,7 +118,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const tags = meta.rows[0]?.tags ?? []
 
   const user = await getSessionUser()
-  const canEdit = can({ id: user?.id ?? '', role: user?.role ?? null }, 'model:edit')
+  const policyUser = { id: user?.id ?? '', role: user?.role ?? null }
+  const canEdit = can(policyUser, 'model:edit')
+  const canLogPrints = can(policyUser, 'print:log')
+  const canSend = can(policyUser, 'printhost:send')
+
+  const [prints, stats, suggestions] = await Promise.all([
+    listPrints(db, { modelId: model.id, limit: 50 }),
+    printStats(db, model.id),
+    printSuggestions(db),
+  ])
 
   // The largest rendered mesh represents the model, and its dimensions are the
   // ones worth showing — a support-only variant is not what people measure.
@@ -257,7 +269,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                         {formatBytes(Number(file.size))}
                       </span>
                       {!file.missing_at && (
-                        <FileDownloadLink fileId={file.id} filename={file.filename} />
+                        <>
+                          {/* Only where a slicer actually reads the format. */}
+                          {slicersFor(file.extension).length > 0 && (
+                            <OpenInSlicer fileId={file.id} filename={file.filename} />
+                          )}
+                          {canSend && canSendToPrinter(file.extension) && (
+                            <SendToPrinter fileId={file.id} filename={file.filename} />
+                          )}
+                          <FileDownloadLink fileId={file.id} filename={file.filename} />
+                        </>
                       )}
                     </li>
                   ))}
@@ -265,6 +286,25 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               </Card>
             </section>
           ))}
+
+          <PrintHistory
+            publicId={model.public_id}
+            canLog={canLogPrints}
+            files={files.rows
+              .filter((file) => !file.missing_at)
+              .map((file) => ({ id: file.id, filename: file.filename }))}
+            suggestions={suggestions}
+            stats={{
+              ...stats,
+              lastPrintedAt: stats.lastPrintedAt?.toISOString() ?? null,
+            }}
+            prints={prints.map((print) => ({
+              ...print,
+              startedAt: print.startedAt?.toISOString() ?? null,
+              finishedAt: print.finishedAt?.toISOString() ?? null,
+              createdAt: print.createdAt.toISOString(),
+            }))}
+          />
         </div>
 
         <aside className="space-y-4">
@@ -352,7 +392,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           </Card>
 
           <p className="text-xs text-[var(--color-ink-faint)]">
-            Drag to rotate, scroll to zoom. Search and filtering arrive next.
+            Drag to rotate, scroll to zoom.
           </p>
         </aside>
       </div>

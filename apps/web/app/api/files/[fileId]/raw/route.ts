@@ -7,6 +7,7 @@ import {
   can,
   contentDisposition,
   parseRange,
+  verifyToken,
   type LibraryLocation,
 } from '@pm/core'
 import { getDb, schema } from '@pm/db'
@@ -26,13 +27,12 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ fileId: string }> },
 ): Promise<Response> {
-  const user = await getSessionUser()
-  if (!can({ id: user?.id ?? '', role: user?.role ?? null }, 'file:download')) {
-    return new Response('Not permitted', { status: 403 })
-  }
-
   const { fileId } = await params
   if (!/^[0-9a-f-]{36}$/i.test(fileId)) return new Response('Not found', { status: 404 })
+
+  if (!(await isAuthorised(request, fileId))) {
+    return new Response('Not permitted', { status: 403 })
+  }
 
   const rows = await getDb()
     .select({ file: schema.modelFiles, model: schema.models, library: schema.libraries })
@@ -128,4 +128,28 @@ export async function GET(
   return new Response(Readable.toWeb(stream) as ReadableStream, {
     headers: { ...baseHeaders, 'content-length': String(info.size) },
   })
+}
+
+/**
+ * A session, or a signed link.
+ *
+ * The session covers the browser. The signed link covers a desktop slicer,
+ * which fetches this URL as a separate application and has none of our cookies
+ * — see the open-in-slicer buttons on the model page. The signature names this
+ * exact file and expires within minutes, so a link that leaks is not a
+ * standing grant to the library.
+ */
+async function isAuthorised(request: Request, fileId: string): Promise<boolean> {
+  const url = new URL(request.url)
+  const token = url.searchParams.get('token')
+
+  if (token) {
+    const secret = process.env.BETTER_AUTH_SECRET
+    const expires = Number(url.searchParams.get('expires'))
+    if (secret && verifyToken(secret, 'file', fileId, token, expires)) return true
+    // Fall through: an expired token from a signed-in browser should still work.
+  }
+
+  const user = await getSessionUser()
+  return can({ id: user?.id ?? '', role: user?.role ?? null }, 'file:download')
 }

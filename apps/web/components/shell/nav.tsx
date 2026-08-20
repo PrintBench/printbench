@@ -9,6 +9,7 @@ import {
   Heart,
   History,
   Home,
+  Printer,
   Search,
   Settings,
   Stethoscope,
@@ -47,6 +48,7 @@ const ICONS = {
   history: History,
   drive: HardDrive,
   health: Stethoscope,
+  printer: Printer,
   settings: Settings,
   upload: Upload,
 }
@@ -67,13 +69,14 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { href: '/collections', label: 'Collections', icon: 'folder', soon: true },
       { href: '/tags', label: 'Tags', icon: 'tags', soon: true },
       { href: '/lists', label: 'Liked', icon: 'heart', soon: true },
-      { href: '/prints', label: 'Print history', icon: 'history', soon: true },
+      { href: '/prints', label: 'Print history', icon: 'history' },
     ],
   },
   {
     title: 'Manage',
     items: [
       { href: '/admin/libraries', label: 'Libraries', icon: 'drive', requires: 'library:manage' },
+      { href: '/admin/printers', label: 'Printers', icon: 'printer', requires: 'printhost:manage' },
       { href: '/admin/health', label: 'Library health', icon: 'health', requires: 'library:manage', soon: true },
       { href: '/admin/users', label: 'Users', icon: 'users', requires: 'user:manage' },
       { href: '/admin/settings', label: 'Settings', icon: 'settings', requires: 'settings:manage', soon: true },
