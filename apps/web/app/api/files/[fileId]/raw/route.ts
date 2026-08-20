@@ -5,6 +5,8 @@ import {
   LocalAdapter,
   REVALIDATE_CACHE,
   can,
+  accelMounts,
+  accelRedirectPath,
   contentDisposition,
   parseRange,
   verifyToken,
@@ -90,14 +92,20 @@ export async function GET(
    * this than we are, and the bytes never enter this process.
    */
   if (process.env.FILE_DELIVERY === 'xaccel' && location.path) {
-    return new Response(null, {
-      status: 200,
-      headers: {
-        ...baseHeaders,
-        // Re-encoded: the path segment may contain spaces or non-ASCII.
-        'x-accel-redirect': `/_protected/${encodeURI(relativePath)}`,
-      },
-    })
+    /*
+     * Resolved against the mounts nginx actually serves. The redirect has to
+     * carry the path relative to the MOUNT, not to the library — otherwise a
+     * library at /libraries/prints asks nginx for /libraries/<file> and every
+     * download 404s. Null means the file is under no known mount, so fall
+     * through to streaming rather than emit something nginx cannot resolve.
+     */
+    const redirect = accelRedirectPath(location.path, relativePath, accelMounts())
+    if (redirect) {
+      return new Response(null, {
+        status: 200,
+        headers: { ...baseHeaders, 'x-accel-redirect': redirect },
+      })
+    }
   }
 
   const range = parseRange(request.headers.get('range'), info.size)

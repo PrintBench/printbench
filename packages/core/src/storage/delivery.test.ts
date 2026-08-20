@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { contentDisposition, parseRange } from './delivery'
+import { afterEach, describe, expect, it } from 'vitest'
+import {
+  accelMounts,
+  accelRedirectPath,
+  contentDisposition,
+  parseRange,
+} from './delivery'
 
 describe('parseRange', () => {
   const SIZE = 1000
@@ -96,5 +101,93 @@ describe('contentDisposition', () => {
 
   it('supports inline disposition for the viewer', () => {
     expect(contentDisposition('body.stl', 'inline').startsWith('inline;')).toBe(true)
+  })
+})
+
+describe('accelRedirectPath', () => {
+  const mounts = [
+    { prefix: '/_protected/library/', root: '/libraries' },
+    { prefix: '/_protected/managed/', root: '/data/libraries' },
+  ]
+
+  /*
+   * The bug this exists to prevent: the redirect used to carry the path
+   * relative to the LIBRARY, so a library at /libraries/prints asked nginx for
+   * /libraries/<file> and every download 404'd in production. It only worked
+   * when the library root was exactly the mount.
+   */
+  it('carries the path relative to the mount, not the library', () => {
+    expect(accelRedirectPath('/libraries/prints', 'Dragon/body.stl', mounts)).toBe(
+      '/_protected/library/prints/Dragon/body.stl',
+    )
+  })
+
+  it('still works when the library is the mount itself', () => {
+    expect(accelRedirectPath('/libraries', 'Dragon/body.stl', mounts)).toBe(
+      '/_protected/library/Dragon/body.stl',
+    )
+  })
+
+  it('picks the mount that actually contains the file', () => {
+    expect(accelRedirectPath('/data/libraries/uploads', 'a.stl', mounts)).toBe(
+      '/_protected/managed/uploads/a.stl',
+    )
+  })
+
+  it('encodes segments that need it', () => {
+    const redirect = accelRedirectPath('/libraries', 'Pokémon Gym/body 1.stl', mounts)
+    expect(redirect).toContain('%C3%A9')
+    expect(redirect).toContain('%20')
+  })
+
+  it('tolerates a trailing slash on the library path', () => {
+    expect(accelRedirectPath('/libraries/prints/', 'a.stl', mounts)).toBe(
+      '/_protected/library/prints/a.stl',
+    )
+  })
+
+  it('normalises Windows separators, since dev runs there', () => {
+    expect(accelRedirectPath(String.raw`C:\libs`, 'a.stl', [{ prefix: '/p/', root: 'C:/libs' }])).toBe(
+      '/p/a.stl',
+    )
+  })
+
+  /*
+   * Null rather than a guess: emitting a redirect nginx cannot resolve turns a
+   * working stream into a silent 404, so the caller falls back to streaming.
+   */
+  it('returns null when the file is under no mount', () => {
+    expect(accelRedirectPath('/somewhere/else', 'a.stl', mounts)).toBeNull()
+  })
+
+  it('does not treat a sibling with a shared prefix as inside a mount', () => {
+    expect(accelRedirectPath('/libraries-private', 'a.stl', mounts)).toBeNull()
+  })
+})
+
+describe('accelMounts', () => {
+  afterEach(() => {
+    delete process.env.ACCEL_MOUNTS
+    delete process.env.DATA_DIR
+  })
+
+  it('parses an explicit configuration', () => {
+    process.env.ACCEL_MOUNTS = '/a/=/one,/b/=/two'
+    expect(accelMounts()).toEqual([
+      { prefix: '/a/', root: '/one' },
+      { prefix: '/b/', root: '/two' },
+    ])
+  })
+
+  it('ignores malformed entries rather than producing a broken mount', () => {
+    process.env.ACCEL_MOUNTS = '/a/=/one,rubbish,'
+    expect(accelMounts()).toEqual([{ prefix: '/a/', root: '/one' }])
+  })
+
+  it('defaults to the mounts the shipped compose file provides', () => {
+    process.env.DATA_DIR = '/data'
+    const roots = accelMounts().map((mount) => mount.root)
+    expect(roots).toContain('/libraries')
+    expect(roots).toContain('/data/libraries')
   })
 })

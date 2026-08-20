@@ -31,6 +31,14 @@ Set these before starting anything:
 | `BETTER_AUTH_URL` | The same value. |
 | `LIBRARY_PATH` | Host folder holding your print files. Mounted read-only. |
 
+The compose file also sets two variables you only need to touch if you change
+the mounts:
+
+| Variable | What it is |
+|---|---|
+| `LIBRARY_ROOTS` | Where an admin may point a library. Confines the folder picker, so browsing cannot wander outside what is mounted. |
+| `ACCEL_MOUNTS` | Maps nginx's internal locations to filesystem roots. **Must match `docker/nginx.conf`** — a mismatch shows up as downloads 404ing while the app thinks they succeeded. |
+
 ```bash
 docker compose up -d
 ```
@@ -96,6 +104,22 @@ library where *every* model is missing. You have to remount and rescan; nothing
 is deleted in the meantime.
 
 ---
+
+## Two kinds of library
+
+The distinction matters and the UI now asks it in plain language, but for the
+record:
+
+- **Files I already have** (`in_place`) — indexed where they sit, never moved,
+  renamed or deleted. `LIBRARY_PATH` is mounted read-only precisely so this
+  promise cannot be broken by a bug.
+- **Somewhere to upload to** (`managed`) — a folder the app owns and writes
+  into, which is what makes the Upload page work. Created under
+  `MANAGED_LIBRARY_ROOT` (default `<DATA_DIR>/libraries`) on the writable data
+  volume, because the collection mount deliberately is not writable.
+
+You need at least one of the second kind before anything can be uploaded
+through the browser.
 
 ## S3 and S3-compatible storage
 

@@ -89,3 +89,69 @@ export const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
  * disk. Revalidation keeps it correct while still avoiding most transfers.
  */
 export const REVALIDATE_CACHE = 'private, max-age=0, must-revalidate'
+
+/**
+ * Builds the X-Accel-Redirect path for a file in a library.
+ *
+ * nginx cannot be told about libraries dynamically, so it exposes one internal
+ * location per mounted root and this works out which one applies. The redirect
+ * carries the path *relative to that root*, not to the library — a library at
+ * `/libraries/prints` and a file at `Dragon/body.stl` must become
+ * `/_protected/library/prints/Dragon/body.stl`, or nginx looks for
+ * `/libraries/Dragon/body.stl` and answers 404.
+ *
+ * Returns null when the file is under no known root, which is the signal to
+ * fall back to streaming rather than emit a redirect nginx cannot resolve.
+ */
+export function accelRedirectPath(
+  libraryPath: string,
+  relativePath: string,
+  mounts: { prefix: string; root: string }[],
+): string | null {
+  const posix = (value: string) => value.replace(/\\/g, '/').replace(/\/+$/, '')
+  const full = `${posix(libraryPath)}/${relativePath.replace(/^\/+/, '')}`
+
+  for (const mount of mounts) {
+    const root = posix(mount.root)
+    if (full === root) continue
+
+    if (full.startsWith(`${root}/`)) {
+      const withinRoot = full.slice(root.length + 1)
+      // Re-encoded: a segment may contain spaces or non-ASCII, and nginx wants
+      // a URI here rather than a filesystem path.
+      return `${mount.prefix}${encodeURI(withinRoot)}`
+    }
+  }
+
+  return null
+}
+
+/**
+ * The mounts nginx serves, from configuration.
+ *
+ * Kept beside the redirect builder so the two cannot drift: adding a mount to
+ * nginx.conf without adding it here produces silent 404s on download.
+ */
+export function accelMounts(): { prefix: string; root: string }[] {
+  const configured = process.env.ACCEL_MOUNTS?.trim()
+
+  if (configured) {
+    // "prefix=root,prefix=root" — explicit, because the mapping has to match
+    // nginx exactly and guessing it is how this breaks.
+    return configured
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const [prefix, root] = entry.split('=')
+        return { prefix: prefix?.trim() ?? '', root: root?.trim() ?? '' }
+      })
+      .filter((mount) => mount.prefix && mount.root)
+  }
+
+  const dataDir = process.env.DATA_DIR?.trim() || '/data'
+  return [
+    { prefix: '/_protected/library/', root: '/libraries' },
+    { prefix: '/_protected/managed/', root: `${dataDir.replace(/\/+$/, '')}/libraries` },
+  ]
+}

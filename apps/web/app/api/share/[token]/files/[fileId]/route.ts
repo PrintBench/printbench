@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm'
 import {
   LocalAdapter,
   REVALIDATE_CACHE,
+  accelMounts,
+  accelRedirectPath,
   contentDisposition,
   getPreviewStore,
   getSettings,
@@ -128,10 +130,15 @@ export async function GET(
    * happened; only delivery is delegated.
    */
   if (process.env.FILE_DELIVERY === 'xaccel' && location.path) {
-    return new Response(null, {
-      status: 200,
-      headers: { ...headers, 'x-accel-redirect': `/_protected/${encodeURI(relativePath)}` },
-    })
+    // Relative to the nginx mount, not the library. See the note in the
+    // authenticated raw route.
+    const redirect = accelRedirectPath(location.path, relativePath, accelMounts())
+    if (redirect) {
+      return new Response(null, {
+        status: 200,
+        headers: { ...headers, 'x-accel-redirect': redirect },
+      })
+    }
   }
 
   const range = parseRange(request.headers.get('range'), info.size)

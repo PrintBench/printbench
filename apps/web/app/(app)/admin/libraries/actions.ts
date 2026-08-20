@@ -2,7 +2,19 @@
 
 import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
-import { LocalAdapter, groupModels, slugify, walkLibrary, type LibraryLocation } from '@pm/core'
+import {
+  LocalAdapter,
+  RootError,
+  browseDirectories,
+  groupModels,
+  libraryRoots,
+  managedRoot,
+  slugify,
+  validateLibraryPath,
+  walkLibrary,
+  type BrowseResult,
+  type LibraryLocation,
+} from '@pm/core'
 import { assertCan, cronProblem, PolicyError } from '@pm/core'
 import { requireUser } from '@pm/auth'
 import { getDb, schema } from '@pm/db'
@@ -14,6 +26,37 @@ async function assertAdmin() {
   const user = await requireUser()
   assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'library:manage')
   return user
+}
+
+type BrowseResponse = { ok: true; result: BrowseResult } | { ok: false; error: string }
+
+/**
+ * Lists the folders an admin may choose from.
+ *
+ * The whole point of the picker: nobody should have to know what path their
+ * files have inside a container. The server knows what is mounted, so it
+ * offers that instead of asking.
+ */
+export async function browseFolders(target?: string | null): Promise<BrowseResponse> {
+  try {
+    await assertAdmin()
+    return { ok: true, result: await browseDirectories(target) }
+  } catch (error) {
+    if (error instanceof RootError) return { ok: false, error: error.message }
+    if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
+    console.error('[libraries] browse failed:', error)
+    return { ok: false, error: 'Could not read that folder.' }
+  }
+}
+
+/** Where managed libraries are created, so the form can say so plainly. */
+export async function uploadLocation(): Promise<{ root: string; browsable: string[] }> {
+  try {
+    await assertAdmin()
+    return { root: managedRoot(), browsable: libraryRoots() }
+  } catch {
+    return { root: '', browsable: [] }
+  }
 }
 
 export interface PreviewSample {
@@ -63,15 +106,20 @@ export async function previewLibrary(input: {
     return { ...empty, error: 'Not permitted.' }
   }
 
-  const trimmed = input.path.trim()
-  if (!trimmed) return { ...empty, error: 'Enter a folder path.' }
+  /*
+   * Validated against the roots for the same reason createLibrary is: this
+   * walks a directory and reports its contents, so an unchecked path here
+   * would be a way to enumerate the host.
+   */
+  const validated = await validateLibraryPath(input.path)
+  if (!validated.ok) return { ...empty, error: validated.error }
 
   const location: LibraryLocation = {
     id: 'preview',
     kind: 'in_place',
     backend: 'local',
     allowWrites: false,
-    path: trimmed,
+    path: validated.path,
   }
 
   try {
@@ -128,7 +176,8 @@ export async function previewLibrary(input: {
 
 export async function createLibrary(input: {
   name: string
-  path: string
+  /** Required for an existing folder; ignored for an uploads library. */
+  path?: string
   kind: 'in_place' | 'managed'
   groupingMode: 'deepest' | 'top_level' | 'flat'
   groupingDepth?: number
@@ -138,19 +187,31 @@ export async function createLibrary(input: {
     await assertAdmin()
 
     const name = input.name.trim()
-    const path = input.path.trim()
     if (!name) return { ok: false, error: 'Give the library a name.' }
-    if (!path) return { ok: false, error: 'Enter a folder path.' }
 
-    /*
-     * A managed library owns its folder, so create it if it is not there yet —
-     * asking someone to go and mkdir before they can upload is a pointless
-     * step. An in-place library must already exist: being pointed at a typo and
-     * silently creating an empty directory is worse than an error.
-     */
+    let path: string
+
     if (input.kind === 'managed') {
+      /*
+       * An uploads library owns its folder, so the admin never picks a path —
+       * one is derived from the name under the writable root and created here.
+       * Asking someone to choose a directory for files they have not uploaded
+       * yet is a question with no useful answer.
+       */
+      const { join } = await import('node:path')
       const { mkdir } = await import('node:fs/promises')
+
+      path = join(managedRoot(), slugify(name) || 'library')
       await mkdir(path, { recursive: true })
+    } else {
+      /*
+       * An existing folder must already be there. Being pointed at a typo and
+       * silently creating an empty directory is worse than an error, and the
+       * roots check keeps this from becoming a way to index /etc.
+       */
+      const validated = await validateLibraryPath(input.path ?? '')
+      if (!validated.ok) return { ok: false, error: validated.error }
+      path = validated.path
     }
 
     const storage = new LocalAdapter({
@@ -178,6 +239,9 @@ export async function createLibrary(input: {
         path,
         kind: input.kind,
         backend: 'local',
+        // An uploads library exists to be written to; the read-only promise
+        // applies to folders the user already had.
+        allowWrites: input.kind === 'managed',
         groupingMode: input.groupingMode,
         groupingDepth: input.groupingDepth ?? null,
         writeSidecar: input.writeSidecar,

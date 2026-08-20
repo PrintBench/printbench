@@ -33,6 +33,11 @@ services:
       APP_URL: ${APP_URL:-http://localhost:8080}
       FILE_DELIVERY: ${FILE_DELIVERY:-xaccel}
       DATA_DIR: /data
+      # Where an admin may point a library. Confines the folder picker, so
+      # browsing cannot wander outside what is mounted.
+      LIBRARY_ROOTS: /libraries:/data/libraries
+      # Must match the internal locations in docker/nginx.conf.
+      ACCEL_MOUNTS: /_protected/library/=/libraries,/_protected/managed/=/data/libraries
     volumes:
       - previews:/data
       # Your existing collection, mounted read-only. The app never writes here.
@@ -53,6 +58,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-printmanager}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-printmanager}
       DATA_DIR: /data
+      LIBRARY_ROOTS: /libraries:/data/libraries
     volumes:
       - previews:/data
       - ${LIBRARY_PATH:-./libraries}:/libraries:ro
