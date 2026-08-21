@@ -6,9 +6,9 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sql } from 'drizzle-orm'
-import { loadRootEnv } from '@pm/core'
-import { createDb } from '@pm/db'
-import { JOB, JobQueue } from '@pm/jobs'
+import { loadRootEnv } from '@pb/core'
+import { createDb } from '@pb/db'
+import { JOB, JobQueue } from '@pb/jobs'
 
 loadRootEnv()
 
@@ -110,7 +110,7 @@ try {
   const ids = await db.execute<{ id: string }>(
     sql`SELECT id FROM models WHERE library_id = ${LIBRARY_ID}`,
   )
-  const { refreshModelSearchVectors } = await import('@pm/core')
+  const { refreshModelSearchVectors } = await import('@pb/core')
   await refreshModelSearchVectors(db, ids.rows.map((r) => r.id))
   check('search vectors rebuilt', ids.rows.length > 0, `${ids.rows.length} models`)
 

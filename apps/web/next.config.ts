@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
-import { loadRootEnv } from '@pm/core'
+import { loadRootEnv } from '@pb/core'
 
 // Next only reads .env from apps/web; our .env lives at the repo root.
 loadRootEnv()
@@ -13,7 +13,7 @@ const config: NextConfig = {
   // fileURLToPath, not URL.pathname: the latter yields "/D:/..." on Windows.
   outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
   // Workspace packages are shipped as TypeScript source, not built dist output.
-  transpilePackages: ['@pm/db', '@pm/core', '@pm/auth', '@pm/mesh'],
+  transpilePackages: ['@pb/db', '@pb/core', '@pb/auth', '@pb/mesh'],
   typedRoutes: true,
 
   /*

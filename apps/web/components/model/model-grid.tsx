@@ -1,4 +1,4 @@
-import type { SearchHit } from '@pm/core'
+import type { SearchHit } from '@pb/core'
 import { ModelCard, formatDimensions } from './model-card'
 
 /**

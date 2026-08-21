@@ -1,5 +1,5 @@
 {
-  "name": "@pm/web",
+  "name": "@pb/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,11 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@pm/auth": "*",
-    "@pm/core": "*",
-    "@pm/db": "*",
-    "@pm/jobs": "*",
-    "@pm/mesh": "*",
+    "@pb/auth": "*",
+    "@pb/core": "*",
+    "@pb/db": "*",
+    "@pb/jobs": "*",
+    "@pb/mesh": "*",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@radix-ui/react-label": "^2.1.15",

@@ -2,9 +2,9 @@
 
 import { createHmac } from 'node:crypto'
 import { eq } from 'drizzle-orm'
-import { PolicyError, assertCan } from '@pm/core'
-import { requireUser } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+import { PolicyError, assertCan } from '@pb/core'
+import { requireUser } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 
 type Result = { ok: true; url: string } | { ok: false; error: string }
 

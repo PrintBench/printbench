@@ -1,5 +1,5 @@
-import { getSessionUser } from '@pm/auth'
-import { can } from '@pm/core'
+import { getSessionUser } from '@pb/auth'
+import { can } from '@pb/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
 import { listUploadTargets } from './actions'

@@ -3,7 +3,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: { default: 'Print Manager', template: '%s · Print Manager' },
+  title: { default: 'PrintBench', template: '%s · PrintBench' },
   description: 'Manage and find your 3D print files',
   icons: { icon: '/icon.svg' },
 }

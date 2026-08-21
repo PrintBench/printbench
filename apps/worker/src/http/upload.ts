@@ -6,7 +6,7 @@ import path from 'node:path'
 import { eq } from 'drizzle-orm'
 import { Server } from '@tus/server'
 import { FileStore } from '@tus/file-store'
-import { getDb, schema } from '@pm/db'
+import { getDb, schema } from '@pb/db'
 import {
   createStorageAdapter,
   dirname,
@@ -18,8 +18,8 @@ import {
   isIndexable,
   joinPath,
   stemOf,
-} from '@pm/core'
-import { JOB, getQueue } from '@pm/jobs'
+} from '@pb/core'
+import { JOB, getQueue } from '@pb/jobs'
 import { extractZipIntoLibrary, ZipIngestError } from './zip-ingest'
 
 /**

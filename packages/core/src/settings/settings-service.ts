@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import type { Database } from '@pm/db'
+import type { Database } from '@pb/db'
 
 /**
  * Site-wide settings.
@@ -30,12 +30,12 @@ export interface Settings {
   viewerMaxBytes: number
   /** Raise metadata-completeness problems (no licence, no tags, and so on). */
   trackMetadataProblems: boolean
-  /** Write .printmanager.json into managed libraries as metadata changes. */
+  /** Write .printbench.json into managed libraries as metadata changes. */
   writeSidecars: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  siteName: 'Print Manager',
+  siteName: 'PrintBench',
   publicSharing: false,
   defaultRole: 'viewer',
   missingGraceDays: 30,

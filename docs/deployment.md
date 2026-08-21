@@ -1,4 +1,4 @@
-# Deploying Print Manager
+# Deploying PrintBench
 
 Postgres is the only infrastructure dependency. There is no Redis, no message
 broker and nothing to compile — which is the whole point of the project.
@@ -180,13 +180,13 @@ Everything you typed: tags, creators, licences, collections, print history,
 accounts.
 
 ```bash
-docker compose exec db pg_dump -U printmanager printmanager > backup.sql
+docker compose exec db pg_dump -U printbench printbench > backup.sql
 ```
 
 Restore into an empty database:
 
 ```bash
-docker compose exec -T db psql -U printmanager printmanager < backup.sql
+docker compose exec -T db psql -U printbench printbench < backup.sql
 ```
 
 ### 3. The metadata export
@@ -216,7 +216,7 @@ a scan, and the files are already on disk.
 
 ### The sidecar, which is the real safety net
 
-With `writeSidecars` on (the default), a `.printmanager.json` is written beside
+With `writeSidecars` on (the default), a `.printbench.json` is written beside
 each model in a writable library holding its tags, creator, licence and notes.
 The database can then be rebuilt from disk alone: drop it, migrate, rescan, and
 the metadata comes back. There is a test that performs exactly that drill.

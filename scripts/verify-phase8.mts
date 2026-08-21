@@ -29,8 +29,8 @@ import {
   unshareModel,
   updateSettings,
   type LibraryLocation,
-} from '@pm/core'
-import { createDb } from '@pm/db'
+} from '@pb/core'
+import { createDb } from '@pb/db'
 
 loadRootEnv()
 
@@ -66,7 +66,7 @@ try {
   await cleanup()
 
   section('Set up')
-  const base = await mkdtemp(path.join(tmpdir(), 'pm-p8-'))
+  const base = await mkdtemp(path.join(tmpdir(), 'pb-p8-'))
   libraryRoot = path.join(base, 'library')
 
   // Three models: one complete, one with nothing filled in, one nested inside

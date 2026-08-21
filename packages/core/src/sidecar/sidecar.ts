@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { SIDECAR_FILENAME } from '../library/paths'
+import { LEGACY_SIDECAR_FILENAMES, SIDECAR_FILENAME } from '../library/paths'
 import type { StorageAdapter } from '../storage/types'
 
 /**
@@ -57,7 +57,7 @@ export function sidecarPath(modelPath: string): string {
 export function serializeSidecar(content: SidecarContent): string {
   const data: SidecarData = {
     version: SIDECAR_VERSION,
-    generator: 'print-manager',
+    generator: 'printbench',
     updatedAt: new Date().toISOString(),
     ...content,
     // Sorted so rewriting unchanged metadata produces an identical file, which
@@ -98,27 +98,53 @@ export function parseSidecar(text: string): { data: SidecarContent | null; error
   return { data: content }
 }
 
+/**
+ * Reads a model's sidecar, falling back to the name this app used before it
+ * was called PrintBench.
+ *
+ * The current name wins where both exist, so a folder migrates simply by the
+ * new file being written beside the old one. Dropping the fallback would
+ * silently discard tags and notes that exist nowhere else — see
+ * LEGACY_SIDECAR_FILENAMES.
+ */
 export async function readSidecar(
   storage: StorageAdapter,
   modelPath: string,
 ): Promise<{ data: SidecarContent | null; error?: string }> {
-  const path = sidecarPath(modelPath)
-  try {
-    const stream = await storage.createReadStream(path)
-    const chunks: Buffer[] = []
-    for await (const chunk of stream) {
-      chunks.push(chunk as Buffer)
-      // A sidecar is a few kilobytes. Anything larger is not one, and reading
-      // it would be a way to make the scanner allocate arbitrarily.
-      if (chunks.reduce((sum, c) => sum + c.length, 0) > 1024 * 1024) {
-        return { data: null, error: 'Sidecar is implausibly large; ignoring' }
+  const candidates = [
+    sidecarPath(modelPath),
+    ...LEGACY_SIDECAR_FILENAMES.map((name) =>
+      modelPath ? `${modelPath}/${name}` : name,
+    ),
+  ]
+
+  for (const path of candidates) {
+    let text: string
+    try {
+      const stream = await storage.createReadStream(path)
+      const chunks: Buffer[] = []
+      let total = 0
+      for await (const chunk of stream) {
+        chunks.push(chunk as Buffer)
+        total += (chunk as Buffer).length
+        // A sidecar is a few kilobytes. Anything larger is not one, and
+        // reading it would be a way to make the scanner allocate arbitrarily.
+        if (total > 1024 * 1024) {
+          return { data: null, error: 'Sidecar is implausibly large; ignoring' }
+        }
       }
+      text = Buffer.concat(chunks).toString('utf8')
+    } catch {
+      // Absent is the normal case, not an error. Try the next name.
+      continue
     }
-    return parseSidecar(Buffer.concat(chunks).toString('utf8'))
-  } catch {
-    // Absent is the normal case, not an error.
-    return { data: null }
+
+    // A file that exists but does not parse is reported rather than skipped:
+    // falling through to the legacy name would hide a corrupt current one.
+    return parseSidecar(text)
   }
+
+  return { data: null }
 }
 
 export async function writeSidecar(

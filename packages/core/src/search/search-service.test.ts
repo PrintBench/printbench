@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { createDb } from '@pm/db'
+import { createDb } from '@pb/db'
 import { refreshModelSearchVectors } from './refresh'
 import { quickSearch, searchModels } from './search-service'
 

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { ChevronsUpDown, LogOut } from 'lucide-react'
-import type { PolicyUser } from '@pm/core/policy'
+import type { PolicyUser } from '@pb/core/policy'
 import { signOut } from '@/lib/auth-client'
 import { ThemeToggle } from './theme-toggle'
 

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
-import { createDb } from '@pm/db'
+import { createDb } from '@pb/db'
 import {
   DeleteError,
   deleteModelFiles,
@@ -60,7 +60,7 @@ describeDb('deleting models', () => {
     await cleanup()
     if (base) await rm(base, { recursive: true, force: true })
 
-    base = await mkdtemp(path.join(tmpdir(), 'pm-del-'))
+    base = await mkdtemp(path.join(tmpdir(), 'pb-del-'))
     inPlaceRoot = path.join(base, 'mine')
     managedRoot = path.join(base, 'uploads')
 

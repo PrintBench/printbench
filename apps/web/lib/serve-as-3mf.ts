@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream'
 import { eq } from 'drizzle-orm'
-import { getSessionUser } from '@pm/auth'
+import { getSessionUser } from '@pb/auth'
 import {
   can,
   canOpenInSlicer,
@@ -8,9 +8,9 @@ import {
   createStorageAdapter,
   libraryLocationFromRow,
   verifyToken,
-} from '@pm/core'
-import { readObj, readPly, readStl, writeThreeMf } from '@pm/mesh/parse'
-import { getDb, schema } from '@pm/db'
+} from '@pb/core'
+import { readObj, readPly, readStl, writeThreeMf } from '@pb/mesh/parse'
+import { getDb, schema } from '@pb/db'
 
 /**
  * Serves any mesh as a 3MF, converting on the way out.

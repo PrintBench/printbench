@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Copy, Link2, Loader2, UserPlus, X } from 'lucide-react'
-import { ROLE_ORDER } from '@pm/core/policy'
+import { ROLE_ORDER } from '@pb/core/policy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'

@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'chokidar'
-import { getDb, schema } from '@pm/db'
-import { isIgnoredPath } from '@pm/core'
-import { JOB, getQueue } from '@pm/jobs'
+import { getDb, schema } from '@pb/db'
+import { isIgnoredPath } from '@pb/core'
+import { JOB, getQueue } from '@pb/jobs'
 
 /**
  * Live filesystem watching, per library, on top of the scan schedule.

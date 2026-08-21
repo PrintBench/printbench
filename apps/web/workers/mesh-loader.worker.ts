@@ -4,7 +4,7 @@ import { BufferGeometry, Float32BufferAttribute, type Object3D } from 'three'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
-import { readThreeMf } from '@pm/mesh/parse'
+import { readThreeMf } from '@pb/mesh/parse'
 
 /**
  * Downloads and parses a mesh, off the main thread.

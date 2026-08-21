@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getSessionUser } from '@pm/auth'
+import { getSessionUser } from '@pb/auth'
 import { needsFirstRunSetup } from '@/lib/setup'
 import { LoginForm } from './login-form'
 

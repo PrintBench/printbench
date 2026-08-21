@@ -2,8 +2,8 @@
 
 import { headers } from 'next/headers'
 import { eq } from 'drizzle-orm'
-import { getAuth } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+import { getAuth } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 import { needsFirstRunSetup } from '@/lib/setup'
 
 type Result = { ok: true } | { ok: false; error: string }

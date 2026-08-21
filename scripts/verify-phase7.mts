@@ -25,8 +25,8 @@ import {
   slicerUrl,
   slicersFor,
   type LibraryLocation,
-} from '@pm/core'
-import { createDb } from '@pm/db'
+} from '@pb/core'
+import { createDb } from '@pb/db'
 
 loadRootEnv()
 
@@ -113,7 +113,7 @@ try {
   await cleanup()
 
   section('Set up')
-  const base = await mkdtemp(path.join(tmpdir(), 'pm-p7-'))
+  const base = await mkdtemp(path.join(tmpdir(), 'pb-p7-'))
   libraryRoot = path.join(base, 'library')
   await mkdir(path.join(libraryRoot, 'Calibration Cube'), { recursive: true })
 
@@ -180,7 +180,7 @@ try {
   const userRow = await db.execute<{ id: string }>(
     sql`SELECT id FROM "user" WHERE email = ${EMAIL}`,
   )
-  const { logPrint, listPrints, printStats, printBelongsToModel } = await import('@pm/core')
+  const { logPrint, listPrints, printStats, printBelongsToModel } = await import('@pb/core')
 
   await logPrint(db, {
     modelId,

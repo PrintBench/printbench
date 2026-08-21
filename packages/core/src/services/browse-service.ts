@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
-import type { Database } from '@pm/db'
+import type { Database } from '@pb/db'
 import { slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
 

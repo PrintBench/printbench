@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { sql } from 'drizzle-orm'
 import { Boxes, HardDrive, History, Printer, Wrench } from 'lucide-react'
-import { can, printStats } from '@pm/core'
-import { getSessionUser } from '@pm/auth'
-import { getDb } from '@pm/db'
+import { can, printStats } from '@pb/core'
+import { getSessionUser } from '@pb/auth'
+import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -172,7 +172,7 @@ export default async function DashboardPage() {
           title="No libraries yet"
           description={
             canManage
-              ? 'Point Print Manager at a folder of STL and 3MF files and it will index them in place — your files are never moved or renamed.'
+              ? 'Point PrintBench at a folder of STL and 3MF files and it will index them in place — your files are never moved or renamed.'
               : 'An admin needs to add a library before anything appears here.'
           }
           action={

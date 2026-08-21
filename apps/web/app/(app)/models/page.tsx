@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Boxes, ChevronLeft, ChevronRight, HardDrive } from 'lucide-react'
 import { sql } from 'drizzle-orm'
-import { getDb } from '@pm/db'
+import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'

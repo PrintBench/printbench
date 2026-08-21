@@ -1,5 +1,5 @@
-import { getSessionUser } from '@pm/auth'
-import { can } from '@pm/core'
+import { getSessionUser } from '@pb/auth'
+import { can } from '@pb/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
 import { NewLibraryForm } from './new-library-form'
@@ -17,7 +17,7 @@ export default async function NewLibraryPage() {
     <>
       <PageHeader
         title="Add a library"
-        description="Point Print Manager at a folder. It indexes what is there and never moves, renames or deletes your files."
+        description="Point PrintBench at a folder. It indexes what is there and never moves, renames or deletes your files."
       />
       <NewLibraryForm />
     </>

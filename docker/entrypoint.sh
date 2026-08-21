@@ -14,7 +14,7 @@ case "${1:-web}" in
   worker)
     echo "[entrypoint] waiting for schema"
     until node --import tsx -e "
-      import('@pm/db').then(async ({ createDb }) => {
+      import('@pb/db').then(async ({ createDb }) => {
         const { pool, db } = createDb()
         const { sql } = await import('drizzle-orm')
         await db.execute(sql\`select 1 from models limit 1\`)

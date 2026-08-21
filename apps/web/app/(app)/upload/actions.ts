@@ -2,9 +2,9 @@
 
 import { createHmac } from 'node:crypto'
 import { eq, or } from 'drizzle-orm'
-import { PolicyError, assertCan } from '@pm/core'
-import { requireUser } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+import { PolicyError, assertCan } from '@pb/core'
+import { requireUser } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 
 /** Long enough for a multi-gigabyte upload on a slow connection. */
 const UPLOAD_TTL_MS = 6 * 60 * 60 * 1000

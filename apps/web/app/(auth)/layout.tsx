@@ -1,16 +1,14 @@
 import Link from 'next/link'
-import { Boxes } from 'lucide-react'
+import { PrintBenchLogo } from '@/components/brand/logo'
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
       <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
         <div className="mx-auto w-full max-w-sm">
-          <Link href="/" className="mb-8 inline-flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-accent)] text-[var(--color-accent-ink)]">
-              <Boxes className="size-5" />
-            </span>
-            <span className="text-lg font-semibold tracking-tight">Print Manager</span>
+          <Link href="/" className="mb-8 inline-block">
+            {/* The full lockup, tagline and all: this is the front door. */}
+            <PrintBenchLogo className="text-xl" tagline />
           </Link>
           {children}
         </div>

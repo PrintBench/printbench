@@ -11,8 +11,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
-import { LocalAdapter, loadRootEnv, scanLibrary, type LibraryLocation } from '@pm/core'
-import { createDb } from '@pm/db'
+import { LocalAdapter, loadRootEnv, scanLibrary, type LibraryLocation } from '@pb/core'
+import { createDb } from '@pb/db'
 
 loadRootEnv()
 
@@ -100,7 +100,7 @@ async function cleanup(): Promise<void> {
 }
 
 try {
-  const base = await mkdtemp(path.join(tmpdir(), 'pm-verify2-'))
+  const base = await mkdtemp(path.join(tmpdir(), 'pb-verify2-'))
   root = path.join(base, 'prints')
   await buildLibrary()
 
@@ -157,7 +157,7 @@ try {
   ] as const) {
     const hit = await db.execute<{ name: string }>(sql`
       SELECT name FROM models WHERE library_id = ${LIBRARY_ID}
-        AND search_vector @@ websearch_to_tsquery('pm_search', ${query}) LIMIT 5
+        AND search_vector @@ websearch_to_tsquery('pb_search', ${query}) LIMIT 5
     `)
     check(`search "${query}" finds ${expected}`,
       hit.rows.some((r) => r.name === expected),

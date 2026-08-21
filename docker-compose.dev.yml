@@ -3,17 +3,17 @@
 services:
   db:
     image: postgres:18-alpine
-    container_name: printmanager-dev-db
+    container_name: printbench-dev-db
     environment:
-      POSTGRES_USER: printmanager
-      POSTGRES_PASSWORD: printmanager
-      POSTGRES_DB: printmanager
+      POSTGRES_USER: printbench
+      POSTGRES_PASSWORD: printbench
+      POSTGRES_DB: printbench
     ports:
       - '5433:5432'
     volumes:
       - pgdata-dev:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U printmanager -d printmanager']
+      test: ['CMD-SHELL', 'pg_isready -U printbench -d printbench']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -24,12 +24,12 @@ services:
   # then run `npm run verify:s3`.
   minio:
     image: minio/minio:latest
-    container_name: printmanager-dev-minio
+    container_name: printbench-dev-minio
     profiles: ['s3']
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: printmanager
-      MINIO_ROOT_PASSWORD: printmanager
+      MINIO_ROOT_USER: printbench
+      MINIO_ROOT_PASSWORD: printbench
     ports:
       - '9000:9000'
       - '9001:9001'

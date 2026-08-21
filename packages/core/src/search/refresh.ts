@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import type { Database } from '@pm/db'
+import type { Database } from '@pb/db'
 
 /**
  * Search vector maintenance.
@@ -34,11 +34,11 @@ export async function refreshModelSearchVectors(db: Database, modelIds: string[]
 
   await db.execute(sql`
     UPDATE models m SET search_vector =
-        setweight(to_tsvector('pm_search', coalesce(m2.name, '')),  'A')
-     || setweight(to_tsvector('pm_search', coalesce(c.name, '')),   'B')
-     || setweight(to_tsvector('pm_search', coalesce(t.tags, '')),   'B')
-     || setweight(to_tsvector('pm_search', coalesce(m2.notes, '')), 'C')
-     || setweight(to_tsvector('pm_search',
+        setweight(to_tsvector('pb_search', coalesce(m2.name, '')),  'A')
+     || setweight(to_tsvector('pb_search', coalesce(c.name, '')),   'B')
+     || setweight(to_tsvector('pb_search', coalesce(t.tags, '')),   'B')
+     || setweight(to_tsvector('pb_search', coalesce(m2.notes, '')), 'C')
+     || setweight(to_tsvector('pb_search',
           regexp_replace(coalesce(f.names, ''), '[^[:alnum:]]+', ' ', 'g')), 'D')
     FROM models m2
     LEFT JOIN creators c ON c.id = m2.creator_id

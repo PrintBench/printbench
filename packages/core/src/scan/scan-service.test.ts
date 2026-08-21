@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
-import { createDb } from '@pm/db'
+import { createDb } from '@pb/db'
 import { LocalAdapter } from '../storage/local-adapter'
 import type { LibraryLocation } from '../storage/types'
 import { MASS_DISAPPEARANCE_THRESHOLD, scanLibrary } from './scan-service'
@@ -64,7 +64,7 @@ describeDb('scanLibrary', () => {
   })
 
   beforeEach(async () => {
-    const base = await mkdtemp(path.join(tmpdir(), 'pm-scan-'))
+    const base = await mkdtemp(path.join(tmpdir(), 'pb-scan-'))
     root = path.join(base, 'library')
     library = {
       id: LIBRARY_ID,
@@ -169,7 +169,7 @@ describeDb('scanLibrary', () => {
       const found = await db.execute<{ name: string }>(sql`
         SELECT name FROM models
         WHERE library_id = ${LIBRARY_ID}
-          AND search_vector @@ websearch_to_tsquery('pm_search', 'dragon')
+          AND search_vector @@ websearch_to_tsquery('pb_search', 'dragon')
         ORDER BY name
       `)
       expect(found.rows.map((r) => r.name)).toEqual(['Blue Dragon', 'Red Dragon'])

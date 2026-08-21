@@ -2,8 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { eq, isNull, and } from 'drizzle-orm'
 import { ZipArchive, type ArchiverError } from 'archiver'
-import { getDb, schema } from '@pm/db'
-import { contentDisposition, createStorageAdapter, libraryLocationFromRow } from '@pm/core'
+import { getDb, schema } from '@pb/db'
+import { contentDisposition, createStorageAdapter, libraryLocationFromRow } from '@pb/core'
 
 /**
  * Streams a whole model as a ZIP.

@@ -28,7 +28,7 @@ export class SecretUnavailableError extends Error {
 
 /** A 32-byte key from a secret of any length. */
 function keyFrom(secret: string): Buffer {
-  return createHash('sha256').update(`printmanager:secret-box:${secret}`).digest()
+  return createHash('sha256').update(`printbench:secret-box:${secret}`).digest()
 }
 
 function requireSecret(secret?: string): string {

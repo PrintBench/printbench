@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarClock, Check, Loader2 } from 'lucide-react'
-import { SCHEDULE_PRESETS } from '@pm/core/schedule'
+import { SCHEDULE_PRESETS } from '@pb/core/schedule'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'

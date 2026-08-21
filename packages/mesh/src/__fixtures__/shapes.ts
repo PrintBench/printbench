@@ -126,7 +126,7 @@ export function degenerateSoup(): Mesh {
 // ---------------------------------------------------------------------------
 
 /** Writes a binary STL. `header` lets tests fake the "solid" trap. */
-export function toBinaryStl(mesh: Mesh, header = 'print-manager test fixture'): Buffer {
+export function toBinaryStl(mesh: Mesh, header = 'printbench test fixture'): Buffer {
   const buffer = Buffer.alloc(84 + mesh.triangleCount * 50)
   buffer.write(header.slice(0, 79), 0, 'latin1')
   buffer.writeUInt32LE(mesh.triangleCount, 80)
@@ -156,7 +156,7 @@ export function toAsciiStl(mesh: Mesh, name = 'fixture'): Buffer {
 }
 
 export function toObj(mesh: Mesh): Buffer {
-  const lines: string[] = ['# print-manager test fixture']
+  const lines: string[] = ['# printbench test fixture']
   for (let i = 0; i < mesh.triangleCount; i++) {
     const t = mesh.triangles.subarray(i * 9, i * 9 + 9)
     for (let v = 0; v < 3; v++) {

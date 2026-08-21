@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
-import { createDb } from '@pm/db'
+import { createDb } from '@pb/db'
 import { LocalAdapter } from '../storage/local-adapter'
 import type { LibraryLocation } from '../storage/types'
 import { scanLibrary } from '../scan/scan-service'
@@ -89,7 +89,7 @@ describeDb('sidecar round trip', () => {
   })
 
   beforeEach(async () => {
-    const base = await mkdtemp(path.join(tmpdir(), 'pm-sidecar-'))
+    const base = await mkdtemp(path.join(tmpdir(), 'pb-sidecar-'))
     root = path.join(base, 'library')
     library = { id: LIBRARY_ID, kind: 'in_place', backend: 'local', allowWrites: false, path: root }
 
@@ -136,7 +136,7 @@ describeDb('sidecar round trip', () => {
     expect(result.ok).toBe(true)
     expect(result.sidecarWritten).toBe(true)
 
-    const written = await readFile(path.join(root, 'Red Dragon', '.printmanager.json'), 'utf8')
+    const written = await readFile(path.join(root, 'Red Dragon', '.printbench.json'), 'utf8')
     const { data } = parseSidecar(written)
     expect(data).toMatchObject({
       name: 'Red Dragon Miniature',
@@ -155,7 +155,7 @@ describeDb('sidecar round trip', () => {
     expect(result.ok).toBe(true)
     expect(result.sidecarWritten).toBe(false)
     await expect(
-      readFile(path.join(root, 'Red Dragon', '.printmanager.json'), 'utf8'),
+      readFile(path.join(root, 'Red Dragon', '.printbench.json'), 'utf8'),
     ).rejects.toThrow()
   })
 
@@ -179,7 +179,7 @@ describeDb('sidecar round trip', () => {
       SELECT f.filename FROM model_files f JOIN models m ON m.id = f.model_id
       WHERE m.library_id = ${LIBRARY_ID}
     `)
-    expect(files.rows.map((r) => r.filename)).not.toContain('.printmanager.json')
+    expect(files.rows.map((r) => r.filename)).not.toContain('.printbench.json')
   })
 
   /*
@@ -250,7 +250,7 @@ describeDb('sidecar round trip', () => {
   })
 
   it('ignores a corrupt sidecar rather than failing the scan', async () => {
-    await writeFile(path.join(root, 'Blue Dragon', '.printmanager.json'), '{ this is not json')
+    await writeFile(path.join(root, 'Blue Dragon', '.printbench.json'), '{ this is not json')
 
     const outcome = await scan()
 

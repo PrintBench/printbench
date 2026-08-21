@@ -475,7 +475,7 @@ export function NewLibraryForm() {
                 <span className="font-medium">Write a metadata sidecar into each model folder</span>
                 <span className="mt-0.5 block text-[var(--color-ink-muted)]">
                   Saves tags, creator and notes to a small{' '}
-                  <code className="font-mono text-xs">.printmanager.json</code> file, so your
+                  <code className="font-mono text-xs">.printbench.json</code> file, so your
                   metadata survives a database loss and moves with the files. This is the only
                   thing ever written into an indexed folder — your model files are never touched.
                 </span>

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2, Pencil, Plug, Plus, Printer, Trash2, XCircle } from 'lucide-react'
-import type { PrintHostProtocol } from '@pm/core'
+import type { PrintHostProtocol } from '@pb/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'

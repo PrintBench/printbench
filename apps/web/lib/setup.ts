@@ -1,6 +1,6 @@
 import 'server-only'
 import { sql } from 'drizzle-orm'
-import { getDb } from '@pm/db'
+import { getDb } from '@pb/db'
 
 /**
  * True when the instance has no users at all.

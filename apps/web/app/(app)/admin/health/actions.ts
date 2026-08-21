@@ -10,9 +10,9 @@ import {
   resolveProblems,
   unignoreProblems,
   type ProblemKind,
-} from '@pm/core'
-import { requireUser } from '@pm/auth'
-import { getDb } from '@pm/db'
+} from '@pb/core'
+import { requireUser } from '@pb/auth'
+import { getDb } from '@pb/db'
 
 type Result = { ok: true; count?: number } | { ok: false; error: string }
 

@@ -5,7 +5,7 @@ Re-run these checks if the text search configuration changes.
 
 ## Configuration
 
-`pm_search` = `english` + `unaccent`, so "pokemon" matches "Pokémon" and stemming
+`pb_search` = `english` + `unaccent`, so "pokemon" matches "Pokémon" and stemming
 works ("game" matches "games").
 
 ## Two non-obvious traps, both hit and fixed

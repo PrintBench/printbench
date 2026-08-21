@@ -1,7 +1,7 @@
 import { eq, isNotNull, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
-import type { Database } from '@pm/db'
-import { schema } from '@pm/db'
+import type { Database } from '@pb/db'
+import { schema } from '@pb/db'
 
 /**
  * Share links.

@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises'
 import { unzipSync } from 'fflate'
-import { isIgnoredPath, isSafeRelativePath, joinPath, normalizePath, type StorageAdapter } from '@pm/core'
+import { isIgnoredPath, isSafeRelativePath, joinPath, normalizePath, type StorageAdapter } from '@pb/core'
 
 /**
  * Extracting an uploaded zip into a library.

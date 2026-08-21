@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import type { Database } from '@pm/db'
+import type { Database } from '@pb/db'
 
 /**
  * Hard deletion, after the grace period.

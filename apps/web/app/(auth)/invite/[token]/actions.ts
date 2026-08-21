@@ -2,9 +2,9 @@
 
 import { headers } from 'next/headers'
 import { eq } from 'drizzle-orm'
-import { consumeInvite, inviteByToken } from '@pm/core'
-import { getAuth } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+import { consumeInvite, inviteByToken } from '@pb/core'
+import { getAuth } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 
 type Result = { ok: true } | { ok: false; error: string }
 

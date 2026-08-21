@@ -9,9 +9,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import * as tus from 'tus-js-client'
-import { loadRootEnv, parseSidecar } from '@pm/core'
-import { createDb } from '@pm/db'
-import { JobQueue } from '@pm/jobs'
+import { loadRootEnv, parseSidecar } from '@pb/core'
+import { createDb } from '@pb/db'
+import { JobQueue } from '@pb/jobs'
 import { cube, sphere, toBinaryStl } from '../packages/mesh/src/__fixtures__/shapes'
 
 loadRootEnv()
@@ -83,7 +83,7 @@ try {
   await cleanup()
   await queue.start()
 
-  const base = await mkdtemp(path.join(tmpdir(), 'pm-p6-'))
+  const base = await mkdtemp(path.join(tmpdir(), 'pb-p6-'))
   managedRoot = path.join(base, 'managed')
   inPlaceRoot = path.join(base, 'in-place')
 
@@ -199,7 +199,7 @@ try {
   const edit = await fetch(`${BASE}/models/${model.public_id}`, { headers: { cookie } })
   check('model page renders', edit.status === 200)
 
-  const { updateModel } = await import('@pm/core')
+  const { updateModel } = await import('@pb/core')
   const result = await updateModel(db, model.id, {
     name: 'Uploaded Dragon Knight',
     notes: 'Arrived by upload',
@@ -222,11 +222,11 @@ try {
   const searchable = await db.execute<{ n: number }>(sql`
     SELECT count(*)::int AS n FROM models
     WHERE id = ${model.id}
-      AND search_vector @@ websearch_to_tsquery('pm_search', 'loot studios')`)
+      AND search_vector @@ websearch_to_tsquery('pb_search', 'loot studios')`)
   check('search vector rebuilt on save', (searchable.rows[0]?.n ?? 0) === 1)
 
   section('Sidecar on disk')
-  const sidecarFile = path.join(managedRoot, 'Uploaded Dragon', '.printmanager.json')
+  const sidecarFile = path.join(managedRoot, 'Uploaded Dragon', '.printbench.json')
   const sidecarText = await readFile(sidecarFile, 'utf8').catch(() => null)
   check('sidecar file exists', sidecarText !== null)
 
@@ -237,7 +237,7 @@ try {
 
   const asFile = await db.execute<{ n: number }>(sql`
     SELECT count(*)::int AS n FROM model_files f JOIN models m ON m.id = f.model_id
-    WHERE m.library_id = ${MANAGED_ID} AND f.filename LIKE '%printmanager%'`)
+    WHERE m.library_id = ${MANAGED_ID} AND f.filename LIKE '%printbench%'`)
   check('the sidecar is never indexed as a model file', (asFile.rows[0]?.n ?? 0) === 0)
 
   section('Restore drill: lose the database, rescan, get it back')
@@ -246,7 +246,7 @@ try {
     sql`SELECT count(*)::int AS n FROM models WHERE library_id = ${MANAGED_ID}`)
   check('models deleted', (emptied.rows[0]?.n ?? -1) === 0)
 
-  const { LocalAdapter, scanLibrary } = await import('@pm/core')
+  const { LocalAdapter, scanLibrary } = await import('@pb/core')
   const location = {
     id: MANAGED_ID,
     kind: 'managed' as const,

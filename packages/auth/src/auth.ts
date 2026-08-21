@@ -2,7 +2,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins/admin'
 import { nextCookies } from 'better-auth/next-js'
-import { getDb, schema } from '@pm/db'
+import { getDb, schema } from '@pb/db'
 import { ROLES, type Role } from './roles'
 
 /**
@@ -24,7 +24,7 @@ export function getAuth(): ReturnType<typeof build> {
 
 function build() {
   return betterAuth({
-    appName: 'Print Manager',
+    appName: 'PrintBench',
     baseURL: process.env.BETTER_AUTH_URL ?? process.env.APP_URL ?? 'http://localhost:3000',
     secret: process.env.BETTER_AUTH_SECRET,
 

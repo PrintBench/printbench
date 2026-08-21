@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { zipSync } from 'fflate'
-import { LocalAdapter } from '@pm/core'
+import { LocalAdapter } from '@pb/core'
 import { extractZipIntoLibrary, ZipIngestError } from './zip-ingest'
 
 /**
@@ -37,7 +37,7 @@ describe('extractZipIntoLibrary', () => {
     })
 
   beforeEach(async () => {
-    base = await mkdtemp(path.join(tmpdir(), 'pm-zip-'))
+    base = await mkdtemp(path.join(tmpdir(), 'pb-zip-'))
     library = path.join(base, 'library')
     await mkdir(library, { recursive: true })
   })

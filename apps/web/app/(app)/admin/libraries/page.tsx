@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { desc, sql } from 'drizzle-orm'
 import { FolderPlus, HardDrive, Lock } from 'lucide-react'
-import { getSessionUser } from '@pm/auth'
-import { can, listExclusions, nextRun } from '@pm/core'
-import { getDb, schema } from '@pm/db'
+import { getSessionUser } from '@pb/auth'
+import { can, listExclusions, nextRun } from '@pb/core'
+import { getDb, schema } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
 import { Card, CardContent } from '@/components/ui/card'
@@ -90,7 +90,7 @@ export default async function LibrariesPage() {
     <>
       <PageHeader
         title="Libraries"
-        description="Folders Print Manager indexes. Your files are never moved or renamed."
+        description="Folders PrintBench indexes. Your files are never moved or renamed."
         actions={
           <Button asChild>
             <Link href="/admin/libraries/new">
@@ -105,7 +105,7 @@ export default async function LibrariesPage() {
         <EmptyState
           icon={<HardDrive />}
           title="No libraries yet"
-          description="Point Print Manager at a folder of STL and 3MF files. It indexes them where they already live — nothing is moved, renamed or deleted."
+          description="Point PrintBench at a folder of STL and 3MF files. It indexes them where they already live — nothing is moved, renamed or deleted."
           action={
             <Button asChild>
               <Link href="/admin/libraries/new">

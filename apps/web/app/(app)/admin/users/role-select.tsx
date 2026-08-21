@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ROLE_ORDER } from '@pm/core/policy'
+import { ROLE_ORDER } from '@pb/core/policy'
 import { cn } from '@/lib/cn'
 import { setUserRole } from './actions'
 

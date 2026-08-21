@@ -1,8 +1,8 @@
 import { Readable } from 'node:stream'
 import { eq } from 'drizzle-orm'
-import { getSessionUser } from '@pm/auth'
-import { can, getPreviewStore } from '@pm/core'
-import { getDb, schema } from '@pm/db'
+import { getSessionUser } from '@pb/auth'
+import { can, getPreviewStore } from '@pb/core'
+import { getDb, schema } from '@pb/db'
 
 export const dynamic = 'force-dynamic'
 

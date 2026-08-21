@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
-import { getDb } from '@pm/db'
-import { getSettings, prune } from '@pm/core'
-import { JOB, getQueue } from '@pm/jobs'
+import { getDb } from '@pb/db'
+import { getSettings, prune } from '@pb/core'
+import { JOB, getQueue } from '@pb/jobs'
 
 /**
  * The two maintenance sweeps.

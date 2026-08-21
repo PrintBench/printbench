@@ -1,7 +1,7 @@
-import { getDb } from '@pm/db'
-import { detectProblems, getSettings } from '@pm/core'
-import type { JobPayload } from '@pm/jobs'
-import type { JOB } from '@pm/jobs'
+import { getDb } from '@pb/db'
+import { detectProblems, getSettings } from '@pb/core'
+import type { JobPayload } from '@pb/jobs'
+import type { JOB } from '@pb/jobs'
 
 /**
  * Re-examines the library for fixable problems.

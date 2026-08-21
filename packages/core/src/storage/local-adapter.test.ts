@@ -30,7 +30,7 @@ const managed = (): LibraryLocation => ({
 })
 
 beforeAll(async () => {
-  const base = await mkdtemp(path.join(tmpdir(), 'pm-storage-'))
+  const base = await mkdtemp(path.join(tmpdir(), 'pb-storage-'))
   root = path.join(base, 'library')
   outside = path.join(base, 'outside')
 

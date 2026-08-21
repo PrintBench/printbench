@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
-import { getSessionUser } from '@pm/auth'
-import { getSettings } from '@pm/core'
-import { getDb } from '@pm/db'
+import { getSessionUser } from '@pb/auth'
+import { getSettings } from '@pb/core'
+import { getDb } from '@pb/db'
 import { needsFirstRunSetup } from '@/lib/setup'
 import { Sidebar } from '@/components/shell/sidebar'
 

@@ -11,9 +11,9 @@ CREATE EXTENSION IF NOT EXISTS unaccent;
 --> statement-breakpoint
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_ts_config WHERE cfgname = 'pm_search') THEN
-    CREATE TEXT SEARCH CONFIGURATION pm_search ( COPY = english );
-    ALTER TEXT SEARCH CONFIGURATION pm_search
+  IF NOT EXISTS (SELECT 1 FROM pg_ts_config WHERE cfgname = 'pb_search') THEN
+    CREATE TEXT SEARCH CONFIGURATION pb_search ( COPY = english );
+    ALTER TEXT SEARCH CONFIGURATION pb_search
       ALTER MAPPING FOR hword, hword_part, word WITH unaccent, english_stem;
   END IF;
 END

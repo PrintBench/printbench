@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Check, X } from 'lucide-react'
-import type { SearchFacets } from '@pm/core'
+import type { SearchFacets } from '@pb/core'
 import { cn } from '@/lib/cn'
 import { buildHref, toggleHref, type ParsedSearchParams, type RawParams } from './params'
 

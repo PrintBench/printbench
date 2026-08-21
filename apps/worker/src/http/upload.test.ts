@@ -52,8 +52,8 @@ describe('sanitizeUploadPath', () => {
   })
 
   it('refuses dotfiles, which could shadow our own sidecar', () => {
-    expect(sanitizeUploadPath('.printmanager.json')).toBeNull()
-    expect(sanitizeUploadPath('Red Dragon/.printmanager.json')).toBeNull()
+    expect(sanitizeUploadPath('.printbench.json')).toBeNull()
+    expect(sanitizeUploadPath('Red Dragon/.printbench.json')).toBeNull()
     expect(sanitizeUploadPath('.hidden.stl')).toBeNull()
   })
 

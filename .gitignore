@@ -24,3 +24,6 @@ desktop.ini
 /reference/
 demo-library/
 data/
+
+# Local metadata backups (scripts/backup.mts). Your data, not the project.
+backups/

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import type { Database } from '@pm/db'
+import type { Database } from '@pb/db'
 import { isScanDue } from './schedule-presets'
 
 export * from './schedule-presets'

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { createDb } from '@pm/db'
+import { createDb } from '@pb/db'
 
 /**
  * Verifies our hand-written auth schema actually satisfies better-auth at

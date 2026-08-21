@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { createDb } from '@pm/db'
+import { createDb } from '@pb/db'
 import { refreshModelSearchVectors } from './refresh'
 
 const url = process.env.DATABASE_URL
@@ -30,8 +30,8 @@ describeDb('refreshModelSearchVectors', () => {
     const res = await db.execute<{ name: string }>(sql`
       SELECT name FROM models
       WHERE library_id = ${LIB}
-        AND search_vector @@ websearch_to_tsquery('pm_search', ${query})
-      ORDER BY ts_rank_cd(search_vector, websearch_to_tsquery('pm_search', ${query}), 32) DESC
+        AND search_vector @@ websearch_to_tsquery('pb_search', ${query})
+      ORDER BY ts_rank_cd(search_vector, websearch_to_tsquery('pb_search', ${query}), 32) DESC
     `)
     return res.rows.map((r) => r.name)
   }

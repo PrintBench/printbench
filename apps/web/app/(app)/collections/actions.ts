@@ -11,9 +11,9 @@ import {
   deleteCollection,
   removeModelFromCollection,
   renameCollection,
-} from '@pm/core'
-import { requireUser } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+} from '@pb/core'
+import { requireUser } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 
 type Result = { ok: true; slug?: string } | { ok: false; error: string }
 

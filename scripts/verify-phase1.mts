@@ -8,8 +8,8 @@
  *   npx tsx scripts/verify-phase1.mts
  */
 import { sql } from 'drizzle-orm'
-import { loadRootEnv } from '@pm/core'
-import { createDb } from '@pm/db'
+import { loadRootEnv } from '@pb/core'
+import { createDb } from '@pb/db'
 
 loadRootEnv()
 

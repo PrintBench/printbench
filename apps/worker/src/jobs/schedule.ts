@@ -1,6 +1,6 @@
-import { getDb } from '@pm/db'
-import { librariesDue } from '@pm/core'
-import { JOB, getQueue } from '@pm/jobs'
+import { getDb } from '@pb/db'
+import { librariesDue } from '@pb/core'
+import { JOB, getQueue } from '@pb/jobs'
 
 /**
  * Starts scans whose schedule has come round.

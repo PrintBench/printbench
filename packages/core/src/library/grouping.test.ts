@@ -197,7 +197,7 @@ describe('grouping', () => {
       [
         dir(
           'Explicit',
-          ['.printmanager.json', 'top.stl'],
+          ['.printbench.json', 'top.stl'],
           [dir('Explicit/Sub', ['sub.stl'])],
         ),
       ],
@@ -330,7 +330,7 @@ describe('paths', () => {
     for (const name of ['Thumbs.db', '.DS_Store', '__MACOSX', '@eaDir', 'x.tmp', '~$doc.docx', '.git']) {
       expect(isIgnoredName(name), name).toBe(true)
     }
-    for (const name of ['body.stl', 'readme.txt', '.printmanager.json']) {
+    for (const name of ['body.stl', 'readme.txt', '.printbench.json']) {
       expect(isIgnoredName(name), name).toBe(false)
     }
   })

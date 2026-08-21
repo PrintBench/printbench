@@ -18,7 +18,7 @@ import {
   Users,
 } from 'lucide-react'
 import type { Route } from 'next'
-import type { Action } from '@pm/core/policy'
+import type { Action } from '@pb/core/policy'
 import { cn } from '@/lib/cn'
 
 interface NavItemBase {

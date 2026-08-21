@@ -11,9 +11,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { unzipSync } from 'fflate'
 import { sql } from 'drizzle-orm'
-import { loadRootEnv } from '@pm/core'
-import { createDb } from '@pm/db'
-import { JOB, JobQueue } from '@pm/jobs'
+import { loadRootEnv } from '@pb/core'
+import { createDb } from '@pb/db'
+import { JOB, JobQueue } from '@pb/jobs'
 
 loadRootEnv()
 

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Loader2 } from 'lucide-react'
-import type { Settings } from '@pm/core'
+import type { Settings } from '@pb/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -94,7 +94,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
 
           <Toggle
             label="Write metadata back to disk"
-            hint="Keeps a .printmanager.json beside each model in writable libraries, so tags, creator and licence survive losing the database. Never touches your model files."
+            hint="Keeps a .printbench.json beside each model in writable libraries, so tags, creator and licence survive losing the database. Never touches your model files."
             checked={values.writeSidecars}
             onChange={(value) => set('writeSidecars', value)}
           />

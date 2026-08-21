@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream'
 import { eq } from 'drizzle-orm'
-import { getSessionUser } from '@pm/auth'
+import { getSessionUser } from '@pb/auth'
 import {
   REVALIDATE_CACHE,
   can,
@@ -11,8 +11,8 @@ import {
   libraryLocationFromRow,
   parseRange,
   verifyToken,
-} from '@pm/core'
-import { getDb, schema } from '@pm/db'
+} from '@pb/core'
+import { getDb, schema } from '@pb/db'
 
 /**
  * Serves the bytes of one file, for download or for the 3D viewer.

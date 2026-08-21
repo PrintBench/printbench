@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm'
-import type { Database } from '@pm/db'
-import { schema } from '@pm/db'
+import type { Database } from '@pb/db'
+import { schema } from '@pb/db'
 import { ReadOnlyLibraryError, type StorageAdapter } from '../storage/types'
 
 /**

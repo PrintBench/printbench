@@ -154,7 +154,7 @@ export function UploadDropzone({ targets }: { targets: UploadTarget[] }) {
         <FolderUp className="mx-auto mb-3 size-6 text-[var(--color-ink-faint)]" />
         <p className="text-sm font-medium">No library can accept uploads</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-[var(--color-ink-muted)]">
-          Uploads go into a <strong>managed</strong> library, which Print Manager owns and
+          Uploads go into a <strong>managed</strong> library, which PrintBench owns and
           organises. Your existing folders stay read-only so nothing is ever written into them.
         </p>
         <Button asChild className="mt-4" variant="secondary">

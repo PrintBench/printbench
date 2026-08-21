@@ -2,16 +2,16 @@
 
 import { eq, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
-import { PolicyError, assertCan, updateModel } from '@pm/core'
-import { requireUser } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+import { PolicyError, assertCan, updateModel } from '@pb/core'
+import { requireUser } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 
 type Result = { ok: true; sidecarWritten: boolean } | { ok: false; error: string }
 
 /**
  * Saves a model's metadata.
  *
- * Everything goes through updateModel in @pm/core so the row, the search vector
+ * Everything goes through updateModel in @pb/core so the row, the search vector
  * and the on-disk sidecar always move together — doing any one of them here
  * would let them drift.
  */

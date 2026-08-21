@@ -6,10 +6,10 @@
  *   npx tsx scripts/introspect-auth-schema.mts
  */
 process.env.BETTER_AUTH_SECRET ??= 'introspection-secret-at-least-32-chars'
-process.env.DATABASE_URL ??= 'postgres://printmanager:printmanager@localhost:5433/printmanager'
+process.env.DATABASE_URL ??= 'postgres://printbench:printbench@localhost:5433/printbench'
 
 const { getAuthTables } = await import('better-auth/db')
-const { auth } = await import('@pm/auth')
+const { auth } = await import('@pb/auth')
 
 const tables = getAuthTables(auth.options)
 for (const [key, table] of Object.entries(tables)) {

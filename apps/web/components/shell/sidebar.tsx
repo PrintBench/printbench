@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Boxes, Menu, X } from 'lucide-react'
-import type { Action, PolicyUser } from '@pm/core/policy'
-import { can } from '@pm/core/policy'
+import { Menu, X } from 'lucide-react'
+import { PrintBenchMark } from '@/components/brand/logo'
+import type { Action, PolicyUser } from '@pb/core/policy'
+import { can } from '@pb/core/policy'
 import { cn } from '@/lib/cn'
 import { NAV_SECTIONS, NavLink } from './nav'
 import { UserMenu } from './user-menu'
@@ -40,9 +41,7 @@ export function Sidebar({
           <Menu className="size-5" />
         </button>
         <Link href="/" className="flex items-center gap-2 font-semibold">
-          <span className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-ink)]">
-            <Boxes className="size-4" />
-          </span>
+          <PrintBenchMark className="h-7 w-auto" />
           {siteName}
         </Link>
         <div className="ml-auto">
@@ -66,9 +65,7 @@ export function Sidebar({
       >
         <div className="flex h-14 items-center gap-2 px-4">
           <Link href="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
-            <span className="flex size-8 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-accent)] text-[var(--color-accent-ink)]">
-              <Boxes className="size-[18px]" />
-            </span>
+            <PrintBenchMark className="h-8 w-auto" />
             {siteName}
           </Link>
           <button

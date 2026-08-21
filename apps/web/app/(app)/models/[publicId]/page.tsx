@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { sql } from 'drizzle-orm'
 import { Box, FileStack, FolderOpen, HardDrive, Layers } from 'lucide-react'
-import { getDb } from '@pm/db'
-import { getSessionUser } from '@pm/auth'
+import { getDb } from '@pb/db'
+import { getSessionUser } from '@pb/auth'
 import {
   can,
   canSendToPrinter,
@@ -17,7 +17,7 @@ import {
   printStats,
   printSuggestions,
   slicersFor,
-} from '@pm/core'
+} from '@pb/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'

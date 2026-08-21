@@ -23,7 +23,7 @@ describe('library roots', () => {
   let outside = ''
 
   beforeAll(async () => {
-    base = await mkdtemp(path.join(tmpdir(), 'pm-roots-'))
+    base = await mkdtemp(path.join(tmpdir(), 'pb-roots-'))
     root = path.join(base, 'libraries')
     outside = path.join(base, 'private')
 

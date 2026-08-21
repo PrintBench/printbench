@@ -11,8 +11,8 @@ import {
   libraryLocationFromRow,
   parseRange,
   shareTokenCoversFile,
-} from '@pm/core'
-import { getDb, schema } from '@pm/db'
+} from '@pb/core'
+import { getDb, schema } from '@pb/db'
 
 export const dynamic = 'force-dynamic'
 

@@ -11,9 +11,9 @@ import {
   PolicyError,
   ROLE_ORDER,
   type Role,
-} from '@pm/core'
-import { getAuth, requireUser } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+} from '@pb/core'
+import { getAuth, requireUser } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 
 type Result = { ok: true } | { ok: false; error: string }
 type InviteResult = { ok: true; token: string } | { ok: false; error: string }

@@ -1,6 +1,6 @@
-import { getSessionUser } from '@pm/auth'
-import { can, quickSearch } from '@pm/core'
-import { getDb } from '@pm/db'
+import { getSessionUser } from '@pb/auth'
+import { can, quickSearch } from '@pb/core'
+import { getDb } from '@pb/db'
 
 export const dynamic = 'force-dynamic'
 

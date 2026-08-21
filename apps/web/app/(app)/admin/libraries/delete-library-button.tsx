@@ -69,7 +69,7 @@ export function DeleteLibraryButton({
         <p className="text-sm font-medium">Remove {name}?</p>
 
         <p className="text-xs text-[var(--color-ink-muted)]">
-          Print Manager forgets this library and the {modelCount.toLocaleString('en-GB')} model
+          PrintBench forgets this library and the {modelCount.toLocaleString('en-GB')} model
           {modelCount === 1 ? '' : 's'} it indexed. <strong>No files are deleted</strong> — every
           one stays exactly where it is on disk.
         </p>

@@ -16,11 +16,11 @@ import {
   walkLibrary,
   type BrowseResult,
   type LibraryLocation,
-} from '@pm/core'
-import { assertCan, cronProblem, PolicyError } from '@pm/core'
-import { requireUser } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
-import { getStartedQueue, JOB } from '@pm/jobs'
+} from '@pb/core'
+import { assertCan, cronProblem, PolicyError } from '@pb/core'
+import { requireUser } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
+import { getStartedQueue, JOB } from '@pb/jobs'
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string }
 

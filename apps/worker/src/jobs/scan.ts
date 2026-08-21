@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm'
-import { getDb, schema } from '@pm/db'
-import { createStorageAdapter, libraryLocationFromRow, scanLibrary, type LibraryLocation } from '@pm/core'
-import type { JobPayload } from '@pm/jobs'
-import { JOB, getQueue } from '@pm/jobs'
+import { getDb, schema } from '@pb/db'
+import { createStorageAdapter, libraryLocationFromRow, scanLibrary, type LibraryLocation } from '@pb/core'
+import type { JobPayload } from '@pb/jobs'
+import { JOB, getQueue } from '@pb/jobs'
 
 /**
  * Runs a library scan.

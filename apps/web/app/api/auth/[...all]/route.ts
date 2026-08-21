@@ -1,4 +1,4 @@
-import { getAuth } from '@pm/auth'
+import { getAuth } from '@pb/auth'
 
 /**
  * Built per request rather than via toNextJsHandler at module scope: the auth

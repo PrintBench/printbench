@@ -153,7 +153,7 @@ function buildModelXml(vertices: number[], indices: number[]): string {
     '<?xml version="1.0" encoding="UTF-8"?>\n',
     `<model unit="${UNIT}" xml:lang="en-US" `,
     'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">',
-    '<metadata name="Application">Print Manager</metadata>',
+    '<metadata name="Application">PrintBench</metadata>',
     '<resources><object id="1" type="model"><mesh><vertices>',
   ]
 

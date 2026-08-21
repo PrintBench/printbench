@@ -1,4 +1,6 @@
-# Print Manager
+# PrintBench
+
+**Your 3D printing workspace.**
 
 A self-hosted web app for managing and finding your 3D print files (STL, 3MF, OBJ, PLY).
 
@@ -119,7 +121,7 @@ web shell is replaceable without touching the app.
 - **The 3MF parser is isomorphic** — the same code produces the server-side
   thumbnail and the in-browser view. three's own 3MFLoader cannot run in a Web
   Worker, because it depends on DOMParser.
-- **Metadata is written back to disk** as a `.printmanager.json` sidecar per
+- **Metadata is written back to disk** as a `.printbench.json` sidecar per
   model, so the database can be rebuilt by rescanning. That restore drill is
   covered by tests, not just intent.
 - **Uploads are resumable** (tus), handled by the worker so a multi-gigabyte

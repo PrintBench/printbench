@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { CheckCircle2, CircleDashed, Loader2, XCircle } from 'lucide-react'
-import type { PrintStatus } from '@pm/core'
+import type { PrintStatus } from '@pb/core'
 import { cn } from '@/lib/cn'
 
 /**

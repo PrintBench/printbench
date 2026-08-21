@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { eq, sql } from 'drizzle-orm'
-import { createDb, schema } from '@pm/db'
-import { LocalAdapter, scanLibrary, type LibraryLocation } from '@pm/core'
+import { createDb, schema } from '@pb/db'
+import { LocalAdapter, scanLibrary, type LibraryLocation } from '@pb/core'
 import { handleFileDigest } from './analyze'
 
 /**
@@ -42,7 +42,7 @@ describeDb('rename detection', () => {
     await cleanup()
     if (base) await rm(base, { recursive: true, force: true })
 
-    base = await mkdtemp(path.join(tmpdir(), 'pm-rename-'))
+    base = await mkdtemp(path.join(tmpdir(), 'pb-rename-'))
     root = path.join(base, 'library')
     await mkdir(path.join(root, 'Widget'), { recursive: true })
     await writeFile(path.join(root, 'Widget', 'part.stl'), stl())

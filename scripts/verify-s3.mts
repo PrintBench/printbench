@@ -28,16 +28,16 @@ import {
   loadRootEnv,
   scanLibrary,
   type LibraryLocation,
-} from '@pm/core'
-import { createDb, schema } from '@pm/db'
+} from '@pb/core'
+import { createDb, schema } from '@pb/db'
 import { extractZipIntoLibrary } from '../apps/worker/src/http/zip-ingest'
 
 loadRootEnv()
 
 const ENDPOINT = process.env.VERIFY_S3_ENDPOINT ?? 'http://localhost:9000'
-const BUCKET = process.env.VERIFY_S3_BUCKET ?? 'print-manager-test'
-const ACCESS_KEY = process.env.VERIFY_S3_ACCESS_KEY ?? 'printmanager'
-const SECRET_KEY = process.env.VERIFY_S3_SECRET_KEY ?? 'printmanager'
+const BUCKET = process.env.VERIFY_S3_BUCKET ?? 'printbench-test'
+const ACCESS_KEY = process.env.VERIFY_S3_ACCESS_KEY ?? 'printbench'
+const SECRET_KEY = process.env.VERIFY_S3_SECRET_KEY ?? 'printbench'
 
 /** Unique per run, so a failed run never poisons the next one. */
 const PREFIX = `verify-${Date.now()}`
@@ -85,7 +85,7 @@ async function cleanup() {
 
 try {
   await cleanup()
-  workDir = await mkdtemp(path.join(tmpdir(), 'pm-s3-'))
+  workDir = await mkdtemp(path.join(tmpdir(), 'pb-s3-'))
 
   section('Reachability')
   const storage = new S3Adapter(managed)

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { MailX, UserPlus } from 'lucide-react'
-import { inviteByToken } from '@pm/core'
-import { getDb } from '@pm/db'
+import { inviteByToken } from '@pb/core'
+import { getDb } from '@pb/db'
 import { Button } from '@/components/ui/button'
 import { InviteForm } from './invite-form'
 

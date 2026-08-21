@@ -43,7 +43,26 @@ const IGNORED_PATTERNS: RegExp[] = [
 ]
 
 /** The sidecar we write. Recognised so it never appears as a model file. */
-export const SIDECAR_FILENAME = '.printmanager.json'
+export const SIDECAR_FILENAME = '.printbench.json'
+
+/**
+ * Sidecars written under the old name, still read.
+ *
+ * The application was called Print Manager before it was PrintBench, and its
+ * sidecars are sitting in people's libraries carrying tags and notes that
+ * exist nowhere else. Renaming the file we WRITE is fine; forgetting how to
+ * READ the old one would quietly discard all of that at the next scan, which
+ * is precisely the loss the sidecar exists to prevent.
+ *
+ * Read-only and additive: nothing writes this name any more, and a folder is
+ * migrated simply by the new file appearing beside the old one.
+ */
+export const LEGACY_SIDECAR_FILENAMES: readonly string[] = ['.printmanager.json']
+
+/** True for the current sidecar name or any earlier one. */
+export function isSidecarFilename(name: string): boolean {
+  return name === SIDECAR_FILENAME || LEGACY_SIDECAR_FILENAMES.includes(name)
+}
 
 /**
  * Converts a native path to the canonical form.
@@ -96,7 +115,7 @@ export function isIgnoredName(name: string): boolean {
   if (IGNORED_NAMES.has(lower)) return true
   if (IGNORED_DIRS.has(lower)) return true
   // Dotfiles and dot-directories, except our own sidecar.
-  if (name.startsWith('.') && name !== SIDECAR_FILENAME) return true
+  if (name.startsWith('.') && !isSidecarFilename(name)) return true
   return IGNORED_PATTERNS.some((pattern) => pattern.test(name))
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "@pm/core",
+  "name": "@pb/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "@aws-sdk/client-s3": "^3.1114.0",
     "@aws-sdk/lib-storage": "^3.1115.0",
     "@aws-sdk/s3-request-presigner": "^3.1114.0",
-    "@pm/db": "*",
+    "@pb/db": "*",
     "cron-parser": "^5.10.0",
     "drizzle-orm": "^0.45.2",
     "nanoid": "^6.0.1",

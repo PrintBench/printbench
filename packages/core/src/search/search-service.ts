@@ -1,5 +1,5 @@
 import { sql, type SQL } from 'drizzle-orm'
-import type { Database } from '@pm/db'
+import type { Database } from '@pb/db'
 
 /**
  * Model search.
@@ -211,7 +211,7 @@ export async function searchModels(
 function rankExpression(query: string): SQL {
   if (!query) return sql`0::float4`
   return sql`(
-    ts_rank_cd(m.search_vector, websearch_to_tsquery('pm_search', ${query}), 32) * 4
+    ts_rank_cd(m.search_vector, websearch_to_tsquery('pb_search', ${query}), 32) * 4
     + coalesce(word_similarity(${query}, m.name), 0)
   )::float4`
 }
@@ -234,10 +234,10 @@ function buildWhere(query: string, filters: SearchFilters): SQL {
      * precisely.
      */
     if (hasSearchOperators(query)) {
-      clauses.push(sql`m.search_vector @@ websearch_to_tsquery('pm_search', ${query})`)
+      clauses.push(sql`m.search_vector @@ websearch_to_tsquery('pb_search', ${query})`)
     } else {
       clauses.push(sql`(
-        m.search_vector @@ websearch_to_tsquery('pm_search', ${query})
+        m.search_vector @@ websearch_to_tsquery('pb_search', ${query})
         OR ${query} <% m.name
         OR m.name ILIKE ${'%' + escapeLike(query) + '%'}
       )`)
@@ -451,11 +451,11 @@ export async function quickSearch(db: Database, query: string, limit = 12): Prom
     (
       SELECT 'model'::text AS kind, m.id::text, m.public_id, m.name AS label,
              l.name AS detail,
-             (ts_rank_cd(m.search_vector, websearch_to_tsquery('pm_search', ${trimmed}), 32) * 4
+             (ts_rank_cd(m.search_vector, websearch_to_tsquery('pb_search', ${trimmed}), 32) * 4
               + coalesce(word_similarity(${trimmed}, m.name), 0))::float4 AS rank
       FROM models m JOIN libraries l ON l.id = m.library_id
       WHERE m.missing_at IS NULL
-        AND (m.search_vector @@ websearch_to_tsquery('pm_search', ${trimmed})
+        AND (m.search_vector @@ websearch_to_tsquery('pb_search', ${trimmed})
              OR ${trimmed} <% m.name
              OR m.name ILIKE ${like})
       ORDER BY rank DESC, m.name ASC LIMIT ${limit}

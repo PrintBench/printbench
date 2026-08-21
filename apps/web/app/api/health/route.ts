@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { getDb } from '@pm/db'
+import { getDb } from '@pb/db'
 
 // Always hit the database; a cached health check tells you nothing.
 export const dynamic = 'force-dynamic'

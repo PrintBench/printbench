@@ -7,20 +7,35 @@
  * dark mode is the same perceived distance from its background as in light.
  * Dark is the default assumption for this app: people browse model libraries
  * in the evening, and renders read better on a dark ground.
+ *
+ * The accent and brand ramp come from the PrintBench identity, converted from
+ * its sRGB hex rather than matched by eye:
+ *
+ *   #1B7FDB  oklch(59.1% 0.164 252)   logo gradient, bottom
+ *   #2BBF9C  oklch(72.2% 0.130 172)   logo gradient, top
+ *   #1FA5C4  oklch(66.9% 0.115 219)   the cyan of "Bench" in the wordmark
+ *
+ * The accent tracks that cyan's hue (219) at a lightness that keeps white
+ * legible on it, rather than using the wordmark value directly — the wordmark
+ * sits on a dark ground, buttons do not.
  */
 @theme {
-  --color-bg: oklch(98.5% 0.002 265);
+  /* The mark's own two stops, for the logo gradient and anything quoting it. */
+  --color-brand-from: oklch(59.1% 0.164 252);
+  --color-brand-to: oklch(72.2% 0.130 172);
+
+  --color-bg: oklch(98.5% 0.002 255);
   --color-surface: oklch(100% 0 0);
-  --color-surface-2: oklch(97% 0.003 265);
-  --color-border: oklch(91% 0.005 265);
-  --color-border-strong: oklch(84% 0.008 265);
-  --color-ink: oklch(24% 0.012 265);
-  --color-ink-muted: oklch(52% 0.014 265);
-  --color-ink-faint: oklch(66% 0.012 265);
-  --color-accent: oklch(55% 0.19 264);
-  --color-accent-hover: oklch(49% 0.19 264);
+  --color-surface-2: oklch(97% 0.003 255);
+  --color-border: oklch(91% 0.005 255);
+  --color-border-strong: oklch(84% 0.008 255);
+  --color-ink: oklch(24% 0.012 255);
+  --color-ink-muted: oklch(52% 0.014 255);
+  --color-ink-faint: oklch(66% 0.012 255);
+  --color-accent: oklch(56% 0.125 219);
+  --color-accent-hover: oklch(50% 0.125 219);
   --color-accent-ink: oklch(100% 0 0);
-  --color-accent-soft: oklch(95% 0.03 264);
+  --color-accent-soft: oklch(95% 0.028 219);
   --color-danger: oklch(55% 0.21 26);
   --color-danger-soft: oklch(95% 0.04 26);
   --color-success: oklch(58% 0.15 155);
@@ -43,18 +58,22 @@
  * the toggle.
  */
 .dark {
-  --color-bg: oklch(16% 0.008 265);
-  --color-surface: oklch(20% 0.009 265);
-  --color-surface-2: oklch(24% 0.010 265);
-  --color-border: oklch(28% 0.012 265);
-  --color-border-strong: oklch(36% 0.014 265);
-  --color-ink: oklch(96% 0.003 265);
-  --color-ink-muted: oklch(72% 0.012 265);
-  --color-ink-faint: oklch(56% 0.012 265);
-  --color-accent: oklch(70% 0.16 264);
-  --color-accent-hover: oklch(76% 0.15 264);
-  --color-accent-ink: oklch(18% 0.02 264);
-  --color-accent-soft: oklch(28% 0.05 264);
+  /*
+   * The navy the brand sheet sits everything on is oklch(17.6% 0.019 256).
+   * The canvas is tuned to it, and the surfaces step up from there.
+   */
+  --color-bg: oklch(17.6% 0.019 256);
+  --color-surface: oklch(21% 0.018 256);
+  --color-surface-2: oklch(25% 0.017 256);
+  --color-border: oklch(29% 0.016 256);
+  --color-border-strong: oklch(37% 0.016 256);
+  --color-ink: oklch(96% 0.003 256);
+  --color-ink-muted: oklch(72% 0.012 256);
+  --color-ink-faint: oklch(56% 0.012 256);
+  --color-accent: oklch(72% 0.115 219);
+  --color-accent-hover: oklch(78% 0.105 219);
+  --color-accent-ink: oklch(18% 0.02 219);
+  --color-accent-soft: oklch(29% 0.045 219);
   --color-danger: oklch(66% 0.19 26);
   --color-danger-soft: oklch(28% 0.06 26);
   --color-success: oklch(70% 0.14 155);

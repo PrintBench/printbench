@@ -8,9 +8,9 @@ import {
   problemSummary,
   type ProblemKind,
   type ProblemSeverity,
-} from '@pm/core'
-import { getSessionUser } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+} from '@pb/core'
+import { getSessionUser } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
 import { EmptyState } from '@/components/ui/empty-state'

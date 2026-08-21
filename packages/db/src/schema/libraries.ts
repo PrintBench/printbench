@@ -43,7 +43,7 @@ export const libraries = pgTable(
      */
     allowWrites: boolean('allow_writes').notNull().default(false),
 
-    /** Write a .printmanager.json sidecar per model so metadata survives DB loss. */
+    /** Write a .printbench.json sidecar per model so metadata survives DB loss. */
     writeSidecar: boolean('write_sidecar').notNull().default(true),
 
     scanEnabled: boolean('scan_enabled').notNull().default(true),

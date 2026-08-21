@@ -2,9 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { eq } from 'drizzle-orm'
-import { PolicyError, assertCan, toggleLike } from '@pm/core'
-import { requireUser } from '@pm/auth'
-import { getDb, schema } from '@pm/db'
+import { PolicyError, assertCan, toggleLike } from '@pb/core'
+import { requireUser } from '@pb/auth'
+import { getDb, schema } from '@pb/db'
 
 type Result = { ok: true; liked: boolean } | { ok: false; error: string }
 

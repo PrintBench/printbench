@@ -1,5 +1,5 @@
 {
-  "name": "@pm/worker",
+  "name": "@pb/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,10 +10,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@pm/core": "*",
-    "@pm/db": "*",
-    "@pm/jobs": "*",
-    "@pm/mesh": "*",
+    "@pb/core": "*",
+    "@pb/db": "*",
+    "@pb/jobs": "*",
+    "@pb/mesh": "*",
     "@tus/file-store": "^2.1.1",
     "@tus/server": "^2.4.4",
     "archiver": "^8.0.0",

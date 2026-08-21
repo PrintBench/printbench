@@ -20,7 +20,7 @@
  */
 
 import { isModelFile } from './media-types'
-import { SIDECAR_FILENAME, basename, humanizeName, isIgnoredName, joinPath } from './paths'
+import { basename, humanizeName, isIgnoredName, isSidecarFilename, joinPath } from './paths'
 
 /**
  * Folder names that are part of a model rather than a model of their own.
@@ -113,7 +113,7 @@ function collectOwnFiles(dir: WalkedDir): GroupedFile[] {
 
   for (const file of dir.files) {
     if (isIgnoredName(file.name)) continue
-    if (file.name === SIDECAR_FILENAME) continue
+    if (isSidecarFilename(file.name)) continue
     // Size and mtime travel with the path: the scanner stores them, and the
     // digest step later uses them to decide what actually needs re-hashing.
     collected.push({ path: joinPath(dir.path, file.name), size: file.size, mtimeMs: file.mtimeMs })
@@ -132,7 +132,9 @@ function collectOwnFiles(dir: WalkedDir): GroupedFile[] {
 }
 
 function hasSidecar(dir: WalkedDir): boolean {
-  return dir.files.some((file) => file.name === SIDECAR_FILENAME)
+  // Any sidecar name, current or legacy: a folder marked as a model root by
+  // the old name must keep grouping the same way after the rename.
+  return dir.files.some((file) => isSidecarFilename(file.name))
 }
 
 /** Does this directory hold model files of its own (including common subfolders)? */

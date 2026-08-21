@@ -10,10 +10,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sql } from 'drizzle-orm'
 import sharp from 'sharp'
-import { getPreviewStore, loadRootEnv } from '@pm/core'
-import { createDb } from '@pm/db'
-import { JOB, JobQueue } from '@pm/jobs'
-import { RENDERER_VERSION } from '@pm/mesh'
+import { getPreviewStore, loadRootEnv } from '@pb/core'
+import { createDb } from '@pb/db'
+import { JOB, JobQueue } from '@pb/jobs'
+import { RENDERER_VERSION } from '@pb/mesh'
 
 loadRootEnv()
 

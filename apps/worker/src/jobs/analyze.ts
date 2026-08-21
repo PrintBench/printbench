@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto'
 import { and, eq, isNotNull } from 'drizzle-orm'
-import { getDb, schema } from '@pm/db'
+import { getDb, schema } from '@pb/db'
 import {
   createStorageAdapter,
   getPreviewStore,
   libraryLocationFromRow,
   previewKey,
   type StorageAdapter,
-} from '@pm/core'
+} from '@pb/core'
 import {
   MeshParseError,
   RENDERER_VERSION,
@@ -15,9 +15,9 @@ import {
   boxSize,
   renderThumbnail,
   supportedFormat,
-} from '@pm/mesh'
-import type { JobPayload } from '@pm/jobs'
-import { JOB } from '@pm/jobs'
+} from '@pb/mesh'
+import type { JobPayload } from '@pb/jobs'
+import { JOB } from '@pb/jobs'
 
 const THUMBNAIL_SIZE = 512
 
