@@ -3,7 +3,13 @@ import { readStl } from '../parse/stl'
 import { readThreeMf } from '../parse/threemf'
 import { readObj } from '../parse/obj'
 import { readPly } from '../parse/ply'
-import { MeshParseError, type MeshStats, type StreamSource } from '../types'
+import {
+  MeshParseError,
+  describeImplausibleSize,
+  isImplausiblySized,
+  type MeshStats,
+  type StreamSource,
+} from '../types'
 import { RENDERER_VERSION, Rasterizer, isRenderable, type RenderOptions } from './rasterizer'
 
 /**
@@ -43,11 +49,33 @@ export function supportedFormat(extension: string): SupportedFormat | null {
   return lower === 'stl' || lower === '3mf' || lower === 'obj' || lower === 'ply' ? lower : null
 }
 
-/** Measures a mesh without drawing anything. Used by the analysis job. */
+/**
+ * Measures a mesh without drawing anything. Used by the analysis job.
+ *
+ * Refuses a result that cannot describe a real object. A file can parse
+ * structurally and still not be geometry — see `isImplausiblySized` — and
+ * returning those numbers rather than refusing them pushes the problem
+ * downstream, where it surfaces as a database overflow rather than as
+ * "this file is not a mesh".
+ */
 export async function analyzeMesh(
   format: SupportedFormat,
   source: StreamSource,
   options: { byteLength?: number; signal?: AbortSignal } = {},
+): Promise<MeshStats> {
+  const stats = await measure(format, source, options)
+
+  if (isImplausiblySized(stats.bbox)) {
+    throw new MeshParseError(describeImplausibleSize(stats.bbox), format)
+  }
+
+  return stats
+}
+
+async function measure(
+  format: SupportedFormat,
+  source: StreamSource,
+  options: { byteLength?: number; signal?: AbortSignal },
 ): Promise<MeshStats> {
   switch (format) {
     case 'stl':
@@ -126,6 +154,16 @@ async function rasterise(
 ): Promise<ThumbnailResult> {
   if (!isRenderable(stats.bbox)) {
     throw new MeshParseError('Mesh has no renderable geometry', stats.format)
+  }
+
+  /*
+   * Checked here as well as in analyzeMesh, because the 3MF path reaches this
+   * function without going through it. Without this, garbage rasterises
+   * happily into a meaningless image — which is then content-addressed and
+   * cached indefinitely, and looks to everyone like a real thumbnail.
+   */
+  if (isImplausiblySized(stats.bbox)) {
+    throw new MeshParseError(describeImplausibleSize(stats.bbox), stats.format)
   }
 
   const rasterizer = new Rasterizer(stats.bbox, { ...options, size })

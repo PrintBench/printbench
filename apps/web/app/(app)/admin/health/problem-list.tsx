@@ -219,7 +219,11 @@ function Detail({ kind, detail }: { kind: ProblemKind; detail: unknown }) {
   if (kind === 'unparseable') {
     return (
       <p className="text-xs text-[var(--color-ink-muted)]">
-        analysis {String(data.analysis)}, thumbnail {String(data.thumbnail)}
+        {/* The parser's own explanation when there is one; the raw states
+            otherwise, for a failure recorded before reasons were kept. */}
+        {typeof data.reason === 'string' && data.reason
+          ? data.reason
+          : `analysis ${String(data.analysis)}, thumbnail ${String(data.thumbnail)}`}
       </p>
     )
   }

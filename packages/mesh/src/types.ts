@@ -97,6 +97,53 @@ export function boxSize(box: BoundingBox): { x: number; y: number; z: number } {
 }
 
 /**
+ * The largest dimension, in millimetres, a real model can plausibly have.
+ *
+ * A kilometre: a thousand times the largest printable object, so no genuine
+ * model is ever near it. The threshold does not exist to police model size —
+ * it exists to recognise a file that is not a mesh at all.
+ *
+ * Random bytes read as a binary STL decode into coordinates near ±3.4e38,
+ * the edge of the Float32 range. Each one is individually finite, so
+ * `isDegenerate` passes them happily, and the result is a bounding box some
+ * 6.8e38 across. That is not a large model; it is proof the bytes were never
+ * geometry.
+ */
+export const MAX_PLAUSIBLE_DIMENSION = 1_000_000
+
+/**
+ * True when a bounding box is too large to have come from a real mesh.
+ *
+ * Tested on the box's SIZE rather than its coordinates: a mesh may sit
+ * legitimately far from the origin — exported from a build plate, say — and
+ * it is the extent that has to be believable, not the position.
+ *
+ * An absent or empty box is NOT implausible, merely empty. That is a
+ * different failure with its own message, and conflating the two would
+ * report "not a mesh" for a file that simply has no triangles.
+ */
+export function isImplausiblySized(box: BoundingBox | null): box is BoundingBox {
+  if (!box || isEmptyBox(box)) return false
+  const size = boxSize(box)
+  return (
+    size.x > MAX_PLAUSIBLE_DIMENSION ||
+    size.y > MAX_PLAUSIBLE_DIMENSION ||
+    size.z > MAX_PLAUSIBLE_DIMENSION
+  )
+}
+
+/** Explains an implausible box in terms someone can act on. */
+export function describeImplausibleSize(box: BoundingBox): string {
+  const size = boxSize(box)
+  const largest = Math.max(size.x, size.y, size.z)
+  return (
+    `This does not look like a mesh: its geometry spans ${largest.toPrecision(3)} mm, ` +
+    `which is not a real object. The file is probably corrupt, truncated, or not ` +
+    `the format its extension claims.`
+  )
+}
+
+/**
  * True when a triangle cannot contribute to a render.
  *
  * Real-world meshes are full of these — exporters emit zero-area slivers and

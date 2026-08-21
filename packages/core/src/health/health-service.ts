@@ -145,9 +145,20 @@ function detector(kind: ProblemKind, libraryId?: string) {
         WHERE child.missing_at IS NULL AND NOT child.is_file_model ${lib}`
 
     case 'unparseable':
+      /*
+       * The parser's own reason is carried through, not just the two state
+       * columns. "analysis failed, thumbnail failed" says only that something
+       * went wrong; the recorded message says what — a truncated file, or one
+       * whose geometry could not be a real object — which is the difference
+       * between a report someone can act on and one they cannot.
+       */
       return sql`
         SELECT f.model_id AS id, f.id AS file_id,
-               jsonb_build_object('analysis', f.analysis_state, 'thumbnail', f.thumb_state) AS detail
+               jsonb_build_object(
+                 'analysis', f.analysis_state,
+                 'thumbnail', f.thumb_state,
+                 'reason', coalesce(f.analysis_error, f.thumb_error)
+               ) AS detail
         FROM model_files f
         JOIN models m ON m.id = f.model_id
         WHERE f.missing_at IS NULL AND f.previewable
