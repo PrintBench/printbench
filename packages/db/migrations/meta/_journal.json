@@ -50,6 +50,13 @@
       "when": 1787280000000,
       "tag": "0006_library_watch",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787320000000,
+      "tag": "0007_invitations",
+      "breakpoints": true
     }
   ]
 }

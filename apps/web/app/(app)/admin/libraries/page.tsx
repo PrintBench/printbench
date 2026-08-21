@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ScanButton } from './scan-button'
 import { SchedulePicker } from './schedule-picker'
 import { RemovedModels } from './removed-models'
+import { DeleteLibraryButton } from './delete-library-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Libraries' }
@@ -48,6 +49,7 @@ export default async function LibrariesPage() {
       scanEnabled: schema.libraries.scanEnabled,
       scanCron: schema.libraries.scanCron,
       watchEnabled: schema.libraries.watchEnabled,
+      writeSidecar: schema.libraries.writeSidecar,
       createdAt: schema.libraries.createdAt,
     })
     .from(schema.libraries)
@@ -144,8 +146,23 @@ export default async function LibrariesPage() {
                     </p>
 
                     <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-                      {NUMBER.format(stat?.models ?? 0)} models ·{' '}
-                      {NUMBER.format(stat?.files ?? 0)} files ·{' '}
+                      {/*
+                        A count is the obvious thing to click when you want to
+                        see what it counted. Search already filters by library,
+                        so this needs no new page — just the link nobody had
+                        put on it.
+                      */}
+                      {(stat?.models ?? 0) > 0 ? (
+                        <Link
+                          href={`/search?library=${library.id}`}
+                          className="font-medium text-[var(--color-ink)] underline decoration-[var(--color-border-strong)] underline-offset-2 hover:decoration-[var(--color-accent)]"
+                        >
+                          {NUMBER.format(stat!.models)} models
+                        </Link>
+                      ) : (
+                        <>0 models</>
+                      )}{' '}
+                      · {NUMBER.format(stat?.files ?? 0)} files ·{' '}
                       {formatBytes(Number(stat?.total_size ?? 0))}
                     </p>
 
@@ -198,7 +215,15 @@ export default async function LibrariesPage() {
                     )}
                   </div>
 
-                  <ScanButton libraryId={library.id} needsConfirmation={aborted} />
+                  <div className="flex flex-col items-end gap-1.5">
+                    <ScanButton libraryId={library.id} needsConfirmation={aborted} />
+                    <DeleteLibraryButton
+                      libraryId={library.id}
+                      name={library.name}
+                      modelCount={stat?.models ?? 0}
+                      writesSidecars={library.writeSidecar}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             )

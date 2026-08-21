@@ -46,8 +46,26 @@ describeDb('refreshModelSearchVectors', () => {
     return res.rows.map((r) => r.name)
   }
 
+  /**
+   * Removes this suite's fixtures, including by name.
+   *
+   * The unique index on creators is lower(name), so an id-only delete leaves a
+   * colliding row behind. Run before inserting as well as after: a run that
+   * dies partway — the database going away mid-suite, say — never reaches its
+   * teardown, and every later run would then fail on the residue rather than
+   * on anything real.
+   */
+  async function cleanup() {
+    await db.execute(sql`DELETE FROM models WHERE library_id = ${LIB}`)
+    await db.execute(sql`DELETE FROM tags WHERE id = ${TAG} OR lower(name) = 'pokémon'`)
+    await db.execute(sql`
+      DELETE FROM creators WHERE id = ${CREATOR} OR lower(name) = 'loot studios'`)
+    await db.execute(sql`DELETE FROM libraries WHERE id = ${LIB}`)
+  }
+
   beforeAll(async () => {
     ;({ pool, db } = createDb(url))
+    await cleanup()
     await db.execute(sql`SET pg_trgm.word_similarity_threshold = 0.5`)
     await db.execute(sql`
       INSERT INTO libraries (id, name, backend, path)
@@ -75,13 +93,7 @@ describeDb('refreshModelSearchVectors', () => {
   })
 
   afterAll(async () => {
-    await db.execute(sql`DELETE FROM models WHERE library_id = ${LIB}`)
-    await db.execute(sql`DELETE FROM tags WHERE id = ${TAG} OR lower(name) = 'pokémon'`)
-    // By name too: the unique index is lower(name), so an id-only delete can
-    // leave a colliding row from another run.
-    await db.execute(sql`
-      DELETE FROM creators WHERE id = ${CREATOR} OR lower(name) = 'loot studios'`)
-    await db.execute(sql`DELETE FROM libraries WHERE id = ${LIB}`)
+    await cleanup()
     await pool.end()
   })
 

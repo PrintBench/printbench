@@ -1,14 +1,15 @@
+import { headers } from 'next/headers'
 import { desc } from 'drizzle-orm'
-import { UserPlus } from 'lucide-react'
 import { getSessionUser } from '@pm/auth'
-import { can } from '@pm/core'
+import { can, listPendingInvites } from '@pm/core'
 import { getDb, schema } from '@pm/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { NotPermitted } from '@/components/shell/not-permitted'
 import { RoleSelect } from './role-select'
+import { UserActions } from './user-actions'
+import { AddPeople } from './add-people'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Users' }
@@ -27,7 +28,9 @@ export default async function UsersPage() {
     return <NotPermitted what="user management" />
   }
 
-  const users = await getDb()
+  const db = getDb()
+
+  const users = await db
     .select({
       id: schema.user.id,
       name: schema.user.name,
@@ -39,18 +42,41 @@ export default async function UsersPage() {
     .from(schema.user)
     .orderBy(desc(schema.user.createdAt))
 
+  const pending = await listPendingInvites(db)
+
+  /*
+   * The origin an invitation link should carry, taken from the request rather
+   * than from configuration: whoever is reading this page reached it somehow,
+   * and that host is the one their colleague will also be able to reach. A
+   * configured APP_URL is frequently the container's idea of itself.
+   */
+  const requestHeaders = await headers()
+  const forwardedHost = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host')
+  const protocol = requestHeaders.get('x-forwarded-proto') ?? 'http'
+  const origin = forwardedHost
+    ? `${protocol}://${forwardedHost}`
+    : (process.env.APP_URL ?? 'http://localhost:3000')
+
   return (
     <>
       <PageHeader
         title="Users"
         description="Who can reach this instance, and what they may do."
-        actions={
-          <Button disabled title="Invitations arrive in a later phase">
-            <UserPlus />
-            Invite
-          </Button>
-        }
       />
+
+      <div className="mb-6">
+        <AddPeople
+          origin={origin}
+          pending={pending.map((entry) => ({
+            id: entry.id,
+            token: entry.token,
+            email: entry.email,
+            role: entry.role,
+            expiresAt: entry.expiresAt.toISOString(),
+            invitedByName: entry.invitedByName,
+          }))}
+        />
+      </div>
 
       <Card className="overflow-hidden">
         <table className="w-full text-sm">
@@ -59,6 +85,9 @@ export default async function UsersPage() {
               <th className="px-4 py-2.5 font-medium">User</th>
               <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Joined</th>
               <th className="px-4 py-2.5 font-medium">Role</th>
+              <th className="px-4 py-2.5 text-right font-medium">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -86,6 +115,21 @@ export default async function UsersPage() {
                     // the instance, so the control is disabled for yourself.
                     disabled={row.id === admin!.id}
                   />
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {/*
+                    Nothing offered for your own account: suspending or
+                    deleting yourself is a lockout with no way back through
+                    the UI, and the server refuses both regardless.
+                  */}
+                  {row.id !== admin!.id && (
+                    <UserActions
+                      userId={row.id}
+                      name={row.name}
+                      email={row.email}
+                      suspended={row.banned}
+                    />
+                  )}
                 </td>
               </tr>
             ))}
