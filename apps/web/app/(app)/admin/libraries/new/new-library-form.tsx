@@ -113,8 +113,8 @@ export function NewLibraryForm() {
       const result = await createLibrary({
         name,
         // An uploads library derives its own folder; there is nothing to send.
-        path: kind === 'in_place' && backend !== 's3' ? path : undefined,
-        s3: kind === 'in_place' && backend === 's3' ? s3 : undefined,
+        path: backend === 'local' && kind === 'in_place' ? path : undefined,
+        s3: backend === 's3' ? s3 : undefined,
         kind: kind ?? 'in_place',
         groupingMode: mode,
         groupingDepth: mode === 'flat' ? depth : undefined,
@@ -181,11 +181,13 @@ export function NewLibraryForm() {
 
   /* ------------------------------------------ step 1b: where it lives */
 
-  if (kind === 'in_place' && backend === null) {
+  if (backend === null) {
     return (
       <div className="max-w-3xl space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-[var(--color-ink-muted)]">Where are these files?</p>
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            {kind === 'managed' ? 'Where should uploads be stored?' : 'Where are these files?'}
+          </p>
           <Button variant="ghost" size="sm" onClick={() => setKind(null)}>
             Back
           </Button>
@@ -200,7 +202,9 @@ export function NewLibraryForm() {
             <HardDrive className="size-5 text-[var(--color-accent)]" />
             <p className="mt-3 font-medium">On this server</p>
             <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-              A local disk or a mounted NAS share. Chosen by browsing what is there.
+              {kind === 'managed'
+                ? 'A folder alongside the application’s own data, so it is covered by the same backup.'
+                : 'A local disk or a mounted NAS share. Chosen by browsing what is there.'}
             </p>
           </button>
 
@@ -212,8 +216,9 @@ export function NewLibraryForm() {
             <Cloud className="size-5 text-[var(--color-accent)]" />
             <p className="mt-3 font-medium">S3-compatible storage</p>
             <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-              A bucket you already have files in — AWS S3, MinIO, Backblaze, or anything speaking
-              the same API.
+              {kind === 'managed'
+                ? 'A bucket this app uploads into — AWS S3, MinIO, Backblaze, or anything speaking the same API.'
+                : 'A bucket you already have files in — AWS S3, MinIO, Backblaze, or anything speaking the same API.'}
             </p>
           </button>
         </div>
@@ -224,31 +229,47 @@ export function NewLibraryForm() {
   /* ------------------------------------- step 2a: a library for uploads */
 
   if (kind === 'managed') {
+    const readyToCreate = name.trim() !== '' && (backend !== 's3' || s3.bucket.trim() !== '')
+
     return (
       <div className="max-w-3xl space-y-4">
         <Card>
           <CardContent className="space-y-4 p-5">
             <p className="flex items-start gap-2 text-sm text-[var(--color-ink-muted)]">
               <Upload className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)]" />
-              A folder is created for this library and the app writes uploads into it. You do not
-              choose where — it lives with the application&apos;s own data so it is covered by the
-              same backup.
+              {backend === 's3'
+                ? 'Uploads are written straight into this bucket, in parts, so a multi-gigabyte model never has to fit in the server’s memory.'
+                : 'A folder is created for this library and the app writes uploads into it. You do not choose where — it lives with the application’s own data so it is covered by the same backup.'}
             </p>
 
-            <Field label="Library name" htmlFor="name" hint="Used for the folder name too.">
+            <Field
+              label="Library name"
+              htmlFor="name"
+              hint={backend === 's3' ? undefined : 'Used for the folder name too.'}
+            >
               <Input
                 name="name"
-                autoFocus
+                autoFocus={backend !== 's3'}
                 value={name}
                 placeholder="Uploads"
                 onChange={(e) => setName(e.target.value)}
               />
             </Field>
 
-            {uploadRoot && (
-              <p className="font-mono text-xs text-[var(--color-ink-faint)]">
-                Will be created under {uploadRoot}
-              </p>
+            {backend === 's3' ? (
+              <S3Fields
+                value={s3}
+                onChange={(next) => {
+                  setS3(next)
+                  setError(null)
+                }}
+              />
+            ) : (
+              uploadRoot && (
+                <p className="font-mono text-xs text-[var(--color-ink-faint)]">
+                  Will be created under {uploadRoot}
+                </p>
+              )
             )}
 
             {error && (
@@ -258,10 +279,10 @@ export function NewLibraryForm() {
             )}
 
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={() => setKind(null)}>
+              <Button variant="ghost" onClick={() => setBackend(null)}>
                 Back
               </Button>
-              <Button disabled={saving || !name.trim()} onClick={save}>
+              <Button disabled={saving || !readyToCreate} onClick={save}>
                 {saving ? 'Creating…' : 'Create library'}
               </Button>
             </div>

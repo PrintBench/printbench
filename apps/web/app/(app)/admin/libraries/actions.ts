@@ -208,9 +208,9 @@ export async function previewLibrary(input: {
 
 export async function createLibrary(input: {
   name: string
-  /** Required for an existing folder; ignored for an uploads library or S3. */
+  /** Required for an existing local folder; ignored for an uploads library or S3. */
   path?: string
-  /** An existing S3 bucket. Only offered for `in_place` — see the form. */
+  /** An S3 bucket — one you already have files in, or one to upload into. */
   s3?: S3Config
   kind: 'in_place' | 'managed'
   groupingMode: 'deepest' | 'top_level' | 'flat'
@@ -224,18 +224,9 @@ export async function createLibrary(input: {
     if (!name) return { ok: false, error: 'Give the library a name.' }
 
     if (input.s3) {
-      /*
-       * Not offered by the form, but checked here too: an uploads library
-       * writing into someone's existing bucket is a very different, much
-       * larger feature (multipart writes through the tus pipeline) than
-       * reading one that already has files in it.
-       */
-      if (input.kind === 'managed') {
-        return { ok: false, error: 'An uploads library cannot be backed by S3 yet.' }
-      }
       if (!input.s3.bucket.trim()) return { ok: false, error: 'Give the bucket a name.' }
 
-      const storage = createStorageAdapter(s3Location('validate', 'in_place', input.s3))
+      const storage = createStorageAdapter(s3Location('validate', input.kind, input.s3))
       const health = await storage.healthCheck()
       if (!health.ok) return { ok: false, error: health.reason ?? 'That bucket is not readable.' }
 
@@ -258,9 +249,11 @@ export async function createLibrary(input: {
         .insert(schema.libraries)
         .values({
           name,
-          kind: 'in_place',
+          kind: input.kind,
           backend: 's3',
-          allowWrites: false,
+          // An uploads library exists to be written to; a bucket of files the
+          // user already had keeps the same read-only promise as a folder.
+          allowWrites: input.kind === 'managed',
           s3Bucket: input.s3.bucket.trim(),
           s3Prefix: prefix,
           s3Region: input.s3.region?.trim() || null,

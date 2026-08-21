@@ -1,16 +1,16 @@
 import { Readable } from 'node:stream'
 import { eq } from 'drizzle-orm'
 import {
-  LocalAdapter,
   REVALIDATE_CACHE,
   accelMounts,
   accelRedirectPath,
   contentDisposition,
+  createStorageAdapter,
   getPreviewStore,
   getSettings,
+  libraryLocationFromRow,
   parseRange,
   shareTokenCoversFile,
-  type LibraryLocation,
 } from '@pm/core'
 import { getDb, schema } from '@pm/db'
 
@@ -90,16 +90,10 @@ export async function GET(
     .limit(1)
 
   const row = rows[0]
-  if (!row || row.library.backend !== 'local') return notFound()
+  if (!row) return notFound()
 
-  const location: LibraryLocation = {
-    id: row.library.id,
-    kind: row.library.kind,
-    backend: row.library.backend,
-    allowWrites: row.library.allowWrites,
-    path: row.library.path,
-  }
-  const storage = new LocalAdapter(location)
+  const location = libraryLocationFromRow(row.library)
+  const storage = createStorageAdapter(location)
 
   const relativePath = row.model.isFileModel
     ? row.model.path
@@ -123,6 +117,18 @@ export async function GET(
 
   if (request.headers.get('if-none-match') === headers.etag) {
     return new Response(null, { status: 304, headers })
+  }
+
+  /*
+   * S3: hand over a presigned URL, exactly as the authenticated route does.
+   * The token has already been checked against this file, so the redirect is
+   * the delivery step and nothing more.
+   */
+  if (location.backend === 's3') {
+    const delivery = await storage.downloadUrl(relativePath, filename)
+    if (delivery.kind === 'redirect') {
+      return new Response(null, { status: 302, headers: { location: delivery.url } })
+    }
   }
 
   /*

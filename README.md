@@ -127,6 +127,12 @@ web shell is replaceable without touching the app.
   is preserved, because that structure is what groups files into models. A
   `.zip` is extracted server-side rather than stored whole, with a zip-slip
   guard on every entry, so a downloaded pack can be dropped in as one file.
+- **S3 is a full backend, not just a source.** A library can live on local
+  disk, a NAS mount or an S3-compatible bucket, and read *and* write the same
+  either way — uploads, zip extraction, sidecars and deletion all go through
+  one storage interface. Uploads to a bucket are multipart, so peak memory is
+  the in-flight window (32 MB) rather than the size of the file; verified at
+  128 MB against MinIO with `npm run verify:s3`.
 - **Scanning refuses to destroy metadata.** If a scan would mark more than 20% of
   models missing — an unmounted NAS, say — it aborts and asks an admin. The
   nightly prune additionally refuses to touch a library where *every* model is

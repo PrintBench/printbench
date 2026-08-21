@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { mkdir, rename, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { eq } from 'drizzle-orm'
@@ -7,9 +8,11 @@ import { Server } from '@tus/server'
 import { FileStore } from '@tus/file-store'
 import { getDb, schema } from '@pm/db'
 import {
+  createStorageAdapter,
   dirname,
   extensionOf,
   isSafeRelativePath,
+  libraryLocationFromRow,
   normalizePath,
   isIgnoredName,
   isIndexable,
@@ -185,7 +188,7 @@ async function ingest(
     .limit(1)
 
   const library = rows[0]
-  if (!library || library.backend !== 'local' || !library.path) {
+  if (!library) {
     console.warn(`[upload] library ${libraryId} cannot receive uploads`)
     return
   }
@@ -196,6 +199,7 @@ async function ingest(
     return
   }
 
+  const storage = createStorageAdapter(libraryLocationFromRow(library))
   const staged = path.join(stagingDir, uploadId)
 
   /*
@@ -208,7 +212,7 @@ async function ingest(
   if (extensionOf(relativePath) === 'zip') {
     const destRelativePath = joinPath(dirname(relativePath), stemOf(relativePath))
     try {
-      const result = await extractZipIntoLibrary(staged, library.path, destRelativePath)
+      const result = await extractZipIntoLibrary(staged, storage, destRelativePath)
       console.log(
         `[upload] extracted ${result.filesExtracted} file(s) from ${relativePath} into "${library.name}"`,
       )
@@ -229,15 +233,65 @@ async function ingest(
     return
   }
 
-  const destination = path.join(library.path, relativePath)
-  const resolved = path.resolve(destination)
-  const root = path.resolve(library.path)
-  // Belt and braces alongside sanitizeUploadPath: this is the last point before
-  // a write, and the cost of being wrong is writing outside the library.
-  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-    console.error(`[upload] refusing path escaping the library: ${relativePath}`)
-    await rm(path.join(stagingDir, uploadId), { force: true })
+  const size = (await stat(staged).catch(() => null))?.size ?? 0
+
+  try {
+    if (library.backend === 'local' && library.path) {
+      await moveIntoLocalLibrary(staged, library.path, relativePath)
+    } else {
+      /*
+       * Streamed through the adapter, which does a multipart upload for S3 —
+       * so a multi-gigabyte mesh never has to be held in memory, and a failure
+       * aborts the upload rather than leaving orphaned parts in the bucket.
+       */
+      await storage.write(relativePath, createReadStream(staged))
+      await rm(staged, { force: true })
+    }
+  } catch (error) {
+    console.error(`[upload] could not store ${relativePath}: ${String(error)}`)
+    await rm(staged, { force: true })
+    await rm(`${staged}.json`, { force: true })
     return
+  }
+
+  // tus keeps a .json alongside the payload.
+  await rm(`${staged}.json`, { force: true })
+
+  console.log(`[upload] stored ${relativePath} (${size} bytes) in "${library.name}"`)
+
+  /*
+   * A scan rather than a direct insert. The scan already knows how to group
+   * folders into models, pick a preview and queue thumbnails — duplicating any
+   * of that here would be a second implementation to keep in step.
+   */
+  await getQueue().send(
+    JOB.libraryScan,
+    { libraryId: library.id, mode: 'fast', force: false },
+    { singletonKey: `scan:${library.id}` },
+  )
+}
+
+/**
+ * Moves a staged upload into a local library.
+ *
+ * Kept as a rename rather than routed through the storage adapter, which
+ * would work but would copy every byte. Staging and the library are normally
+ * the same filesystem, where a rename is instant however large the file —
+ * turning that into a full copy of a 6 GB mesh would be a real regression for
+ * the case that matters most.
+ */
+async function moveIntoLocalLibrary(
+  staged: string,
+  libraryPath: string,
+  relativePath: string,
+): Promise<void> {
+  const resolved = path.resolve(path.join(libraryPath, relativePath))
+  const root = path.resolve(libraryPath)
+  // Belt and braces alongside sanitizeUploadPath: this is the last point
+  // before a write, and the cost of being wrong is writing outside the
+  // library. (The adapter applies the same check on the S3 path.)
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+    throw new Error(`path escapes the library: ${relativePath}`)
   }
 
   await mkdir(path.dirname(resolved), { recursive: true })
@@ -254,22 +308,6 @@ async function ingest(
       throw error
     }
   }
-  // tus keeps a .json alongside the payload.
-  await rm(`${staged}.json`, { force: true })
-
-  const size = (await stat(resolved).catch(() => null))?.size ?? 0
-  console.log(`[upload] stored ${relativePath} (${size} bytes) in "${library.name}"`)
-
-  /*
-   * A scan rather than a direct insert. The scan already knows how to group
-   * folders into models, pick a preview and queue thumbnails — duplicating any
-   * of that here would be a second implementation to keep in step.
-   */
-  await getQueue().send(
-    JOB.libraryScan,
-    { libraryId: library.id, mode: 'fast', force: false },
-    { singletonKey: `scan:${library.id}` },
-  )
 }
 
 export function handleUploadRequest(

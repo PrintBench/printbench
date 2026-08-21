@@ -2,13 +2,14 @@
 
 import { eq } from 'drizzle-orm'
 import {
-  LocalAdapter,
   PolicyError,
   assertCan,
   canSendToPrinter,
+  createStorageAdapter,
   decryptSecret,
+  libraryLocationFromRow,
   sendToPrinter,
-  type LibraryLocation,
+  type StorageAdapter,
 } from '@pm/core'
 import { requireUser } from '@pm/auth'
 import { getDb, schema } from '@pm/db'
@@ -82,9 +83,6 @@ export async function sendFileToPrinter(
 
     const row = rows[0]
     if (!row || row.file.missingAt) return { ok: false, error: 'That file is no longer on disk.' }
-    if (row.library.backend !== 'local') {
-      return { ok: false, error: 'Sending is only supported for local libraries so far.' }
-    }
     if (!canSendToPrinter(row.file.extension)) {
       return {
         ok: false,
@@ -92,14 +90,7 @@ export async function sendFileToPrinter(
       }
     }
 
-    const location: LibraryLocation = {
-      id: row.library.id,
-      kind: row.library.kind,
-      backend: row.library.backend,
-      allowWrites: row.library.allowWrites,
-      path: row.library.path,
-    }
-    const storage = new LocalAdapter(location)
+    const storage = createStorageAdapter(libraryLocationFromRow(row.library))
 
     // A model that is a single loose file has no folder of its own.
     const relativePath = row.model.isFileModel
@@ -142,7 +133,7 @@ export async function sendFileToPrinter(
 }
 
 async function readAll(
-  storage: LocalAdapter,
+  storage: StorageAdapter,
   relativePath: string,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const chunks: Buffer[] = []

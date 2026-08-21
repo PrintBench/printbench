@@ -5,8 +5,7 @@ import { schema } from '@pm/db'
 import { slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
 import { readSidecar, sidecarUnchanged, writeSidecar, type SidecarContent } from '../sidecar/sidecar'
-import { LocalAdapter } from '../storage/local-adapter'
-import type { LibraryLocation } from '../storage/types'
+import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
 
 /**
  * Editing a model's metadata.
@@ -203,22 +202,17 @@ export async function syncSidecar(db: Database, modelId: string): Promise<boolea
 
   const row = rows[0]
   if (!row || !row.library.writeSidecar) return false
-  if (row.library.backend !== 'local') return false
   // A single loose file has no folder of its own to put a sidecar in.
   if (row.model.isFileModel) return false
 
   const content = await buildSidecarContent(db, modelId)
 
-  const location: LibraryLocation = {
-    id: row.library.id,
-    kind: row.library.kind,
-    backend: 'local',
+  const storage = createStorageAdapter({
+    ...libraryLocationFromRow(row.library),
     // The sidecar is the one permitted exception to an in-place library being
     // read-only. It never touches the user's model files.
     allowWrites: true,
-    path: row.library.path,
-  }
-  const storage = new LocalAdapter(location)
+  })
 
   const { data: existing } = await readSidecar(storage, row.model.path)
   if (sidecarUnchanged(existing, content)) return false

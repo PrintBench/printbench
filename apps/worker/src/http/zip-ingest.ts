@@ -1,7 +1,6 @@
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import path from 'node:path'
+import { readFile, stat } from 'node:fs/promises'
 import { unzipSync } from 'fflate'
-import { isIgnoredPath, isSafeRelativePath, normalizePath } from '@pm/core'
+import { isIgnoredPath, isSafeRelativePath, joinPath, normalizePath, type StorageAdapter } from '@pm/core'
 
 /**
  * Extracting an uploaded zip into a library.
@@ -12,13 +11,16 @@ import { isIgnoredPath, isSafeRelativePath, normalizePath } from '@pm/core'
  * as useful sitting in the library as one opaque .zip nobody can browse into,
  * so a zip lands here and is unpacked, never stored whole.
  *
- * The zip-slip guard is the point of this file. Every entry name in a zip is
- * an attacker-controlled string, and "../../../../etc/cron.d/x" is a
- * perfectly legal one — fflate does not check this for you, because fflate
- * has no idea it is about to be written to a filesystem.
+ * Everything is written through the storage adapter rather than `fs`, so this
+ * works the same for a local library and an S3 bucket. The adapter is also
+ * the second layer of the traversal guard — the first is the explicit check
+ * on each entry name below, because every entry name in a zip is an
+ * attacker-controlled string and "../../../../etc/cron.d/x" is a perfectly
+ * legal one. fflate does not check this for you; it has no idea it is about
+ * to be written anywhere.
  */
 
-/** unzipSync holds the whole archive in memory, so the input itself is capped. */
+/** The staged zip is read into memory to be unpacked, so its size is capped. */
 export const MAX_ZIP_INPUT_BYTES = 1 * 1024 * 1024 * 1024
 
 /** A second, independent cap on the decompressed total — the actual bomb guard. */
@@ -36,19 +38,21 @@ export class ZipIngestError extends Error {
 export interface ZipIngestResult {
   filesExtracted: number
   bytesExtracted: number
+  /** Library-relative folder the contents landed in. */
   destination: string
 }
 
 /**
- * Extracts `zipPath` into `<libraryRoot>/<destRelativePath>`.
+ * Extracts `zipPath` (a local staged upload) into `destRelativePath` within
+ * whatever the adapter is backed by.
  *
- * Refuses if the destination already exists, rather than merging into it —
- * silently overwriting files nobody asked to overwrite is worse than making
- * someone rename and re-upload.
+ * Refuses if the destination already holds anything, rather than merging into
+ * it — silently overwriting files nobody asked to overwrite is worse than
+ * making someone rename and re-upload.
  */
 export async function extractZipIntoLibrary(
   zipPath: string,
-  libraryRoot: string,
+  storage: StorageAdapter,
   destRelativePath: string,
 ): Promise<ZipIngestResult> {
   const size = (await stat(zipPath)).size
@@ -58,12 +62,11 @@ export async function extractZipIntoLibrary(
     )
   }
 
-  const root = path.resolve(libraryRoot)
-  const destDir = path.resolve(root, destRelativePath)
-  if (destDir !== root && !destDir.startsWith(root + path.sep)) {
+  const destination = normalizePath(destRelativePath)
+  if (!destination || !isSafeRelativePath(destination)) {
     throw new ZipIngestError('Refusing to extract outside the library.')
   }
-  if (await exists(destDir)) {
+  if (await destinationInUse(storage, destination)) {
     throw new ZipIngestError('A folder with that name already exists in the library.')
   }
 
@@ -99,8 +102,7 @@ export async function extractZipIntoLibrary(
       if (!relative) continue
 
       /*
-       * The zip-slip guard. isSafeRelativePath rejects "..", absolute paths
-       * and drive letters on the RAW entry name — checking after
+       * The zip-slip guard, on the RAW entry name. Checking after
        * normalisation would let "../../../etc/passwd" through, because
        * normalizePath only strips leading slashes, not ".." segments.
        */
@@ -109,11 +111,10 @@ export async function extractZipIntoLibrary(
         continue
       }
 
-      const normalized = normalizePath(relative)
-      const target = path.resolve(destDir, normalized)
-      // Belt and braces alongside isSafeRelativePath, exactly like a regular
-      // upload: this is the last check before a write.
-      if (target !== destDir && !target.startsWith(destDir + path.sep)) {
+      const target = joinPath(destination, normalizePath(relative))
+      // Belt and braces: the joined path must still sit under the destination.
+      // The adapter checks containment against the library root again on write.
+      if (target !== destination && !target.startsWith(`${destination}/`)) {
         console.warn(`[zip] skipping entry escaping the destination: ${name}`)
         continue
       }
@@ -125,23 +126,50 @@ export async function extractZipIntoLibrary(
         )
       }
 
-      await mkdir(path.dirname(target), { recursive: true })
-      await writeFile(target, data)
+      await storage.write(target, Buffer.from(data))
       written.push(target)
     }
   } catch (error) {
-    // Partial extraction is worse than none: a half-written pack looks like a
-    // corrupt model to the next scan.
-    await rm(destDir, { recursive: true, force: true })
+    /*
+     * Roll back what landed. A half-extracted pack looks like a corrupt model
+     * to the next scan, and on S3 it would also be silently billable.
+     *
+     * Removed file by file rather than as a tree: S3 has no directories to
+     * remove, and these are exactly the keys this call created. An emptied
+     * folder may remain on a local library, which is harmless — the grouping
+     * step ignores a directory with no model files, and `destinationInUse`
+     * below deliberately tests for *entries* rather than the folder existing,
+     * so a retry of the same upload is not blocked by the leftover.
+     */
+    for (const target of written) {
+      await storage.remove(target).catch(() => undefined)
+    }
     throw error
   }
 
   if (written.length === 0) {
-    await rm(destDir, { recursive: true, force: true })
     throw new ZipIngestError('Every entry in that zip was rejected as unsafe or ignorable.')
   }
 
-  return { filesExtracted: written.length, bytesExtracted, destination: destDir }
+  return { filesExtracted: written.length, bytesExtracted, destination }
+}
+
+/**
+ * Whether anything already occupies the destination.
+ *
+ * Tests for entries rather than for the folder existing, because the two
+ * differ in ways that matter at both ends: S3 has no folders at all, and on a
+ * local library an empty directory left by a rolled-back extraction must not
+ * block the retry.
+ */
+async function destinationInUse(storage: StorageAdapter, destination: string): Promise<boolean> {
+  // A file sitting at exactly that path — "Dragon" the file vs "Dragon/" the
+  // folder we are about to create.
+  const existing = await storage.stat(destination).catch(() => null)
+  if (existing && !existing.isDirectory) return true
+
+  const entries = await storage.list(destination).catch(() => [])
+  return entries.length > 0
 }
 
 /**
@@ -162,15 +190,6 @@ function unwrapCommonRoot(names: string[]): (name: string) => string {
   return (name) => {
     const normalized = normalizePath(name)
     return normalized.startsWith(prefix) ? normalized.slice(prefix.length) : normalized
-  }
-}
-
-async function exists(target: string): Promise<boolean> {
-  try {
-    await stat(target)
-    return true
-  } catch {
-    return false
   }
 }
 

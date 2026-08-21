@@ -127,17 +127,41 @@ Set the library's backend to `s3` and supply bucket, region, and credentials.
 MinIO, Backblaze B2 and Wasabi all work — set the endpoint and leave path-style
 addressing on, which is the default whenever an endpoint is set.
 
+A bucket can be either kind of library: one you already have files in, which
+stays read-only like any other in-place library, or one this application
+uploads into.
+
 Downloads from an S3 library are served as presigned redirects, so the bytes go
 straight from the bucket to the browser and never enter this application at
-all.
+all. Uploads go the other way as a multipart upload, so peak memory is the
+in-flight window (8 MB parts, four at a time) rather than the size of the file
+— a 6 GB mesh uploads in roughly the same memory as a 6 MB one.
 
-Two differences worth knowing:
+Three differences worth knowing:
 
 - **There are no empty folders.** A key is a string; a folder only exists
   because objects share a prefix. A scan of an S3 library therefore never
   reports an empty model folder.
 - **Change detection uses ETags, not timestamps**, because `LastModified`
   changes whenever an object is rewritten even if the bytes are identical.
+- **Live watching is not available.** There is no filesystem to watch, so an
+  S3 library relies on its scan schedule, or on the scan that is triggered
+  automatically after an upload.
+
+### Checking a bucket works
+
+`npm run verify:s3` exercises the whole S3 path — multipart upload, presigned
+download, zip extraction, scanning, deletion and the read-only guard — against
+a real bucket. It defaults to the MinIO in `docker-compose.dev.yml`:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile s3 up -d
+npm run verify:s3
+```
+
+Point it at any other S3 endpoint with `VERIFY_S3_ENDPOINT`,
+`VERIFY_S3_BUCKET`, `VERIFY_S3_ACCESS_KEY` and `VERIFY_S3_SECRET_KEY`. It
+writes only under a `verify-<timestamp>/` prefix and removes what it wrote.
 
 ---
 

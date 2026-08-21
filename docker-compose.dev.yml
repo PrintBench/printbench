@@ -18,5 +18,29 @@ services:
       timeout: 5s
       retries: 10
 
+  # S3-compatible storage, for exercising the S3 backend locally. Not started
+  # by default — bring it up with:
+  #   docker compose -f docker-compose.dev.yml --profile s3 up -d
+  # then run `npm run verify:s3`.
+  minio:
+    image: minio/minio:latest
+    container_name: printmanager-dev-minio
+    profiles: ['s3']
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: printmanager
+      MINIO_ROOT_PASSWORD: printmanager
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - miniodata-dev:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pgdata-dev:
+  miniodata-dev:

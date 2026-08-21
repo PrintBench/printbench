@@ -5,13 +5,13 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import {
   DeleteError,
-  LocalAdapter,
   PolicyError,
   assertCan,
+  createStorageAdapter,
   deleteModelFiles,
+  libraryLocationFromRow,
   removeModel,
   restoreExclusion,
-  type LibraryLocation,
 } from '@pm/core'
 import { requireUser } from '@pm/auth'
 import { getDb, schema } from '@pm/db'
@@ -76,21 +76,10 @@ export async function deleteFiles(publicId: string): Promise<Result> {
 
     const found = await locate(publicId)
     if (!found) return { ok: false, error: 'That model no longer exists.' }
-    if (found.library.backend !== 'local') {
-      return { ok: false, error: 'Deleting is only supported for local libraries so far.' }
-    }
-
-    const location: LibraryLocation = {
-      id: found.library.id,
-      kind: found.library.kind,
-      backend: found.library.backend,
-      allowWrites: found.library.allowWrites,
-      path: found.library.path,
-    }
 
     const result = await deleteModelFiles(
       getDb(),
-      new LocalAdapter(location),
+      createStorageAdapter(libraryLocationFromRow(found.library)),
       found.model.id,
     )
 

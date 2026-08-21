@@ -8,6 +8,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
+import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import {
   PathEscapeError,
@@ -41,6 +42,17 @@ import { isSafeRelativePath, normalizePath } from '../library/paths'
  * browser and the bytes go straight from the bucket, which is the whole reason
  * S3 is worth supporting for large libraries.
  */
+
+/**
+ * Multipart tuning.
+ *
+ * S3 allows at most 10,000 parts, so the part size sets the ceiling on a
+ * single object: 8 MiB × 10,000 is 80 GB, comfortably past the 8 GB cap the
+ * upload endpoint enforces. Four parts in flight keeps a fast connection busy
+ * without letting peak memory (partSize × queueSize) run away.
+ */
+const MULTIPART_PART_BYTES = 8 * 1024 * 1024
+const MULTIPART_CONCURRENCY = 4
 export class S3Adapter implements StorageAdapter {
   readonly library: LibraryLocation
   private readonly client: S3Client
@@ -205,23 +217,38 @@ export class S3Adapter implements StorageAdapter {
 
   async write(relativePath: string, data: Readable | Buffer | string): Promise<void> {
     this.assertWritable()
+    const key = this.keyFor(relativePath)
+
+    // Known length already in memory — a sidecar, or a small generated file.
+    // One request is cheaper than negotiating a multipart upload for a few
+    // hundred bytes.
+    if (typeof data === 'string' || Buffer.isBuffer(data)) {
+      await this.client.send(
+        new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data }),
+      )
+      return
+    }
 
     /*
-     * A stream needs a known length for PutObject, and we do not have one.
-     * Buffering is acceptable because the only thing written to a library is an
-     * uploaded file that already landed on disk, or a sidecar of a few hundred
-     * bytes. Multipart upload would be the answer if that ever changes.
+     * A stream of unknown length: an uploaded model, which can be gigabytes.
+     *
+     * PutObject needs the length up front, so this used to buffer the whole
+     * thing into memory — fine for a sidecar and fatal for a 6 GB mesh, which
+     * is precisely the file someone most wants to upload. `Upload` splits the
+     * stream into parts as it arrives, so peak memory is partSize × queueSize
+     * (64 MB here) whatever the file's size, and it aborts the multipart
+     * upload on failure rather than leaving orphaned parts accruing storage
+     * charges in the bucket forever.
      */
-    const body =
-      typeof data === 'string' || Buffer.isBuffer(data) ? data : await collect(data)
+    const upload = new Upload({
+      client: this.client,
+      params: { Bucket: this.bucket, Key: key, Body: data },
+      partSize: MULTIPART_PART_BYTES,
+      queueSize: MULTIPART_CONCURRENCY,
+      leavePartsOnError: false,
+    })
 
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: this.keyFor(relativePath),
-        Body: body,
-      }),
-    )
+    await upload.done()
   }
 
   async remove(relativePath: string): Promise<void> {
@@ -291,12 +318,6 @@ export class S3Adapter implements StorageAdapter {
   destroy(): void {
     this.client.destroy()
   }
-}
-
-async function collect(stream: Readable): Promise<Buffer> {
-  const chunks: Buffer[] = []
-  for await (const chunk of stream) chunks.push(chunk as Buffer)
-  return Buffer.concat(chunks)
 }
 
 function isNotFound(error: unknown): boolean {

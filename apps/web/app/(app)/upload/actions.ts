@@ -12,7 +12,8 @@ const UPLOAD_TTL_MS = 6 * 60 * 60 * 1000
 export interface UploadTarget {
   id: string
   name: string
-  path: string
+  /** "local" or "s3" — shown so it is obvious where a large upload is going. */
+  backend: 'local' | 's3'
 }
 
 /**
@@ -21,6 +22,11 @@ export interface UploadTarget {
  * Managed libraries always can. An in-place library only if writes were
  * explicitly enabled on it — the default promise is that we never write into
  * the user's own folders.
+ *
+ * A local library needs a path; an S3 one needs a bucket. Neither is
+ * guaranteed by the schema (both columns are nullable, since each backend
+ * uses a different one), so a library missing its own is skipped rather than
+ * offered as a target that would fail at the last step.
  */
 export async function listUploadTargets(): Promise<UploadTarget[]> {
   try {
@@ -34,14 +40,16 @@ export async function listUploadTargets(): Promise<UploadTarget[]> {
     .select({
       id: schema.libraries.id,
       name: schema.libraries.name,
+      backend: schema.libraries.backend,
       path: schema.libraries.path,
+      s3Bucket: schema.libraries.s3Bucket,
     })
     .from(schema.libraries)
     .where(or(eq(schema.libraries.kind, 'managed'), eq(schema.libraries.allowWrites, true)))
 
   return rows
-    .filter((row): row is UploadTarget => row.path !== null)
-    .map((row) => ({ id: row.id, name: row.name, path: row.path }))
+    .filter((row) => (row.backend === 's3' ? Boolean(row.s3Bucket) : Boolean(row.path)))
+    .map((row) => ({ id: row.id, name: row.name, backend: row.backend }))
 }
 
 type TicketResult =
@@ -77,9 +85,6 @@ export async function createUploadTicket(libraryId: string): Promise<TicketResul
 
     const library = rows[0]
     if (!library) return { ok: false, error: 'That library no longer exists.' }
-    if (library.backend !== 'local') {
-      return { ok: false, error: 'Uploads to S3 libraries are not supported yet.' }
-    }
     if (library.kind !== 'managed' && !library.allowWrites) {
       // The read-only promise holds for uploads too.
       return { ok: false, error: 'That library is read-only.' }
