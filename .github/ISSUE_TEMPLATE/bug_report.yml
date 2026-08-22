@@ -1,0 +1,74 @@
+name: Bug report
+description: Something is broken or behaves differently from what the docs say.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **If this is a security vulnerability, please
+        close this and follow [SECURITY.md](../blob/main/SECURITY.md) instead —
+        do not describe it publicly.**
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations: { required: true }
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Point a library at ...
+        2. Run a scan
+        3. Open /models and ...
+    validations: { required: true }
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running it
+      options:
+        - Docker Compose
+        - Coolify
+        - Local development (npm run dev)
+        - Other
+    validations: { required: true }
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0, or the commit SHA
+    validations: { required: true }
+
+  - type: dropdown
+    id: storage
+    attributes:
+      label: Where does the affected library live
+      description: Storage backend is behind a good number of bugs, so this helps a lot.
+      options:
+        - Local disk
+        - NAS or network mount
+        - S3-compatible bucket
+        - Not relevant to this bug
+    validations: { required: true }
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: >
+        From the web or worker container. Please redact anything secret —
+        `BETTER_AUTH_SECRET`, printer API keys and S3 credentials in particular.
+      render: shell
+
+  - type: textarea
+    id: files
+    attributes:
+      label: The files involved, if the bug is about a specific model
+      description: >
+        Format, rough size, and how the folder is arranged. A file that
+        reproduces it is ideal, but only share one you are happy to make public.

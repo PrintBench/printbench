@@ -128,7 +128,7 @@ describeDb('JobQueue', () => {
   })
 })
 
-describe('JobQueue lifecycle', () => {
+describeDb('JobQueue lifecycle', () => {
   /*
    * Regression: the worker held its own JobQueue while handlers reached for the
    * getQueue() singleton, so enqueuing from inside a handler hit an unstarted

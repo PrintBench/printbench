@@ -11,7 +11,6 @@ rasterizer, so there is nothing to compile and nothing to install.
 ## Status
 
 All eight phases complete.
-See `docs/` and the plan for the phase roadmap.
 
 | Phase | Scope | State |
 |-------|-------|-------|
@@ -265,3 +264,16 @@ ManyFold is AGPL-3.0 and its `AGENTS.md` asks that AI agents not contribute to
 that project. Neither affects this codebase, but both mean one firm rule: **no
 code is copied from it.** `reference/` is gitignored, dockerignored and excluded
 from the TypeScript build, and nothing here imports from it.
+
+## Contributing
+
+Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md)
+covers setup, the checks CI runs, and the handful of invariants worth knowing
+before changing them.
+
+Two things to read first: the rule about `reference/` above, and the note in
+CONTRIBUTING about `.env` — without one, the database-backed third of the test
+suite skips silently and a green run proves much less than it appears to.
+
+Security vulnerabilities go through [SECURITY.md](SECURITY.md), privately,
+rather than the issue tracker.

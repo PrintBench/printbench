@@ -27,3 +27,7 @@ data/
 
 # Local metadata backups (scripts/backup.mts). Your data, not the project.
 backups/
+
+# Claude Code worktrees. Local scratch checkouts, never part of a clone —
+# and a second tsconfig root that confuses eslint if it is walked.
+.claude/worktrees/

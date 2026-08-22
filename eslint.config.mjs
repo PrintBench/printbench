@@ -24,6 +24,9 @@ export default tseslint.config(
       '**/.next/**',
       '**/node_modules/**',
       'demo-library/**',
+      // A worktree is a whole second copy of the repo. Linting it doubles the
+      // work and reports every problem twice, against files not in this tree.
+      '.claude/worktrees/**',
       'data/**',
       'packages/*/dist/**',
     ],
@@ -31,6 +34,18 @@ export default tseslint.config(
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
+
+  {
+    /*
+     * Pin the root explicitly. Without it a git worktree under
+     * .claude/worktrees/ presents a second candidate tsconfig root, and the
+     * parser refuses to guess — failing every file in the repo rather than
+     * the one it is unsure about.
+     */
+    languageOptions: {
+      parserOptions: { tsconfigRootDir: import.meta.dirname },
+    },
+  },
 
   {
     rules: {

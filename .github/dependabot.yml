@@ -1,0 +1,35 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # One PR per ecosystem-wide bump rather than per package. A monorepo with
+    # eight workspaces otherwise produces a wall of near-identical PRs.
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      production-minor-and-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      # Major upgrades here are never mechanical: better-auth needs the schema
+      # reconciled with `npm run auth:schema`, and Next majors need the build
+      # and the app shell checked by hand.
+      - dependency-name: better-auth
+        update-types: [version-update:semver-major]
+      - dependency-name: next
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly

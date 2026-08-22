@@ -2,6 +2,26 @@
   "name": "printbench",
   "private": true,
   "version": "0.1.0",
+  "description": "Self-hosted web app for managing and finding your 3D print files (STL, 3MF, OBJ, PLY). Postgres is the only dependency.",
+  "keywords": [
+    "3d-printing",
+    "stl",
+    "3mf",
+    "self-hosted",
+    "model-library",
+    "nextjs",
+    "postgres",
+    "3d-models"
+  ],
+  "homepage": "https://github.com/OWNER/printbench#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWNER/printbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OWNER/printbench/issues"
+  },
+  "author": "Rich Howell",
   "type": "module",
   "engines": {
     "node": ">=22"

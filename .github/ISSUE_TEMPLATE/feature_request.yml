@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest something PrintBench should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you actually trying to do
+      description: >
+        The situation, not the solution. "I have 400 models from one Kickstarter
+        and cannot tell which I have printed" tells us far more than "add a
+        column".
+    validations: { required: true }
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: If you have a specific idea, describe it. It is fine to leave this blank.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How you work around it today
