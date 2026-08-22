@@ -131,9 +131,14 @@ function collectOwnFiles(dir: WalkedDir): GroupedFile[] {
   return collected
 }
 
+/**
+ * Is this folder explicitly declared a model root?
+ *
+ * Depends on the walker surfacing sidecars, which it does as a special case —
+ * they are not indexable files, and filtering them out is what left this rule
+ * unreachable for as long as it existed.
+ */
 function hasSidecar(dir: WalkedDir): boolean {
-  // Any sidecar name, current or legacy: a folder marked as a model root by
-  // the old name must keep grouping the same way after the rename.
   return dir.files.some((file) => isSidecarFilename(file.name))
 }
 
@@ -172,7 +177,7 @@ export function groupModels(root: WalkedDir, options: GroupingOptions = {}): Gro
     })
   }
 
-  /** Everything below, treated as one model. Used by `top_level`. */
+  /** Everything below, treated as one model. Used by `top_level` and by a sidecar. */
   function emitSubtreeAsModel(dir: WalkedDir): void {
     const files: GroupedFile[] = []
     const visit = (node: WalkedDir) => {
@@ -191,9 +196,16 @@ export function groupModels(root: WalkedDir, options: GroupingOptions = {}): Gro
   }
 
   function visit(dir: WalkedDir, depth: number): void {
-    // 1. A sidecar is an explicit declaration; it always wins.
+    /*
+     * 1. A sidecar is an explicit declaration; it always wins.
+     *
+     * The whole subtree becomes that one model, exactly as `top_level` does.
+     * "Stop descending" cannot mean "take only this folder's own files": the
+     * subfolders below would then belong to no model at all and drop out of
+     * the library entirely, which is a worse outcome than any grouping choice.
+     */
     if (hasSidecar(dir) && dir.path !== '') {
-      emitModel(dir)
+      emitSubtreeAsModel(dir)
       return
     }
 

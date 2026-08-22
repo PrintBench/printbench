@@ -205,18 +205,134 @@ describe('grouping', () => {
     ])
   })
 
-  it('a sidecar marks a model root regardless of shape', () => {
-    const tree = dir(
-      '',
-      [],
-      [dir('Explicit', ['.printbench.json', 'top.stl'], [dir('Explicit/Sub', ['sub.stl'])])],
-    )
-    const result = groupModels(tree)
+  /*
+   * The sidecar rule: an explicit declaration beats every heuristic.
+   *
+   * These went untested against the walker for a long time and the rule was
+   * dead code as a result — the walker dropped sidecars before grouping could
+   * see them, because they are not indexable files. The end-to-end half of
+   * this lives in sidecar/sidecar-grouping.test.ts; what is pinned here is
+   * what the rule does once a sidecar does arrive.
+   */
+  describe('an explicit sidecar', () => {
+    it('marks a model root regardless of shape', () => {
+      const tree = dir(
+        '',
+        [],
+        [dir('Explicit', ['.printbench.json', 'top.stl'], [dir('Explicit/Sub', ['sub.stl'])])],
+      )
+      const result = groupModels(tree)
 
-    // Without the sidecar this would split into two models.
-    expect(names(result)).toEqual(['Explicit'])
-    // The sidecar itself is metadata, never a model file.
-    expect(filePaths(result.models[0]!)).toEqual(['Explicit/top.stl'])
+      // Without the sidecar this would split into two models.
+      expect(names(result)).toEqual(['Explicit'])
+      // The subtree collapses INTO the model rather than being discarded:
+      // stopping the descent without taking the files below would leave
+      // sub.stl belonging to no model at all.
+      expect(filePaths(result.models[0]!)).toEqual(['Explicit/Sub/sub.stl', 'Explicit/top.stl'])
+    })
+
+    /*
+     * The case the rule exists for. A pack folder has no files of its own, so
+     * every heuristic reads it as a container and splits it into one model per
+     * subfolder. A sidecar at the top is how the user says otherwise.
+     */
+    it('collapses a container and everything under it into one model', () => {
+      const tree = dir(
+        '',
+        [],
+        [
+          dir(
+            'Goblin Warband',
+            ['.printbench.json'],
+            [
+              dir(
+                'Goblin Warband/Archer',
+                ['archer.stl'],
+                [dir('Goblin Warband/Archer/stl', ['archer_hd.stl'])],
+              ),
+              dir('Goblin Warband/Chief', ['chief.stl']),
+            ],
+          ),
+        ],
+      )
+      const result = groupModels(tree)
+
+      expect(paths(result)).toEqual(['Goblin Warband'])
+      expect(filePaths(result.models[0]!)).toEqual([
+        'Goblin Warband/Archer/archer.stl',
+        'Goblin Warband/Archer/stl/archer_hd.stl',
+        'Goblin Warband/Chief/chief.stl',
+      ])
+      // One model, so nothing below it is a container or a nested model.
+      expect(result.containers).toEqual([])
+      expect(result.models[0]!.nestedModelPaths).toEqual([])
+    })
+
+    it('is never itself one of the model files', () => {
+      const tree = dir('', [], [dir('Dragon', ['.printbench.json', 'body.stl'])])
+      const result = groupModels(tree)
+
+      expect(filePaths(result.models[0]!)).toEqual(['Dragon/body.stl'])
+    })
+
+    /*
+     * The library root is not a model, so a sidecar sitting there cannot make
+     * it one — it would swallow the entire library into a single row.
+     */
+    it('does not turn the library root into a model', () => {
+      const tree = dir(
+        '',
+        ['.printbench.json'],
+        [dir('Red Dragon', ['red.stl']), dir('Blue Dragon', ['blue.stl'])],
+      )
+      const result = groupModels(tree)
+
+      expect(paths(result)).toEqual(['Blue Dragon', 'Red Dragon'])
+    })
+
+    it('pins a folder inside a pack without disturbing its siblings', () => {
+      const tree = dir(
+        '',
+        [],
+        [
+          dir(
+            'Pack',
+            [],
+            [
+              dir(
+                'Pack/Kit',
+                ['.printbench.json'],
+                [dir('Pack/Kit/Piece A', ['a.stl']), dir('Pack/Kit/Piece B', ['b.stl'])],
+              ),
+              dir('Pack/Loose Model', ['loose.stl']),
+            ],
+          ),
+        ],
+      )
+      const result = groupModels(tree)
+
+      expect(paths(result)).toEqual(['Pack/Kit', 'Pack/Loose Model'])
+      expect(filePaths(result.models.find((m) => m.path === 'Pack/Kit')!)).toEqual([
+        'Pack/Kit/Piece A/a.stl',
+        'Pack/Kit/Piece B/b.stl',
+      ])
+      expect(result.containers).toContain('Pack')
+    })
+
+    it('wins over every grouping mode', () => {
+      const tree = () =>
+        dir(
+          '',
+          [],
+          [dir('Set', ['.printbench.json', 'base.stl'], [dir('Set/Variant A', ['a.stl'])])],
+        )
+
+      for (const mode of ['deepest', 'top_level', 'flat'] as const) {
+        const result = groupModels(tree(), { mode, depth: 2 })
+        expect(paths(result), mode).toEqual(['Set'])
+        expect(filePaths(result.models[0]!), mode).toEqual(['Set/Variant A/a.stl', 'Set/base.stl'])
+      }
+    })
   })
 
   it('skips folders with no model files at all', () => {

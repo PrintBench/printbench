@@ -34,7 +34,11 @@ export interface ModelPatch {
 export interface UpdateResult {
   ok: boolean
   error?: string
-  /** False when the library is read-only and has sidecar writing disabled. */
+  /**
+   * False when the library has sidecar writing disabled, when the content is
+   * unchanged, or when writing one would re-group the library. See
+   * {@link syncSidecar}.
+   */
   sidecarWritten: boolean
 }
 
@@ -200,6 +204,16 @@ async function resolveCreator(db: Database, name: string | null): Promise<string
  * Skipped when the library has sidecars turned off, and skipped again when the
  * content is unchanged — rewriting an identical file would change the folder's
  * mtime and send the next fast scan back through it for nothing.
+ *
+ * Also skipped when another model sits inside this one's folder, which is the
+ * subtle one. A sidecar is not only metadata: grouping treats it as an
+ * explicit declaration that its folder is ONE model, and collapses everything
+ * below it. Writing one here would mean that adding a tag silently merged the
+ * models underneath at the next scan — a restructuring of the user's library
+ * as a side effect of an unrelated edit. The metadata stays in the database;
+ * what is given up is the disk backup for the handful of models in that state,
+ * which the `nested_model` health problem is already asking the user to
+ * resolve. Resolve the nesting and the next edit writes the sidecar normally.
  */
 export async function syncSidecar(db: Database, modelId: string): Promise<boolean> {
   const rows = await db
@@ -213,6 +227,7 @@ export async function syncSidecar(db: Database, modelId: string): Promise<boolea
   if (!row || !row.library.writeSidecar) return false
   // A single loose file has no folder of its own to put a sidecar in.
   if (row.model.isFileModel) return false
+  if (await hasNestedModel(db, row.model.libraryId, row.model.path)) return false
 
   const content = await buildSidecarContent(db, modelId)
 
@@ -235,6 +250,31 @@ export async function syncSidecar(db: Database, modelId: string): Promise<boolea
     console.warn(`[sidecar] could not write for model ${modelId}: ${String(error)}`)
     return false
   }
+}
+
+/**
+ * Does another live model sit inside this one's folder?
+ *
+ * Nesting is derived from the path rather than stored, the same way the
+ * `nested_model` health check derives it. Two differences: `starts_with`
+ * rather than `LIKE`, because a real folder name may contain `%` or `_` and
+ * those are wildcards to `LIKE`; and file models count too, since a collapse
+ * would swallow them just the same.
+ */
+async function hasNestedModel(
+  db: Database,
+  libraryId: string,
+  modelPath: string,
+): Promise<boolean> {
+  const result = await db.execute<{ nested: boolean }>(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM models child
+      WHERE child.library_id = ${libraryId}
+        AND child.missing_at IS NULL
+        AND starts_with(child.path, ${`${modelPath}/`})
+    ) AS nested
+  `)
+  return result.rows[0]?.nested === true
 }
 
 export async function buildSidecarContent(db: Database, modelId: string): Promise<SidecarContent> {

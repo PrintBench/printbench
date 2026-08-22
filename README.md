@@ -122,7 +122,12 @@ web shell is replaceable without touching the app.
   Worker, because it depends on DOMParser.
 - **Metadata is written back to disk** as a `.printbench.json` sidecar per
   model, so the database can be rebuilt by rescanning. That restore drill is
-  covered by tests, not just intent.
+  covered by tests, not just intent. The file is also a declaration: drop one
+  into a folder by hand and that folder becomes a single model, whatever the
+  grouping heuristic would otherwise make of it — which is how you stop a pack
+  with subfolders from splitting into one model per subfolder. The app never
+  writes one into a folder that has models inside it, so editing a tag cannot
+  merge them behind your back.
 - **Uploads are resumable** (tus), handled by the worker so a multi-gigabyte
   transfer never occupies the web tier. Folder structure from a drag-and-drop
   is preserved, because that structure is what groups files into models. A

@@ -42,26 +42,17 @@ const IGNORED_PATTERNS: RegExp[] = [
   /^\.trash/i,
 ]
 
-/** The sidecar we write. Recognised so it never appears as a model file. */
+/**
+ * The sidecar we write.
+ *
+ * Named here rather than in the sidecar module because the path rules need it:
+ * it is a dotfile, and dotfiles are ignored, so it has to be the one exception.
+ * Grouping cares as well — a folder holding one is an explicit model root.
+ */
 export const SIDECAR_FILENAME = '.printbench.json'
 
-/**
- * Sidecars written under the old name, still read.
- *
- * The application was called Print Manager before it was PrintBench, and its
- * sidecars are sitting in people's libraries carrying tags and notes that
- * exist nowhere else. Renaming the file we WRITE is fine; forgetting how to
- * READ the old one would quietly discard all of that at the next scan, which
- * is precisely the loss the sidecar exists to prevent.
- *
- * Read-only and additive: nothing writes this name any more, and a folder is
- * migrated simply by the new file appearing beside the old one.
- */
-export const LEGACY_SIDECAR_FILENAMES: readonly string[] = ['.printmanager.json']
-
-/** True for the current sidecar name or any earlier one. */
 export function isSidecarFilename(name: string): boolean {
-  return name === SIDECAR_FILENAME || LEGACY_SIDECAR_FILENAMES.includes(name)
+  return name === SIDECAR_FILENAME
 }
 
 /**

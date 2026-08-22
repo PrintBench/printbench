@@ -24,7 +24,7 @@
  * weekly deep scan catches those.
  */
 
-import { isIgnoredName, normalizePath } from './paths'
+import { isIgnoredName, isSidecarFilename, normalizePath } from './paths'
 import { isIndexable } from './media-types'
 import type { StorageAdapter } from '../storage/types'
 import type { WalkedDir, WalkedFile } from './grouping'
@@ -142,11 +142,26 @@ export async function walkLibrary(
 
     for (const entry of visible) {
       if (entry.isDirectory) continue
-      if (!isIndexable(entry.path)) continue
-      stats.filesSeen++
-      if (!unchanged) stats.filesStatted++
+      const name = baseName(entry.path)
+      /*
+       * Sidecars are surfaced but never counted.
+       *
+       * They are not indexable — `json` is deliberately absent from the media
+       * type table, so a library full of unrelated .json files stays out of the
+       * index — but grouping has to SEE one to honour it: a folder holding a
+       * sidecar is an explicit model root. Filtering them out here is what made
+       * that rule dead code for as long as it has existed. They are excluded
+       * from the counters because they are still not files we index, and
+       * `filesSeen` is reported to the user as such.
+       */
+      const sidecar = isSidecarFilename(name)
+      if (!sidecar && !isIndexable(entry.path)) continue
+      if (!sidecar) {
+        stats.filesSeen++
+        if (!unchanged) stats.filesStatted++
+      }
       node.files.push({
-        name: baseName(entry.path),
+        name,
         size: entry.size,
         mtimeMs: entry.mtimeMs,
       } satisfies WalkedFile)

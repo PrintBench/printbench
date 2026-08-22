@@ -161,6 +161,53 @@ describeDb('sidecar round trip', () => {
     ).rejects.toThrow()
   })
 
+  /*
+   * A sidecar is not only metadata: grouping reads it as "this folder is ONE
+   * model" and collapses everything below it. Writing one into a folder that
+   * has models inside it would merge them at the next scan — because someone
+   * added a tag, not because they asked for a merge.
+   */
+  it('does not write a sidecar into a model that has models inside it', async () => {
+    await mkdir(path.join(root, 'Set', 'Variant A'), { recursive: true })
+    await writeFile(path.join(root, 'Set', 'base.stl'), 'z'.repeat(300))
+    await writeFile(path.join(root, 'Set', 'Variant A', 'a.stl'), 'z'.repeat(200))
+    await scan()
+
+    // `deepest` grouping makes both of them models. That is the state guarded.
+    const parent = await modelId('Set')
+    const child = await modelId('Set/Variant A')
+
+    const result = await updateModel(db, parent, { tags: ['pack'] })
+
+    expect(result.ok).toBe(true)
+    expect(result.sidecarWritten).toBe(false)
+    await expect(readFile(path.join(root, 'Set', '.printbench.json'), 'utf8')).rejects.toThrow()
+
+    // The edit itself still happened; only the copy on disk was withheld.
+    const tags = await db.execute<{ name: string }>(sql`
+      SELECT t.name FROM model_tags mt JOIN tags t ON t.id = mt.tag_id
+      WHERE mt.model_id = ${parent}
+    `)
+    expect(tags.rows.map((r) => r.name)).toEqual(['pack'])
+
+    // The child has nothing inside it, so it is written as normal.
+    const inner = await updateModel(db, child, { tags: ['variant'] })
+    expect(inner.sidecarWritten).toBe(true)
+  })
+
+  /*
+   * The separator matters. Without it "Red Dragon" looks like the parent of
+   * "Red Dragon Extra" and every sidecar in the library stops being written.
+   */
+  it('does not mistake a sibling with a longer name for a nested model', async () => {
+    await mkdir(path.join(root, 'Red Dragon Extra'), { recursive: true })
+    await writeFile(path.join(root, 'Red Dragon Extra', 'body.stl'), 'z'.repeat(300))
+    await scan()
+
+    const result = await updateModel(db, await modelId('Red Dragon'), { tags: ['dragon'] })
+    expect(result.sidecarWritten).toBe(true)
+  })
+
   it('does not rewrite an unchanged sidecar', async () => {
     await scan()
     const id = await modelId('Red Dragon')
