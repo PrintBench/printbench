@@ -72,7 +72,10 @@ describeDb('rename detection', () => {
       allowWrites: false,
       path: root,
     }
-    await scanLibrary({ db, storage: new LocalAdapter(location), library: location }, { mode: 'deep' })
+    await scanLibrary(
+      { db, storage: new LocalAdapter(location), library: location },
+      { mode: 'deep' },
+    )
   }
 
   async function fileRow(filename: string) {
@@ -93,7 +96,11 @@ describeDb('rename detection', () => {
     await handleFileDigest({ fileId: before.id })
     await db
       .update(schema.modelFiles)
-      .set({ thumbKey: 'ab/cd/deadbeefdeadbeefdeadbeefdeadbeefdead.webp', thumbState: 'ok', analysisState: 'ok' })
+      .set({
+        thumbKey: 'ab/cd/deadbeefdeadbeefdeadbeefdeadbeefdead.webp',
+        thumbState: 'ok',
+        analysisState: 'ok',
+      })
       .where(eq(schema.modelFiles.id, before.id))
 
     await rename(path.join(root, 'Widget', 'part.stl'), path.join(root, 'Widget', 'renamed.stl'))
@@ -146,8 +153,14 @@ describeDb('rename detection', () => {
     await handleFileDigest({ fileId: original.id })
     await handleFileDigest({ fileId: twin.id })
 
-    await rename(path.join(root, 'Widget', 'part.stl'), path.join(root, 'Widget', 'part-renamed.stl'))
-    await rename(path.join(root, 'Widget', 'twin.stl'), path.join(root, 'Widget', 'twin-renamed.stl'))
+    await rename(
+      path.join(root, 'Widget', 'part.stl'),
+      path.join(root, 'Widget', 'part-renamed.stl'),
+    )
+    await rename(
+      path.join(root, 'Widget', 'twin.stl'),
+      path.join(root, 'Widget', 'twin-renamed.stl'),
+    )
     await scan()
 
     const renamed = await fileRow('part-renamed.stl')

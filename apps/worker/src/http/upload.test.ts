@@ -72,7 +72,16 @@ describe('sanitizeUploadPath', () => {
   })
 
   it('accepts every format the library does index', () => {
-    for (const name of ['a.stl', 'a.3mf', 'a.obj', 'a.ply', 'a.step', 'a.gcode', 'a.png', 'a.zip']) {
+    for (const name of [
+      'a.stl',
+      'a.3mf',
+      'a.obj',
+      'a.ply',
+      'a.step',
+      'a.gcode',
+      'a.png',
+      'a.zip',
+    ]) {
       expect(sanitizeUploadPath(name), name).toBe(name)
     }
   })
@@ -90,14 +99,16 @@ describe('upload tokens', () => {
 
   it('accepts a token it just issued', () => {
     const expires = future()
-    expect(verifyUploadToken(LIBRARY, expires, signUploadToken(LIBRARY, expires, SECRET), SECRET))
-      .toBe(true)
+    expect(
+      verifyUploadToken(LIBRARY, expires, signUploadToken(LIBRARY, expires, SECRET), SECRET),
+    ).toBe(true)
   })
 
   it('rejects an expired token', () => {
     const expires = Date.now() - 1000
-    expect(verifyUploadToken(LIBRARY, expires, signUploadToken(LIBRARY, expires, SECRET), SECRET))
-      .toBe(false)
+    expect(
+      verifyUploadToken(LIBRARY, expires, signUploadToken(LIBRARY, expires, SECRET), SECRET),
+    ).toBe(false)
   })
 
   /*
@@ -107,8 +118,9 @@ describe('upload tokens', () => {
   it('rejects a token issued for a different library', () => {
     const expires = future()
     const token = signUploadToken(LIBRARY, expires, SECRET)
-    expect(verifyUploadToken('99999999-8888-4777-8666-555555555555', expires, token, SECRET))
-      .toBe(false)
+    expect(verifyUploadToken('99999999-8888-4777-8666-555555555555', expires, token, SECRET)).toBe(
+      false,
+    )
   })
 
   it('rejects a tampered expiry', () => {

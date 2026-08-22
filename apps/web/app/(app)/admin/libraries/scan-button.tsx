@@ -39,15 +39,19 @@ export function ScanButton({
         {confirming ? (
           <div className="flex flex-col items-end gap-2 rounded-[var(--radius-control)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3">
             <p className="max-w-xs text-right text-xs text-[var(--color-ink)]">
-              Only confirm if you really did delete those models. If a drive or
-              network share is unmounted, fix that first — confirming will mark
-              everything on it as missing.
+              Only confirm if you really did delete those models. If a drive or network share is
+              unmounted, fix that first — confirming will mark everything on it as missing.
             </p>
             <div className="flex gap-2">
               <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
-              <Button size="sm" variant="danger" disabled={pending} onClick={() => run({ force: true })}>
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={pending}
+                onClick={() => run({ force: true })}
+              >
                 Yes, they were deleted
               </Button>
             </div>
@@ -72,7 +76,12 @@ export function ScanButton({
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div className="flex gap-2">
-        <Button size="sm" variant="secondary" disabled={pending} onClick={() => run({ mode: 'fast' })}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          onClick={() => run({ mode: 'fast' })}
+        >
           <RefreshCw className={pending ? 'animate-spin' : undefined} />
           Scan
         </Button>

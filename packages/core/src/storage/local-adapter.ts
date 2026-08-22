@@ -89,8 +89,7 @@ export class LocalAdapter implements StorageAdapter {
 
   async list(relativeDir: string): Promise<StorageEntry[]> {
     const root = await this.getResolvedRoot()
-    const absolute =
-      relativeDir === '' ? root : await this.resolve(relativeDir, true)
+    const absolute = relativeDir === '' ? root : await this.resolve(relativeDir, true)
 
     const entries: StorageEntry[] = []
     let handle
@@ -205,9 +204,7 @@ export class LocalAdapter implements StorageAdapter {
 function isInside(root: string, candidate: string): boolean {
   if (candidate === root) return true
   const relative = path.relative(root, candidate)
-  return (
-    relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
-  )
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
 }
 
 function describe(error: unknown, target: string): string {

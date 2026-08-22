@@ -20,7 +20,7 @@ token. Searching "presupported" therefore returns nothing.
 `presupported | dragon | body | stl`.
 
 Note `translate(x, '/_-.', ' ')` does NOT work — when the target string is
-shorter than the source set, `translate` *deletes* the unmatched characters,
+shorter than the source set, `translate` _deletes_ the unmatched characters,
 collapsing `dragon_body.stl` to `dragonbodystl`.
 
 ### 2. Trigram operator direction
@@ -41,7 +41,7 @@ so a short query against a long model name scores far too low
 "Red Dragon Miniature":
 
 | query      | typo kind      | word_similarity | matches at 0.5 |
-|------------|----------------|-----------------|----------------|
+| ---------- | -------------- | --------------- | -------------- |
 | `dragon`   | exact          | 1.000           | yes            |
 | `draggon`  | doubled letter | 0.667           | yes            |
 | `dragn`    | dropped letter | 0.667           | yes            |

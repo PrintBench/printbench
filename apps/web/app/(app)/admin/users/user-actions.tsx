@@ -2,7 +2,15 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Loader2, MoreHorizontal, Pencil, ShieldOff, ShieldCheck, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  ShieldOff,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
@@ -91,7 +99,13 @@ export function UserActions({
                 disabled={pending}
                 onClick={() => run(() => setSuspended(userId, !suspended))}
               >
-                {pending ? <Loader2 className="animate-spin" /> : suspended ? <ShieldCheck /> : <ShieldOff />}
+                {pending ? (
+                  <Loader2 className="animate-spin" />
+                ) : suspended ? (
+                  <ShieldCheck />
+                ) : (
+                  <ShieldOff />
+                )}
                 {suspended ? 'Restore access' : 'Suspend'}
               </Button>
               <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">
@@ -140,7 +154,9 @@ export function UserActions({
               <Button
                 size="sm"
                 disabled={pending || !draftName.trim() || !draftEmail.trim()}
-                onClick={() => run(() => updateUser(userId, { name: draftName, email: draftEmail }))}
+                onClick={() =>
+                  run(() => updateUser(userId, { name: draftName, email: draftEmail }))
+                }
               >
                 {pending && <Loader2 className="animate-spin" />}
                 Save

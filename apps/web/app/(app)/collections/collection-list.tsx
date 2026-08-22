@@ -77,113 +77,117 @@ export function CollectionList({
       const nested = renderTree(collection.id, depth + 1)
 
       return (
-      <li key={collection.id}>
-        <div
-          className="flex items-center gap-3 px-4 py-2.5"
-          style={{ paddingLeft: `${16 + depth * 20}px` }}
-        >
-          {collection.previewFileId ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`/api/files/${collection.previewFileId}/thumb`}
-              alt=""
-              className="size-8 shrink-0 rounded bg-[var(--color-surface-2)] object-cover"
-            />
-          ) : (
-            <FolderTree className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
-          )}
-
-          {editing === collection.id ? (
-            <>
-              <Input
-                autoFocus
-                value={editDraft}
-                onChange={(e) => setEditDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') run(() => rename(collection.id, editDraft))
-                  if (e.key === 'Escape') setEditing(null)
-                }}
-                className="h-8 max-w-64"
+        <li key={collection.id}>
+          <div
+            className="flex items-center gap-3 px-4 py-2.5"
+            style={{ paddingLeft: `${16 + depth * 20}px` }}
+          >
+            {collection.previewFileId ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/api/files/${collection.previewFileId}/thumb`}
+                alt=""
+                className="size-8 shrink-0 rounded bg-[var(--color-surface-2)] object-cover"
               />
-              <Button size="sm" disabled={pending} onClick={() => run(() => rename(collection.id, editDraft))}>
-                <Check />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
-                <X />
-              </Button>
-            </>
-          ) : (
-            <>
-              <div className="min-w-0 flex-1">
-                <Link
-                  href={`/collections/${collection.slug}` as Route}
-                  className="truncate text-sm font-medium hover:underline"
+            ) : (
+              <FolderTree className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+            )}
+
+            {editing === collection.id ? (
+              <>
+                <Input
+                  autoFocus
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') run(() => rename(collection.id, editDraft))
+                    if (e.key === 'Escape') setEditing(null)
+                  }}
+                  className="h-8 max-w-64"
+                />
+                <Button
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => run(() => rename(collection.id, editDraft))}
                 >
-                  {collection.name}
-                </Link>
-                {collection.caption && (
-                  <p className="truncate text-xs text-[var(--color-ink-faint)]">
-                    {collection.caption}
-                  </p>
-                )}
-              </div>
-              <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-muted)]">
-                {collection.modelCount}
-              </span>
-
-              {canEdit && (
-                <div className="flex shrink-0 gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Add a collection inside ${collection.name}`}
-                    onClick={() => {
-                      setAdding(true)
-                      setParentId(collection.id)
-                      setDraftName('')
-                    }}
+                  <Check />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                  <X />
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/collections/${collection.slug}` as Route}
+                    className="truncate text-sm font-medium hover:underline"
                   >
-                    <Plus />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Rename ${collection.name}`}
-                    onClick={() => {
-                      setEditing(collection.id)
-                      setEditDraft(collection.name)
-                    }}
-                  >
-                    <Pencil />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remove ${collection.name}`}
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Remove "${collection.name}"? The models stay where they are, and anything nested inside moves up a level.`,
-                        )
-                      ) {
-                        run(() => remove(collection.id))
-                      }
-                    }}
-                  >
-                    <Trash2 />
-                  </Button>
+                    {collection.name}
+                  </Link>
+                  {collection.caption && (
+                    <p className="truncate text-xs text-[var(--color-ink-faint)]">
+                      {collection.caption}
+                    </p>
+                  )}
                 </div>
-              )}
-            </>
-          )}
-        </div>
+                <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-muted)]">
+                  {collection.modelCount}
+                </span>
 
-        {nested && (
-          <ul className="divide-y divide-[var(--color-border)] border-t border-[var(--color-border)]">
-            {nested}
-          </ul>
-        )}
-      </li>
+                {canEdit && (
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Add a collection inside ${collection.name}`}
+                      onClick={() => {
+                        setAdding(true)
+                        setParentId(collection.id)
+                        setDraftName('')
+                      }}
+                    >
+                      <Plus />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Rename ${collection.name}`}
+                      onClick={() => {
+                        setEditing(collection.id)
+                        setEditDraft(collection.name)
+                      }}
+                    >
+                      <Pencil />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${collection.name}`}
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Remove "${collection.name}"? The models stay where they are, and anything nested inside moves up a level.`,
+                          )
+                        ) {
+                          run(() => remove(collection.id))
+                        }
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {nested && (
+            <ul className="divide-y divide-[var(--color-border)] border-t border-[var(--color-border)]">
+              {nested}
+            </ul>
+          )}
+        </li>
       )
     })
   }

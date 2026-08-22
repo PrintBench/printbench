@@ -61,8 +61,14 @@ try {
   await cleanup()
 
   section('First-run state (no users)')
-  check('/ redirects to /setup', (await get('/')).headers.get('location')?.includes('/setup') === true)
-  check('/login redirects to /setup', (await get('/login')).headers.get('location')?.includes('/setup') === true)
+  check(
+    '/ redirects to /setup',
+    (await get('/')).headers.get('location')?.includes('/setup') === true,
+  )
+  check(
+    '/login redirects to /setup',
+    (await get('/login')).headers.get('location')?.includes('/setup') === true,
+  )
   check('/setup is reachable', (await get('/setup')).status === 200)
 
   section('Create an account via the real signup endpoint')
@@ -77,11 +83,21 @@ try {
     sql`SELECT id, role FROM "user" WHERE email = ${EMAIL}`,
   )
   check('user row exists', created.rows.length === 1)
-  check('new accounts default to viewer, never admin', created.rows[0]?.role === 'viewer', created.rows[0]?.role)
+  check(
+    'new accounts default to viewer, never admin',
+    created.rows[0]?.role === 'viewer',
+    created.rows[0]?.role,
+  )
 
   section('Setup closes permanently once a user exists')
-  check('/setup redirects to /login', (await get('/setup')).headers.get('location')?.includes('/login') === true)
-  check('/ redirects to /login when signed out', (await get('/')).headers.get('location')?.includes('/login') === true)
+  check(
+    '/setup redirects to /login',
+    (await get('/setup')).headers.get('location')?.includes('/login') === true,
+  )
+  check(
+    '/ redirects to /login when signed out',
+    (await get('/')).headers.get('location')?.includes('/login') === true,
+  )
 
   section('Sign in')
   const cookie = await signIn()
@@ -93,14 +109,20 @@ try {
   check('dashboard renders', dash.status === 200, `HTTP ${dash.status}`)
   check('greets the user by name', dashHtml.includes('Phase'))
   check('shows the empty-library state', dashHtml.includes('No libraries yet'))
-  check('viewer is told an admin must add a library', dashHtml.includes('An admin needs to add a library'))
+  check(
+    'viewer is told an admin must add a library',
+    dashHtml.includes('An admin needs to add a library'),
+  )
   check('viewer is NOT offered the add-library button', !dashHtml.includes('Add a library'))
 
   section('Role guard (viewer)')
   const asViewer = await get('/admin/users', cookie)
   const viewerHtml = await asViewer.text()
   check('refusal is a normal page, not a 500', asViewer.status === 200, `HTTP ${asViewer.status}`)
-  check('viewer sees a refusal', viewerHtml.includes('You&#x27;t') || viewerHtml.includes("don't have access"))
+  check(
+    'viewer sees a refusal',
+    viewerHtml.includes('You&#x27;t') || viewerHtml.includes("don't have access"),
+  )
   check('viewer cannot see the account list', !viewerHtml.includes('Joined'))
 
   // Promotion must take effect on the SAME session. If session data were cached

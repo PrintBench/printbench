@@ -221,7 +221,7 @@ describeDb('lists and likes', () => {
       expect((await listsFor(db, USER)).some((l) => l.id === listId)).toBe(false)
     })
 
-    it('refuses to delete someone else\'s list', async () => {
+    it("refuses to delete someone else's list", async () => {
       const { id: listId } = await createList(db, OTHER_USER, 'Theirs')
       await expect(deleteList(db, USER, listId)).rejects.toThrow(ListError)
     })

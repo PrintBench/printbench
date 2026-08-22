@@ -83,27 +83,27 @@ describe('isScanDue', () => {
 
   it('is due when a fire time has passed since the last scan', () => {
     // Daily at 03:00. Last scanned yesterday morning, now it is this afternoon.
-    expect(
-      isScanDue('0 3 * * *', at('2026-08-19T03:05:00Z'), at('2026-08-20T12:00:00Z')),
-    ).toBe(true)
+    expect(isScanDue('0 3 * * *', at('2026-08-19T03:05:00Z'), at('2026-08-20T12:00:00Z'))).toBe(
+      true,
+    )
   })
 
   it('is not due when the last scan is after the most recent fire time', () => {
-    expect(
-      isScanDue('0 3 * * *', at('2026-08-20T03:05:00Z'), at('2026-08-20T12:00:00Z')),
-    ).toBe(false)
+    expect(isScanDue('0 3 * * *', at('2026-08-20T03:05:00Z'), at('2026-08-20T12:00:00Z'))).toBe(
+      false,
+    )
   })
 
   it('is not due again within the same hour for an hourly schedule', () => {
-    expect(
-      isScanDue('0 * * * *', at('2026-08-20T12:00:30Z'), at('2026-08-20T12:30:00Z')),
-    ).toBe(false)
+    expect(isScanDue('0 * * * *', at('2026-08-20T12:00:30Z'), at('2026-08-20T12:30:00Z'))).toBe(
+      false,
+    )
   })
 
   it('is due once the next hour turns over', () => {
-    expect(
-      isScanDue('0 * * * *', at('2026-08-20T12:00:30Z'), at('2026-08-20T13:00:10Z')),
-    ).toBe(true)
+    expect(isScanDue('0 * * * *', at('2026-08-20T12:00:30Z'), at('2026-08-20T13:00:10Z'))).toBe(
+      true,
+    )
   })
 
   /*
@@ -112,9 +112,9 @@ describe('isScanDue', () => {
    * than being skipped until the following fire.
    */
   it('catches up after downtime', () => {
-    expect(
-      isScanDue('0 3 * * *', at('2026-08-10T03:00:00Z'), at('2026-08-20T12:00:00Z')),
-    ).toBe(true)
+    expect(isScanDue('0 3 * * *', at('2026-08-10T03:00:00Z'), at('2026-08-20T12:00:00Z'))).toBe(
+      true,
+    )
   })
 
   it('does not throw on an unparseable schedule', () => {

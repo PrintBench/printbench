@@ -184,9 +184,9 @@ describeDb('deleting models', () => {
     })
 
     it('refuses a model that is already gone', async () => {
-      await expect(
-        removeModel(db, '4dff0000-0000-4000-8000-0000000000ff'),
-      ).rejects.toThrow(DeleteError)
+      await expect(removeModel(db, '4dff0000-0000-4000-8000-0000000000ff')).rejects.toThrow(
+        DeleteError,
+      )
     })
   })
 
@@ -237,7 +237,7 @@ describeDb('deleting models', () => {
      * storage adapter with a refusal. Neither is redundant — this one is what
      * the user reads.
      */
-    it('refuses outright for a library of the user\'s own files', async () => {
+    it("refuses outright for a library of the user's own files", async () => {
       const where = location(IN_PLACE, inPlaceRoot, 'in_place')
       await expect(
         deleteModelFiles(db, new LocalAdapter(where), await modelId(IN_PLACE, 'Remove Me')),
@@ -246,9 +246,11 @@ describeDb('deleting models', () => {
 
     it('leaves the files alone when it refuses', async () => {
       const where = location(IN_PLACE, inPlaceRoot, 'in_place')
-      await deleteModelFiles(db, new LocalAdapter(where), await modelId(IN_PLACE, 'Remove Me')).catch(
-        () => undefined,
-      )
+      await deleteModelFiles(
+        db,
+        new LocalAdapter(where),
+        await modelId(IN_PLACE, 'Remove Me'),
+      ).catch(() => undefined)
 
       expect(await readdir(path.join(inPlaceRoot, 'Remove Me'))).toEqual(['gone.stl'])
       expect(await modelNames(IN_PLACE)).toContain('Remove Me')

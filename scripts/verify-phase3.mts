@@ -132,18 +132,36 @@ try {
     ORDER BY f.filename
   `)
 
-  check('all files analysed', analysis.rows.every((r) => r.state === 'ok'),
-    analysis.rows.filter((r) => r.state !== 'ok').map((r) => r.filename).join(', ') || 'all ok')
-  check('triangle counts recorded', analysis.rows.every((r) => r.triangle_count > 0))
-  check('dimensions recorded', analysis.rows.every((r) => Number(r.bbox_x) > 0))
+  check(
+    'all files analysed',
+    analysis.rows.every((r) => r.state === 'ok'),
+    analysis.rows
+      .filter((r) => r.state !== 'ok')
+      .map((r) => r.filename)
+      .join(', ') || 'all ok',
+  )
+  check(
+    'triangle counts recorded',
+    analysis.rows.every((r) => r.triangle_count > 0),
+  )
+  check(
+    'dimensions recorded',
+    analysis.rows.every((r) => Number(r.bbox_x) > 0),
+  )
 
   const cube20 = analysis.rows.find((r) => r.filename === 'calibration-cube.stl')
-  check('a 20 mm cube measures 20 mm', Math.abs(Number(cube20?.bbox_x) - 20) < 0.01,
-    `${cube20?.bbox_x} x ${cube20?.bbox_y} x ${cube20?.bbox_z}`)
+  check(
+    'a 20 mm cube measures 20 mm',
+    Math.abs(Number(cube20?.bbox_x) - 20) < 0.01,
+    `${cube20?.bbox_x} x ${cube20?.bbox_y} x ${cube20?.bbox_z}`,
+  )
 
   const cube12 = analysis.rows.find((r) => r.filename === 'golem.stl')
-  check('a 60 mm cube measures 60 mm', Math.abs(Number(cube12?.bbox_x) - 60) < 0.01,
-    `${cube12?.bbox_x}`)
+  check(
+    'a 60 mm cube measures 60 mm',
+    Math.abs(Number(cube12?.bbox_x) - 60) < 0.01,
+    `${cube12?.bbox_x}`,
+  )
 
   /*
    * 3MF declares its units, so a model authored in centimetres must be stored
@@ -151,8 +169,11 @@ try {
    * model ten times too small.
    */
   const gym = analysis.rows.find((r) => r.filename === 'gym.3mf')
-  check('3MF centimetres converted to millimetres', Math.abs(Number(gym?.bbox_x) - 400) < 1,
-    `${gym?.bbox_x} mm (20 cm sphere = 400 mm across)`)
+  check(
+    '3MF centimetres converted to millimetres',
+    Math.abs(Number(gym?.bbox_x) - 400) < 1,
+    `${gym?.bbox_x} mm (20 cm sphere = 400 mm across)`,
+  )
 
   const plate = analysis.rows.find((r) => r.filename === 'stand.stl')
   check('a flat plate records zero depth', Number(plate?.bbox_z) === 0, `z=${plate?.bbox_z}`)
@@ -184,14 +205,20 @@ try {
     if (spread < 10) blank++
   }
 
-  check('every thumbnail decodes as a 512px WebP', decoded === thumbs.rows.length,
-    `${decoded}/${thumbs.rows.length}`)
+  check(
+    'every thumbnail decodes as a 512px WebP',
+    decoded === thumbs.rows.length,
+    `${decoded}/${thumbs.rows.length}`,
+  )
   check('no thumbnail is a blank image', blank === 0, `${blank} blank`)
 
   section('Content addressing')
   const keys = thumbs.rows.map((r) => r.thumb_key)
   check('keys include the renderer version', keys.length > 0)
-  check('keys are sharded two levels deep', keys.every((k) => /^[0-9a-f]{2}\/[0-9a-f]{2}\//.test(k)))
+  check(
+    'keys are sharded two levels deep',
+    keys.every((k) => /^[0-9a-f]{2}\/[0-9a-f]{2}\//.test(k)),
+  )
 
   // Identical geometry stored twice must share one rendered image.
   const duplicates = await db.execute<{ n: number }>(sql`
@@ -222,21 +249,32 @@ try {
   section('Thumbnails appear in the grid')
   const html = (await (await get('/models')).text()).replace(/<!--.*?-->/g, '')
   check('grid links to thumbnail images', html.includes('/thumb'))
-  check('grid shows dimensions', /\d+ × \d+ × \d+ mm/.test(html), html.match(/\d+ × \d+ × \d+ mm/)?.[0] ?? 'none')
+  check(
+    'grid shows dimensions',
+    /\d+ × \d+ × \d+ mm/.test(html),
+    html.match(/\d+ × \d+ × \d+ mm/)?.[0] ?? 'none',
+  )
 
   section('Digests for duplicate detection')
-  const digests = await waitFor(async () => {
-    const result = await db.execute<{ total: number; hashed: number }>(sql`
+  const digests = await waitFor(
+    async () => {
+      const result = await db.execute<{ total: number; hashed: number }>(sql`
       SELECT count(*)::int AS total,
              count(f.digest)::int AS hashed
       FROM model_files f JOIN models m ON m.id = f.model_id
       WHERE m.library_id = ${LIBRARY_ID} AND f.previewable = true
     `)
-    const row = result.rows[0]!
-    return row.hashed === row.total ? row : null
-  }, 'digests', 60_000)
-  check('every previewable file is hashed', digests.hashed === digests.total,
-    `${digests.hashed}/${digests.total}`)
+      const row = result.rows[0]!
+      return row.hashed === row.total ? row : null
+    },
+    'digests',
+    60_000,
+  )
+  check(
+    'every previewable file is hashed',
+    digests.hashed === digests.total,
+    `${digests.hashed}/${digests.total}`,
+  )
 
   section('Rescanning does not re-render')
   const before = await db.execute<{ n: number }>(

@@ -49,11 +49,7 @@ export function InviteForm({
         <Input name="name" autoComplete="name" required autoFocus />
       </Field>
 
-      <Field
-        label="Email"
-        htmlFor="email"
-        hint={email ? 'Set by whoever invited you.' : undefined}
-      >
+      <Field label="Email" htmlFor="email" hint={email ? 'Set by whoever invited you.' : undefined}>
         <Input
           name="email"
           type="email"

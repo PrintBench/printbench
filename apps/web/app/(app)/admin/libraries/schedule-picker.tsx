@@ -154,8 +154,8 @@ export function SchedulePicker({
             Watch for changes live
             <span className="mt-0.5 block text-xs text-[var(--color-ink-faint)]">
               Scans within seconds of a file appearing, on top of the schedule above. Off by
-              default: a very large library can use up the operating system&apos;s limit on how
-              many folders it can watch at once.
+              default: a very large library can use up the operating system&apos;s limit on how many
+              folders it can watch at once.
             </span>
           </span>
         </label>

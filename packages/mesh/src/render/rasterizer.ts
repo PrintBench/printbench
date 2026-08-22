@@ -92,7 +92,12 @@ export class Camera {
   readonly halfWidth: number
   readonly halfHeight: number
 
-  constructor(box: BoundingBox, width: number, height: number, options: Required<Pick<RenderOptions, 'direction' | 'margin' | 'yUp'>>) {
+  constructor(
+    box: BoundingBox,
+    width: number,
+    height: number,
+    options: Required<Pick<RenderOptions, 'direction' | 'margin' | 'yUp'>>,
+  ) {
     const dir = normalize(options.direction)
     // Z-up is the print convention. A Y-up mesh is rotated rather than viewed
     // from a different angle, so lighting stays consistent between the two.
@@ -107,11 +112,7 @@ export class Camera {
     this.right = normalize(right)
     this.up = normalize(cross(this.forward, this.right))
 
-    this.centre = [
-      (box.minX + box.maxX) / 2,
-      (box.minY + box.maxY) / 2,
-      (box.minZ + box.maxZ) / 2,
-    ]
+    this.centre = [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2, (box.minZ + box.maxZ) / 2]
 
     // Fit by projecting all eight corners, so the model is framed by what is
     // actually visible rather than by a bounding sphere, which wastes space.
@@ -195,9 +196,15 @@ export class Rasterizer {
     this.camera.project(t[3]!, t[4]!, t[5]!, p.subarray(3, 6))
     this.camera.project(t[6]!, t[7]!, t[8]!, p.subarray(6, 9))
 
-    const x0 = p[0]!, y0 = p[1]!, z0 = p[2]!
-    const x1 = p[3]!, y1 = p[4]!, z1 = p[5]!
-    const x2 = p[6]!, y2 = p[7]!, z2 = p[8]!
+    const x0 = p[0]!,
+      y0 = p[1]!,
+      z0 = p[2]!
+    const x1 = p[3]!,
+      y1 = p[4]!,
+      z1 = p[5]!
+    const x2 = p[6]!,
+      y2 = p[7]!,
+      z2 = p[8]!
 
     // Signed area in screen space; zero means the triangle is edge-on.
     const area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
@@ -258,17 +265,27 @@ export class Rasterizer {
    * badly-wound mesh punches holes straight through the model.
    */
   private shadeFace(t: Float32Array): Float32Array {
-    const abx = t[3]! - t[0]!, aby = t[4]! - t[1]!, abz = t[5]! - t[2]!
-    const acx = t[6]! - t[0]!, acy = t[7]! - t[1]!, acz = t[8]! - t[2]!
+    const abx = t[3]! - t[0]!,
+      aby = t[4]! - t[1]!,
+      abz = t[5]! - t[2]!
+    const acx = t[6]! - t[0]!,
+      acy = t[7]! - t[1]!,
+      acz = t[8]! - t[2]!
 
     let nx = aby * acz - abz * acy
     let ny = abz * acx - abx * acz
     let nz = abx * acy - aby * acx
     const len = Math.hypot(nx, ny, nz) || 1
-    nx /= len; ny /= len; nz /= len
+    nx /= len
+    ny /= len
+    nz /= len
 
     const facing = dot3(nx, ny, nz, this.camera.forward)
-    if (facing > 0) { nx = -nx; ny = -ny; nz = -nz }
+    if (facing > 0) {
+      nx = -nx
+      ny = -ny
+      nz = -nz
+    }
 
     // Key light offset from the camera, so form reads without flattening.
     const key = normalize([
@@ -285,7 +302,7 @@ export class Rasterizer {
      * at 200 px.
      */
     const upward = (nz + 1) / 2
-    const ambientR = 0.13 + 0.10 * upward
+    const ambientR = 0.13 + 0.1 * upward
     const ambientG = 0.15 + 0.11 * upward
     const ambientB = 0.21 + 0.11 * upward
 
@@ -359,11 +376,7 @@ function normalize(v: [number, number, number]): [number, number, number] {
 }
 
 function cross(a: [number, number, number], b: [number, number, number]): [number, number, number] {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ]
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 }
 
 function length(v: [number, number, number]): number {

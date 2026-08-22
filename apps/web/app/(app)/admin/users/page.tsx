@@ -59,10 +59,7 @@ export default async function UsersPage() {
 
   return (
     <>
-      <PageHeader
-        title="Users"
-        description="Who can reach this instance, and what they may do."
-      />
+      <PageHeader title="Users" description="Who can reach this instance, and what they may do." />
 
       <div className="mb-6">
         <AddPeople
@@ -92,10 +89,7 @@ export default async function UsersPage() {
           </thead>
           <tbody>
             {users.map((row) => (
-              <tr
-                key={row.id}
-                className="border-b border-[var(--color-border)] last:border-0"
-              >
+              <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{row.name}</span>

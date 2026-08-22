@@ -61,7 +61,9 @@ describeDb('library health', () => {
       DELETE FROM problems WHERE model_id IN (SELECT id FROM models WHERE library_id IN (${LIB}, ${OTHER_LIB}))
          OR model_id IS NULL`)
     await db.execute(sql`DELETE FROM libraries WHERE id IN (${LIB}, ${OTHER_LIB})`)
-    await db.execute(sql`DELETE FROM creators WHERE id = ${CREATOR} OR lower(name) = 'health studios'`)
+    await db.execute(
+      sql`DELETE FROM creators WHERE id = ${CREATOR} OR lower(name) = 'health studios'`,
+    )
     await db.execute(sql`DELETE FROM tags WHERE id = ${TAG} OR lower(name) = 'healthy'`)
   }
 
@@ -77,7 +79,9 @@ describeDb('library health', () => {
     await db.execute(sql`
       INSERT INTO creators (id, name, slug, public_id)
       VALUES (${CREATOR}, 'Health Studios', 'health-studios-hx', 'crhx00000001')`)
-    await db.execute(sql`INSERT INTO tags (id, name, slug) VALUES (${TAG}, 'healthy', 'healthy-hx')`)
+    await db.execute(
+      sql`INSERT INTO tags (id, name, slug) VALUES (${TAG}, 'healthy', 'healthy-hx')`,
+    )
 
     // suffix, path, name, creator, licence, fileCount, missing
     const models: [string, string, string, string | null, string | null, number, boolean][] = [
@@ -274,7 +278,7 @@ describeDb('library health', () => {
      * library's problems, because their subjects are absent from this
      * detector's output.
      */
-    it('does not resolve another library\'s problems', async () => {
+    it("does not resolve another library's problems", async () => {
       await db.execute(sql`
         INSERT INTO models (id, library_id, path, name, slug, public_id, file_count, total_size)
         VALUES (${id('20')}, ${OTHER_LIB}, 'other', 'Other Model', 'hx-20', 'mdhx00000020', 1, 10)`)

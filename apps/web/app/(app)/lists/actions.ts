@@ -15,10 +15,7 @@ type Result = { ok: true; liked: boolean } | { ok: false; error: string }
 export async function toggleLiked(modelPublicId: string): Promise<Result> {
   try {
     const user = await requireUser()
-    assertCan(
-      { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
-      'like:toggle',
-    )
+    assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'like:toggle')
 
     const rows = await getDb()
       .select({ id: schema.models.id })

@@ -1,4 +1,12 @@
-import { MeshParseError, expand, isDegenerate, newBox, type MeshStats, type StreamSource, type TriangleVisitor } from '../types'
+import {
+  MeshParseError,
+  expand,
+  isDegenerate,
+  newBox,
+  type MeshStats,
+  type StreamSource,
+  type TriangleVisitor,
+} from '../types'
 
 /**
  * STL reader, binary and ASCII.

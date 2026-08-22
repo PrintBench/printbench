@@ -32,5 +32,8 @@ export const listItems = pgTable(
     note: text('note'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.listId, t.modelId] }), index('list_items_model_idx').on(t.modelId)],
+  (t) => [
+    primaryKey({ columns: [t.listId, t.modelId] }),
+    index('list_items_model_idx').on(t.modelId),
+  ],
 )

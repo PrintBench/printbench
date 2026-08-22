@@ -149,10 +149,9 @@ export async function serveAs3mf(
     })
   } catch (error) {
     console.error(`[3mf] could not convert ${relativePath}:`, error)
-    return new Response(
-      error instanceof Error ? error.message : 'Could not convert that mesh',
-      { status: 422 },
-    )
+    return new Response(error instanceof Error ? error.message : 'Could not convert that mesh', {
+      status: 422,
+    })
   }
 }
 

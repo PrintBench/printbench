@@ -120,7 +120,9 @@ export function CommandMenu({
             placeholder="Search models, creators and tags…"
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-[var(--color-ink-faint)]"
           />
-          {loading && <Loader2 className="size-4 shrink-0 animate-spin text-[var(--color-ink-faint)]" />}
+          {loading && (
+            <Loader2 className="size-4 shrink-0 animate-spin text-[var(--color-ink-faint)]" />
+          )}
         </div>
 
         <Command.List className="max-h-[60vh] overflow-y-auto p-1.5">
@@ -219,7 +221,9 @@ function hrefFor(hit: QuickHit): Route {
 function groupHits(hits: QuickHit[]): [QuickHit['kind'], QuickHit[]][] {
   const order: QuickHit['kind'][] = ['model', 'creator', 'tag', 'collection']
   return order
-    .map((kind) => [kind, hits.filter((hit) => hit.kind === kind)] as [QuickHit['kind'], QuickHit[]])
+    .map(
+      (kind) => [kind, hits.filter((hit) => hit.kind === kind)] as [QuickHit['kind'], QuickHit[]],
+    )
     .filter(([, items]) => items.length > 0)
 }
 

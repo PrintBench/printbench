@@ -40,4 +40,3 @@ export async function librariesDue(db: Database, now: Date = new Date()): Promis
     }))
     .filter((library) => isScanDue(library.cron, library.lastScanAt, now))
 }
-

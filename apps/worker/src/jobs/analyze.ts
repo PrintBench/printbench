@@ -193,10 +193,7 @@ export async function handleFileDigest(payload: JobPayload<typeof JOB.fileDigest
     for await (const chunk of stream) hash.update(chunk as Buffer)
     const digest = hash.digest('hex')
 
-    await getDb()
-      .update(schema.modelFiles)
-      .set({ digest })
-      .where(eq(schema.modelFiles.id, file.id))
+    await getDb().update(schema.modelFiles).set({ digest }).where(eq(schema.modelFiles.id, file.id))
 
     // Only a file that had no digest before is a candidate: one whose content
     // changed already had a digest, and re-matching it against something

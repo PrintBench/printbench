@@ -14,11 +14,7 @@ const ROLE_BLURB: Record<string, string> = {
   viewer: 'You will be a viewer: browse, search and download everything in the library.',
 }
 
-export default async function InvitePage({
-  params,
-}: {
-  params: Promise<{ token: string }>
-}) {
+export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const invitation = await inviteByToken(getDb(), token)
 

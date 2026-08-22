@@ -94,7 +94,12 @@ export function parseSidecar(text: string): { data: SidecarContent | null; error
     return { data: null, error: `Sidecar version ${parsed.data.version} is newer than supported` }
   }
 
-  const { version: _version, generator: _generator, updatedAt: _updatedAt, ...content } = parsed.data
+  const {
+    version: _version,
+    generator: _generator,
+    updatedAt: _updatedAt,
+    ...content
+  } = parsed.data
   return { data: content }
 }
 
@@ -113,9 +118,7 @@ export async function readSidecar(
 ): Promise<{ data: SidecarContent | null; error?: string }> {
   const candidates = [
     sidecarPath(modelPath),
-    ...LEGACY_SIDECAR_FILENAMES.map((name) =>
-      modelPath ? `${modelPath}/${name}` : name,
-    ),
+    ...LEGACY_SIDECAR_FILENAMES.map((name) => (modelPath ? `${modelPath}/${name}` : name)),
   ]
 
   for (const path of candidates) {

@@ -22,7 +22,7 @@
 @theme {
   /* The mark's own two stops, for the logo gradient and anything quoting it. */
   --color-brand-from: oklch(59.1% 0.164 252);
-  --color-brand-to: oklch(72.2% 0.130 172);
+  --color-brand-to: oklch(72.2% 0.13 172);
 
   --color-bg: oklch(98.5% 0.002 255);
   --color-surface: oklch(100% 0 0);

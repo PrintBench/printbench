@@ -78,10 +78,7 @@ export async function unshareModel(db: Database, modelId: string): Promise<void>
  * model missing from disk — because distinguishing them for an anonymous
  * caller tells them which tokens once existed.
  */
-export async function modelByShareToken(
-  db: Database,
-  token: string,
-): Promise<SharedModel | null> {
+export async function modelByShareToken(db: Database, token: string): Promise<SharedModel | null> {
   // Length-checked before the query: an absurd token is not worth an index scan.
   if (!token || token.length < 8 || token.length > 64) return null
 

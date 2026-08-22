@@ -136,10 +136,10 @@ export function FolderPicker({
             </Button>
 
             {/*
-              * Shown only when there is more than one place to look. With a
-              * single mount — the normal Docker setup — naming it would just
-              * be repeating the path already on screen.
-              */}
+             * Shown only when there is more than one place to look. With a
+             * single mount — the normal Docker setup — naming it would just
+             * be repeating the path already on screen.
+             */}
             {roots.length > 1 && (
               <div className="flex flex-wrap items-center gap-1">
                 <span className="text-xs text-[var(--color-ink-faint)]">Jump to:</span>

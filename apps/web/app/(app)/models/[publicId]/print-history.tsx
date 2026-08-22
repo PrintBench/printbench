@@ -2,7 +2,16 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, CircleDashed, Loader2, Pencil, Plus, Star, Trash2, XCircle } from 'lucide-react'
+import {
+  CheckCircle2,
+  CircleDashed,
+  Loader2,
+  Pencil,
+  Plus,
+  Star,
+  Trash2,
+  XCircle,
+} from 'lucide-react'
 import type { PrintStatus } from '@pb/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,13 +68,15 @@ interface Props {
   canLog: boolean
 }
 
-const STATUS_META: Record<PrintStatus, { label: string; icon: typeof CheckCircle2; class: string }> =
-  {
-    success: { label: 'Success', icon: CheckCircle2, class: 'text-[var(--color-success)]' },
-    failed: { label: 'Failed', icon: XCircle, class: 'text-[var(--color-danger)]' },
-    partial: { label: 'Partial', icon: CircleDashed, class: 'text-[var(--color-warning)]' },
-    in_progress: { label: 'Printing', icon: Loader2, class: 'text-[var(--color-accent)]' },
-  }
+const STATUS_META: Record<
+  PrintStatus,
+  { label: string; icon: typeof CheckCircle2; class: string }
+> = {
+  success: { label: 'Success', icon: CheckCircle2, class: 'text-[var(--color-success)]' },
+  failed: { label: 'Failed', icon: XCircle, class: 'text-[var(--color-danger)]' },
+  partial: { label: 'Partial', icon: CircleDashed, class: 'text-[var(--color-warning)]' },
+  in_progress: { label: 'Printing', icon: Loader2, class: 'text-[var(--color-accent)]' },
+}
 
 export function PrintHistory({ publicId, prints, stats, files, suggestions, canLog }: Props) {
   const router = useRouter()
@@ -111,7 +122,12 @@ export function PrintHistory({ publicId, prints, stats, files, suggestions, canL
         <h2 className="text-sm font-semibold">Print history</h2>
         <PrintSummary stats={stats} />
         {canLog && !formOpen && (
-          <Button variant="secondary" size="sm" className="ml-auto" onClick={() => setFormOpen(true)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="ml-auto"
+            onClick={() => setFormOpen(true)}
+          >
             <Plus />
             Log a print
           </Button>
@@ -141,7 +157,8 @@ export function PrintHistory({ publicId, prints, stats, files, suggestions, canL
         <Card>
           <CardContent className="p-6 text-center text-sm text-[var(--color-ink-muted)]">
             Never printed.
-            {canLog && ' Log one once it comes off the plate — settings that worked are worth keeping.'}
+            {canLog &&
+              ' Log one once it comes off the plate — settings that worked are worth keeping.'}
           </CardContent>
         </Card>
       ) : (
@@ -175,9 +192,9 @@ function PrintSummary({ stats }: { stats: PrintStatsView }) {
       Printed {stats.total}
       {stats.total === 1 ? ' time' : ' times'}
       {/*
-        * Null, not zero: a model whose only print is still running has no
-        * verdict yet, and showing 0% would read as a failure.
-        */}
+       * Null, not zero: a model whose only print is still running has no
+       * verdict yet, and showing 0% would read as a failure.
+       */}
       {stats.successRate != null && ` · ${Math.round(stats.successRate * 100)}% success`}
       {stats.lastPrintedAt && ` · last ${formatDate(stats.lastPrintedAt)}`}
       {stats.totalFilamentG > 0 && ` · ${formatGrams(stats.totalFilamentG)} filament`}
@@ -305,12 +322,16 @@ function PrintForm({
 }) {
   const [status, setStatus] = useState<PrintStatus>(initial?.status ?? 'success')
   const [modelFileId, setModelFileId] = useState(initial?.filename ? findFile(files, initial) : '')
-  const [printerName, setPrinterName] = useState(initial?.printerName ?? suggestions.printers[0] ?? '')
+  const [printerName, setPrinterName] = useState(
+    initial?.printerName ?? suggestions.printers[0] ?? '',
+  )
   const [material, setMaterial] = useState(initial?.material ?? suggestions.materials[0] ?? '')
   const [colorHex, setColorHex] = useState(initial?.colorHex ?? '')
   const [layerHeight, setLayerHeight] = useState(initial?.layerHeightMm?.toString() ?? '')
   const [nozzle, setNozzle] = useState(initial?.nozzleMm?.toString() ?? '')
-  const [startedAt, setStartedAt] = useState(toLocalInput(initial?.startedAt) || toLocalInput(new Date().toISOString()))
+  const [startedAt, setStartedAt] = useState(
+    toLocalInput(initial?.startedAt) || toLocalInput(new Date().toISOString()),
+  )
   const [finishedAt, setFinishedAt] = useState(toLocalInput(initial?.finishedAt))
   const [duration, setDuration] = useState(initial?.durationMin?.toString() ?? '')
   const [filament, setFilament] = useState(initial?.filamentUsedG?.toString() ?? '')
@@ -391,10 +412,10 @@ function PrintForm({
         </datalist>
 
         {/*
-          * Not a Field: it clones the id onto its single child, which here is
-          * the wrapper, leaving two elements sharing one id. Two controls
-          * behind one label needs the label written out.
-          */}
+         * Not a Field: it clones the id onto its single child, which here is
+         * the wrapper, leaving two elements sharing one id. Two controls
+         * behind one label needs the label written out.
+         */}
         <div className="space-y-1.5">
           <label
             htmlFor="print-colour"
@@ -483,7 +504,9 @@ function PrintForm({
         </Field>
 
         <div className="space-y-1.5">
-          <span className="block text-sm font-medium text-[var(--color-ink)]">How did it come out?</span>
+          <span className="block text-sm font-medium text-[var(--color-ink)]">
+            How did it come out?
+          </span>
           <div className="flex h-10 items-center gap-1">
             {[1, 2, 3, 4, 5].map((n) => (
               <button

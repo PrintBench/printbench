@@ -76,7 +76,10 @@ describe('grouping', () => {
         dir(
           'Dragons Pack',
           [],
-          [dir('Dragons Pack/Red Dragon', ['red.stl']), dir('Dragons Pack/Blue Dragon', ['blue.stl'])],
+          [
+            dir('Dragons Pack/Red Dragon', ['red.stl']),
+            dir('Dragons Pack/Blue Dragon', ['blue.stl']),
+          ],
         ),
       ],
     )
@@ -147,7 +150,13 @@ describe('grouping', () => {
       dir(
         '',
         [],
-        [dir('Set', ['base.stl'], [dir('Set/Variant A', ['a.stl']), dir('Set/Variant B', ['b.stl'])])],
+        [
+          dir(
+            'Set',
+            ['base.stl'],
+            [dir('Set/Variant A', ['a.stl']), dir('Set/Variant B', ['b.stl'])],
+          ),
+        ],
       )
 
     it('deepest mode splits them and records the nesting', () => {
@@ -180,27 +189,27 @@ describe('grouping', () => {
         dir(
           'Creator',
           [],
-          [dir('Creator/Model A', ['a.stl']), dir('Creator/Model B', [], [dir('Creator/Model B/stl', ['b.stl'])])],
+          [
+            dir('Creator/Model A', ['a.stl']),
+            dir('Creator/Model B', [], [dir('Creator/Model B/stl', ['b.stl'])]),
+          ],
         ),
       ],
     )
     const result = groupModels(tree, { mode: 'flat', depth: 1 })
 
     expect(names(result)).toEqual(['Creator'])
-    expect(filePaths(result.models[0]!)).toEqual(['Creator/Model A/a.stl', 'Creator/Model B/stl/b.stl'])
+    expect(filePaths(result.models[0]!)).toEqual([
+      'Creator/Model A/a.stl',
+      'Creator/Model B/stl/b.stl',
+    ])
   })
 
   it('a sidecar marks a model root regardless of shape', () => {
     const tree = dir(
       '',
       [],
-      [
-        dir(
-          'Explicit',
-          ['.printbench.json', 'top.stl'],
-          [dir('Explicit/Sub', ['sub.stl'])],
-        ),
-      ],
+      [dir('Explicit', ['.printbench.json', 'top.stl'], [dir('Explicit/Sub', ['sub.stl'])])],
     )
     const result = groupModels(tree)
 
@@ -275,19 +284,29 @@ describe('pickPreviewFile', () => {
 
   it('prefers an image named like a cover', () => {
     const chosen = pickPreviewFile(
-      [file('m/body.stl', 'model', true), file('m/preview.png', 'image'), file('m/other.png', 'image')],
+      [
+        file('m/body.stl', 'model', true),
+        file('m/preview.png', 'image'),
+        file('m/other.png', 'image'),
+      ],
       'Dragon',
     )
     expect(chosen).toBe('m/preview.png')
   })
 
   it('prefers an image named after the model', () => {
-    const chosen = pickPreviewFile([file('m/red-dragon.png', 'image'), file('m/z.png', 'image')], 'Red Dragon')
+    const chosen = pickPreviewFile(
+      [file('m/red-dragon.png', 'image'), file('m/z.png', 'image')],
+      'Red Dragon',
+    )
     expect(chosen).toBe('m/red-dragon.png')
   })
 
   it('falls back to an image in an images folder', () => {
-    const chosen = pickPreviewFile([file('m/images/shot.png', 'image'), file('m/body.stl', 'model', true)], 'Dragon')
+    const chosen = pickPreviewFile(
+      [file('m/images/shot.png', 'image'), file('m/body.stl', 'model', true)],
+      'Dragon',
+    )
     expect(chosen).toBe('m/images/shot.png')
   })
 
@@ -318,7 +337,15 @@ describe('paths', () => {
   })
 
   it('rejects traversal and absolute paths', () => {
-    for (const bad of ['../etc/passwd', 'a/../../b', '/etc/passwd', 'C:/Windows', 'a\0b', '', './a']) {
+    for (const bad of [
+      '../etc/passwd',
+      'a/../../b',
+      '/etc/passwd',
+      'C:/Windows',
+      'a\0b',
+      '',
+      './a',
+    ]) {
       expect(isSafeRelativePath(bad), bad).toBe(false)
     }
     for (const good of ['a/b.stl', 'Red Dragon/stl/body.stl', 'Pokémon/a.stl']) {
@@ -327,7 +354,15 @@ describe('paths', () => {
   })
 
   it('identifies rubbish to skip', () => {
-    for (const name of ['Thumbs.db', '.DS_Store', '__MACOSX', '@eaDir', 'x.tmp', '~$doc.docx', '.git']) {
+    for (const name of [
+      'Thumbs.db',
+      '.DS_Store',
+      '__MACOSX',
+      '@eaDir',
+      'x.tmp',
+      '~$doc.docx',
+      '.git',
+    ]) {
       expect(isIgnoredName(name), name).toBe(true)
     }
     for (const name of ['body.stl', 'readme.txt', '.printbench.json']) {

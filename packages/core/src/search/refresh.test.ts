@@ -75,7 +75,9 @@ describeDb('refreshModelSearchVectors', () => {
       INSERT INTO creators (id, name, slug, public_id)
       VALUES (${CREATOR}, 'Loot Studios', 'loot-studios-fx', 'cr000000fx01')
     `)
-    await db.execute(sql`INSERT INTO tags (id, name, slug) VALUES (${TAG}, 'Pokémon', 'pokemon-fx')`)
+    await db.execute(
+      sql`INSERT INTO tags (id, name, slug) VALUES (${TAG}, 'Pokémon', 'pokemon-fx')`,
+    )
     await db.execute(sql`
       INSERT INTO models (id, library_id, path, name, slug, public_id, creator_id, notes) VALUES
         (${DRAGON}, ${LIB}, 'fx/red-dragon', 'Red Dragon Miniature', 'red-dragon-fx', 'md000000fx01',

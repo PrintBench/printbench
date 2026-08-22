@@ -153,7 +153,10 @@ describe('readStl (ascii)', () => {
   })
 
   it('copes with CRLF line endings', async () => {
-    const buffer = Buffer.from(toAsciiStl(cube()).toString('latin1').replace(/\n/g, '\r\n'), 'latin1')
+    const buffer = Buffer.from(
+      toAsciiStl(cube()).toString('latin1').replace(/\n/g, '\r\n'),
+      'latin1',
+    )
     const stats = await readStl(chunked(buffer, 512), () => {}, { byteLength: buffer.length })
     expect(stats.triangleCount).toBe(12)
   })

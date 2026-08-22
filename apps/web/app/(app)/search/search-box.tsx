@@ -101,9 +101,7 @@ export function SearchBox({ initialQuery, params }: { initialQuery: string; para
         Sort
         <select
           value={sort}
-          onChange={(event) =>
-            router.push(buildHref(params, { sort: event.target.value }))
-          }
+          onChange={(event) => router.push(buildHref(params, { sort: event.target.value }))}
           className="h-9 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-ink)]"
         >
           {SORTS.map((option) => (

@@ -170,10 +170,7 @@ try {
   check('refuses a schedule that would scan constantly', cronProblem('* * * * *') !== null)
   check('reports the next run', nextRun('0 3 * * *') instanceof Date)
   check('a never-scanned library is due at once', isScanDue('0 3 * * *', null))
-  check(
-    'a just-scanned library is not',
-    !isScanDue('0 3 * * *', new Date(), new Date()),
-  )
+  check('a just-scanned library is not', !isScanDue('0 3 * * *', new Date(), new Date()))
 
   section('Share links')
   const model = await db.execute<{ id: string; public_id: string }>(sql`
@@ -196,7 +193,7 @@ try {
   check('resolves to the model', (await modelByShareToken(db, token))?.id === modelId)
   check('covers its own files', await shareTokenCoversFile(db, token, fileId))
   check(
-    'does not cover another model\'s files',
+    "does not cover another model's files",
     !(await shareTokenCoversFile(db, token, otherFile.rows[0]!.id)),
   )
 
@@ -217,7 +214,7 @@ try {
 
   const wrongFile = await fetch(`${BASE}/api/share/${token}/files/${otherFile.rows[0]!.id}`)
   check(
-    'a share token cannot fetch another model\'s file',
+    "a share token cannot fetch another model's file",
     wrongFile.status === 404,
     `${wrongFile.status}`,
   )
@@ -253,7 +250,10 @@ try {
 
   const pruned = await prune(db, { graceDays: 30 })
   check('removes what is long gone', pruned.modelsDeleted > 0)
-  check('skips a library where everything is missing', pruned.librariesSkipped.includes('Unplugged NAS'))
+  check(
+    'skips a library where everything is missing',
+    pruned.librariesSkipped.includes('Unplugged NAS'),
+  )
 
   const after = await db.execute<{ count: number }>(
     sql`SELECT count(*)::int FROM models WHERE library_id = ${DEAD_LIBRARY_ID}`,

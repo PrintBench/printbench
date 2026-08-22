@@ -2,14 +2,29 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Boxes, Check, Cloud, FolderSearch, HardDrive, Loader2, Upload } from 'lucide-react'
+import {
+  AlertTriangle,
+  Boxes,
+  Check,
+  Cloud,
+  FolderSearch,
+  HardDrive,
+  Loader2,
+  Upload,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
-import { createLibrary, previewLibrary, uploadLocation, type PreviewResult, type S3Config } from '../actions'
+import {
+  createLibrary,
+  previewLibrary,
+  uploadLocation,
+  type PreviewResult,
+  type S3Config,
+} from '../actions'
 import { FolderPicker } from './folder-picker'
 import { S3Fields } from './s3-fields'
 
@@ -21,8 +36,7 @@ const MODES: { value: GroupingMode; label: string; description: string }[] = [
   {
     value: 'deepest',
     label: 'Each folder',
-    description:
-      'Every folder holding model files becomes a model. Right for most collections.',
+    description: 'Every folder holding model files becomes a model. Right for most collections.',
   },
   {
     value: 'top_level',
@@ -94,7 +108,13 @@ export function NewLibraryForm() {
       if (!result.ok && result.error) setError(result.error)
       // Seed the name once we know the location is real.
       if (result.ok && !name.trim()) {
-        const seed = backend === 's3' ? s3.bucket : path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()
+        const seed =
+          backend === 's3'
+            ? s3.bucket
+            : path
+                .replace(/[\\/]+$/, '')
+                .split(/[\\/]/)
+                .pop()
         if (seed) setName(seed)
       }
     } finally {
@@ -134,9 +154,7 @@ export function NewLibraryForm() {
   if (kind === null) {
     return (
       <div className="max-w-3xl space-y-4">
-        <p className="text-sm text-[var(--color-ink-muted)]">
-          What is this library for?
-        </p>
+        <p className="text-sm text-[var(--color-ink-muted)]">What is this library for?</p>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <button
@@ -163,8 +181,8 @@ export function NewLibraryForm() {
             <Upload className="size-5 text-[var(--color-accent)]" />
             <p className="mt-3 font-medium">Somewhere to upload to</p>
             <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-              A folder this app owns and writes to, so you can add models through the browser.
-              It starts empty.
+              A folder this app owns and writes to, so you can add models through the browser. It
+              starts empty.
             </p>
             <p className="mt-2 text-xs text-[var(--color-ink-faint)]">
               You need one of these before the Upload page can do anything.
@@ -335,7 +353,11 @@ export function NewLibraryForm() {
             </>
           )}
 
-          <Button variant="secondary" disabled={previewing || !ready} onClick={() => void runPreview()}>
+          <Button
+            variant="secondary"
+            disabled={previewing || !ready}
+            onClick={() => void runPreview()}
+          >
             {previewing ? <Loader2 className="animate-spin" /> : <FolderSearch />}
             {previewing ? 'Looking…' : 'Preview what will be indexed'}
           </Button>
@@ -475,9 +497,9 @@ export function NewLibraryForm() {
                 <span className="font-medium">Write a metadata sidecar into each model folder</span>
                 <span className="mt-0.5 block text-[var(--color-ink-muted)]">
                   Saves tags, creator and notes to a small{' '}
-                  <code className="font-mono text-xs">.printbench.json</code> file, so your
-                  metadata survives a database loss and moves with the files. This is the only
-                  thing ever written into an indexed folder — your model files are never touched.
+                  <code className="font-mono text-xs">.printbench.json</code> file, so your metadata
+                  survives a database loss and moves with the files. This is the only thing ever
+                  written into an indexed folder — your model files are never touched.
                 </span>
               </span>
             </label>

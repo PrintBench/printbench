@@ -200,7 +200,10 @@ try {
 
   const runs = await listPrints(db, { modelId })
   check('both prints recorded', runs.length === 2, `${runs.length}`)
-  check('duration derived from timestamps', runs.some((r) => r.durationMin === 210))
+  check(
+    'duration derived from timestamps',
+    runs.some((r) => r.durationMin === 210),
+  )
   check('model joined for linking', runs[0]?.modelName === 'Calibration Cube')
 
   const stats = await printStats(db, modelId)
@@ -243,8 +246,7 @@ try {
    * Studio downloads a perfectly valid STL and reports an unknown or corrupt
    * format.
    */
-  const fileUrl =
-    `${BASE}/api/files/${stl!.id}/raw/cube.stl?token=${token}&expires=${expires}`
+  const fileUrl = `${BASE}/api/files/${stl!.id}/raw/cube.stl?token=${token}&expires=${expires}`
   const link = slicerUrl(forStl[0]!, fileUrl)
   check('handoff link is a slicer scheme', link.startsWith('bambustudio://open?file='))
   check('file URL is encoded into it', link.includes('%3Ftoken%3D'))

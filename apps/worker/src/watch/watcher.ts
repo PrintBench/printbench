@@ -57,9 +57,7 @@ export async function watchTargets(): Promise<WatchTarget[]> {
 
 /** Starts and stops watchers so the active set matches `watchTargets()`. */
 export async function reconcileWatches(): Promise<void> {
-  const wanted = new Map(
-    (await watchTargets()).map((target) => [target.id, target] as const),
-  )
+  const wanted = new Map((await watchTargets()).map((target) => [target.id, target] as const))
 
   for (const [libraryId, watched] of active) {
     const target = wanted.get(libraryId)

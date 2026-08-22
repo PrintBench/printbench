@@ -341,7 +341,11 @@ describeDb('searchModels', () => {
     })
 
     it('combines a query with filters', async () => {
-      const result = await names({ query: 'dragon', creatorIds: [CREATOR_LOOT], licenses: ['CC-BY-4.0'] })
+      const result = await names({
+        query: 'dragon',
+        creatorIds: [CREATOR_LOOT],
+        licenses: ['CC-BY-4.0'],
+      })
       expect(result.sort()).toEqual(['Blue Dragon Wyrmling', 'Red Dragon Miniature'])
     })
   })

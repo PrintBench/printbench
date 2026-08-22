@@ -163,11 +163,17 @@ try {
   section('Libraries admin page')
   const librariesHtml = await text('/admin/libraries')
   check('lists the library', librariesHtml.includes('Demo Library'))
-  check('shows model and file counts', /11 models/.test(librariesHtml), 
-    librariesHtml.match(/\d+ models[^<]*/)?.[0] ?? 'no count found')
+  check(
+    'shows model and file counts',
+    /11 models/.test(librariesHtml),
+    librariesHtml.match(/\d+ models[^<]*/)?.[0] ?? 'no count found',
+  )
   check('marks in-place libraries read-only', librariesHtml.includes('Read-only'))
-  check('reports the last scan', /Last (deep|fast) scan/.test(librariesHtml),
-    librariesHtml.match(/Last \w+ scan[^<]{0,40}/)?.[0] ?? 'no scan line found')
+  check(
+    'reports the last scan',
+    /Last (deep|fast) scan/.test(librariesHtml),
+    librariesHtml.match(/Last \w+ scan[^<]{0,40}/)?.[0] ?? 'no scan line found',
+  )
 
   section('Rescan is idempotent through the queue')
   await queue.send(

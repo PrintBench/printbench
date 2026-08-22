@@ -30,13 +30,15 @@ export interface TimelinePrint {
   at: string
 }
 
-const STATUS_META: Record<PrintStatus, { label: string; icon: typeof CheckCircle2; class: string }> =
-  {
-    success: { label: 'Success', icon: CheckCircle2, class: 'text-[var(--color-success)]' },
-    failed: { label: 'Failed', icon: XCircle, class: 'text-[var(--color-danger)]' },
-    partial: { label: 'Partial', icon: CircleDashed, class: 'text-[var(--color-warning)]' },
-    in_progress: { label: 'Printing', icon: Loader2, class: 'text-[var(--color-accent)]' },
-  }
+const STATUS_META: Record<
+  PrintStatus,
+  { label: string; icon: typeof CheckCircle2; class: string }
+> = {
+  success: { label: 'Success', icon: CheckCircle2, class: 'text-[var(--color-success)]' },
+  failed: { label: 'Failed', icon: XCircle, class: 'text-[var(--color-danger)]' },
+  partial: { label: 'Partial', icon: CircleDashed, class: 'text-[var(--color-warning)]' },
+  in_progress: { label: 'Printing', icon: Loader2, class: 'text-[var(--color-accent)]' },
+}
 
 export function PrintTimeline({ prints }: { prints: TimelinePrint[] }) {
   return (

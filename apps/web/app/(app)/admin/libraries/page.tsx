@@ -200,13 +200,15 @@ export default async function LibrariesPage() {
                       >
                         {aborted ? (
                           <>
-                            Last scan was stopped for safety ({run.abort_reason?.replace(/_/g, ' ')}).
-                            Nothing was removed from the index.
+                            Last scan was stopped for safety ({run.abort_reason?.replace(/_/g, ' ')}
+                            ). Nothing was removed from the index.
                           </>
                         ) : (
                           <>
                             Last {run.mode} scan{' '}
-                            {run.finished_at ? DATE.format(new Date(run.finished_at)) : 'in progress'}
+                            {run.finished_at
+                              ? DATE.format(new Date(run.finished_at))
+                              : 'in progress'}
                             {run.models_created > 0 && ` · ${run.models_created} added`}
                             {run.models_missing > 0 && ` · ${run.models_missing} missing`}
                           </>

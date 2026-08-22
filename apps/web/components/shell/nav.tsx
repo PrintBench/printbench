@@ -34,8 +34,7 @@ interface NavItemBase {
  * entries take a typed Route that must exist.
  */
 export type NavItem =
-  | (NavItemBase & { soon: true; href: string })
-  | (NavItemBase & { soon?: false; href: Route })
+  (NavItemBase & { soon: true; href: string }) | (NavItemBase & { soon?: false; href: Route })
 
 const ICONS = {
   home: Home,
@@ -77,7 +76,12 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
     items: [
       { href: '/admin/libraries', label: 'Libraries', icon: 'drive', requires: 'library:manage' },
       { href: '/admin/printers', label: 'Printers', icon: 'printer', requires: 'printhost:manage' },
-      { href: '/admin/health', label: 'Library health', icon: 'health', requires: 'library:manage' },
+      {
+        href: '/admin/health',
+        label: 'Library health',
+        icon: 'health',
+        requires: 'library:manage',
+      },
       { href: '/admin/users', label: 'Users', icon: 'users', requires: 'user:manage' },
       { href: '/admin/settings', label: 'Settings', icon: 'settings', requires: 'settings:manage' },
     ],

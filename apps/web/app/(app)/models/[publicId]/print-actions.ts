@@ -214,8 +214,7 @@ export async function createSlicerLinks(fileId: string): Promise<SlicerLinks> {
     const leaf = (file.filename.split('/').pop() ?? 'model').replace(/\.[^.]+$/, '')
     const name = encodeURIComponent(`${safeFilename(leaf)}.3mf`)
 
-    const fileUrl =
-      `${origin.replace(/\/+$/, '')}/api/files/${fileId}/slicer/${expires}-${token}/${name}`
+    const fileUrl = `${origin.replace(/\/+$/, '')}/api/files/${fileId}/slicer/${expires}-${token}/${name}`
 
     return {
       ok: true,

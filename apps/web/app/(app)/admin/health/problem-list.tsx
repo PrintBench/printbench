@@ -117,9 +117,9 @@ export function ProblemList({
               Un-ignore
             </Button>
             {/*
-              * Resolving by hand is rarely right — detectors clear their own —
-              * so it sits behind the less prominent styling.
-              */}
+             * Resolving by hand is rarely right — detectors clear their own —
+             * so it sits behind the less prominent styling.
+             */}
             <Button variant="ghost" size="sm" disabled={pending} onClick={() => run(resolve)}>
               <Check />
               Mark fixed

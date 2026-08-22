@@ -61,11 +61,7 @@ async function waitFor<T>(probe: () => Promise<T | null>, label: string, timeout
 }
 
 /** Uploads one buffer through the real tus endpoint. */
-function upload(
-  endpoint: string,
-  data: Buffer,
-  metadata: Record<string, string>,
-): Promise<void> {
+function upload(endpoint: string, data: Buffer, metadata: Record<string, string>): Promise<void> {
   return new Promise((resolve, reject) => {
     const instance = new tus.Upload(data, {
       endpoint: `${BASE}${endpoint}`,
@@ -124,9 +120,7 @@ try {
   section('Resumable upload into a managed library')
   const secret = process.env.BETTER_AUTH_SECRET!
   const expires = Date.now() + 3_600_000
-  const token = createHmac('sha256', secret)
-    .update(`upload:${MANAGED_ID}:${expires}`)
-    .digest('hex')
+  const token = createHmac('sha256', secret).update(`upload:${MANAGED_ID}:${expires}`).digest('hex')
   const endpoint = `/api/upload?library=${MANAGED_ID}&expires=${expires}&token=${token}`
 
   const bodyStl = toBinaryStl(sphere(12, 24, 16))
@@ -140,8 +134,11 @@ try {
   const landed = path.join(managedRoot, 'Uploaded Dragon', 'stl', 'body.stl')
   const info = await stat(landed).catch(() => null)
   check('file landed at the right path', info !== null, 'Uploaded Dragon/stl/body.stl')
-  check('file is byte-for-byte intact', info?.size === bodyStl.length,
-    `${info?.size ?? 0}/${bodyStl.length}`)
+  check(
+    'file is byte-for-byte intact',
+    info?.size === bodyStl.length,
+    `${info?.size ?? 0}/${bodyStl.length}`,
+  )
 
   // Folder structure is what the scanner uses to group files into models.
   const cubeStl = toBinaryStl(cube(30))
@@ -154,7 +151,12 @@ try {
 
   section('Uploads are indexed automatically')
   const model = await waitFor(async () => {
-    const r = await db.execute<{ id: string; public_id: string; name: string; file_count: number }>(sql`
+    const r = await db.execute<{
+      id: string
+      public_id: string
+      name: string
+      file_count: number
+    }>(sql`
       SELECT id, public_id, name, file_count FROM models
       WHERE library_id = ${MANAGED_ID} AND missing_at IS NULL LIMIT 1`)
     return r.rows[0] ?? null
@@ -210,7 +212,12 @@ try {
   check('metadata saved', result.ok)
   check('sidecar written', result.sidecarWritten)
 
-  const stored = await db.execute<{ name: string; license: string; creator: string; tags: string[] }>(sql`
+  const stored = await db.execute<{
+    name: string
+    license: string
+    creator: string
+    tags: string[]
+  }>(sql`
     SELECT m.name, m.license, c.name AS creator,
            (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
               JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
@@ -243,7 +250,8 @@ try {
   section('Restore drill: lose the database, rescan, get it back')
   await db.execute(sql`DELETE FROM models WHERE library_id = ${MANAGED_ID}`)
   const emptied = await db.execute<{ n: number }>(
-    sql`SELECT count(*)::int AS n FROM models WHERE library_id = ${MANAGED_ID}`)
+    sql`SELECT count(*)::int AS n FROM models WHERE library_id = ${MANAGED_ID}`,
+  )
   check('models deleted', (emptied.rows[0]?.n ?? -1) === 0)
 
   const { LocalAdapter, scanLibrary } = await import('@pb/core')
@@ -267,7 +275,11 @@ try {
               JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
     FROM models m LEFT JOIN creators c ON c.id = m.creator_id
     WHERE m.library_id = ${MANAGED_ID}`)
-  check('name came back', restored.rows[0]?.name === 'Uploaded Dragon Knight', restored.rows[0]?.name)
+  check(
+    'name came back',
+    restored.rows[0]?.name === 'Uploaded Dragon Knight',
+    restored.rows[0]?.name,
+  )
   check('creator came back', restored.rows[0]?.creator === 'Loot Studios')
   check('tags came back', (restored.rows[0]?.tags ?? []).join(',') === 'dragon,miniature')
 } catch (error) {

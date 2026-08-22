@@ -63,11 +63,7 @@ export default async function ModelsPage({
     JOIN libraries l ON l.id = m.library_id
     LEFT JOIN model_files f ON f.id = m.preview_file_id
     WHERE m.missing_at IS NULL
-      ${
-        afterName && afterId
-          ? sql`AND (m.name, m.id) > (${afterName}, ${afterId}::uuid)`
-          : sql``
-      }
+      ${afterName && afterId ? sql`AND (m.name, m.id) > (${afterName}, ${afterId}::uuid)` : sql``}
     ORDER BY m.name ASC, m.id ASC
     LIMIT ${PAGE_SIZE + 1}
   `)
@@ -150,9 +146,7 @@ export default async function ModelsPage({
 
             {hasMore && last && (
               <Button asChild variant="secondary" size="sm">
-                <Link
-                  href={`/models?after=${encodeURIComponent(last.name)}&afterId=${last.id}`}
-                >
+                <Link href={`/models?after=${encodeURIComponent(last.name)}&afterId=${last.id}`}>
                   Next
                   <ChevronRight />
                 </Link>

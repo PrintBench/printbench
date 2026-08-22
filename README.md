@@ -12,17 +12,17 @@ rasterizer, so there is nothing to compile and nothing to install.
 
 All eight phases complete.
 
-| Phase | Scope | State |
-|-------|-------|-------|
-| 0 | Monorepo, schema, migrations, Docker, CI | done |
-| 1 | Auth, roles, app shell | done |
-| 2 | Libraries, scanning, browse | done |
-| 3 | Geometry parsing and thumbnails | done |
-| 4 | 3D viewer and downloads | done |
-| 5 | Search and faceted filtering | done |
-| 6 | Uploads and editing | done |
-| 7 | Print history, open-in-slicer, send-to-printer | done |
-| 8 | Library health, settings, schedules, sharing, S3 | done |
+| Phase | Scope                                            | State |
+| ----- | ------------------------------------------------ | ----- |
+| 0     | Monorepo, schema, migrations, Docker, CI         | done  |
+| 1     | Auth, roles, app shell                           | done  |
+| 2     | Libraries, scanning, browse                      | done  |
+| 3     | Geometry parsing and thumbnails                  | done  |
+| 4     | 3D viewer and downloads                          | done  |
+| 5     | Search and faceted filtering                     | done  |
+| 6     | Uploads and editing                              | done  |
+| 7     | Print history, open-in-slicer, send-to-printer   | done  |
+| 8     | Library health, settings, schedules, sharing, S3 | done  |
 
 ## Quick start (Docker)
 
@@ -129,14 +129,14 @@ web shell is replaceable without touching the app.
   `.zip` is extracted server-side rather than stored whole, with a zip-slip
   guard on every entry, so a downloaded pack can be dropped in as one file.
 - **S3 is a full backend, not just a source.** A library can live on local
-  disk, a NAS mount or an S3-compatible bucket, and read *and* write the same
+  disk, a NAS mount or an S3-compatible bucket, and read _and_ write the same
   either way — uploads, zip extraction, sidecars and deletion all go through
   one storage interface. Uploads to a bucket are multipart, so peak memory is
   the in-flight window (32 MB) rather than the size of the file; verified at
   128 MB against MinIO with `npm run verify:s3`.
 - **Scanning refuses to destroy metadata.** If a scan would mark more than 20% of
   models missing — an unmounted NAS, say — it aborts and asks an admin. The
-  nightly prune additionally refuses to touch a library where *every* model is
+  nightly prune additionally refuses to touch a library where _every_ model is
   missing, whatever the grace period says, because that is an unplugged drive
   rather than a deletion.
 - **Scan schedules are evaluated, not registered.** pg-boss keeps one schedule
@@ -150,13 +150,13 @@ web shell is replaceable without touching the app.
   the same kind of sweep as the scan schedule, so turning it on or off in the
   UI takes effect within a minute with nothing to restart.
 - **Slicer hand-off converts to 3MF.** Bambu Studio's URL handler refuses any
-  extension but `.3mf`, and checks *before* downloading — so a link to an STL
+  extension but `.3mf`, and checks _before_ downloading — so a link to an STL
   fails without a request ever reaching the server. Meshes are repackaged as
   3MF on the way out, which every other slicer reads too. An existing 3MF is
   passed through untouched, so a project keeps its plates and painted supports.
   Geometry is preserved; colour on an OBJ or PLY is not, and the UI says so.
 - **The link only appears where it can work.** Because delivery is always 3MF,
-  the question is what *we* can convert (STL, OBJ, PLY, 3MF) rather than what
+  the question is what _we_ can convert (STL, OBJ, PLY, 3MF) rather than what
   each slicer reads. STEP is the difference: slicers open it happily, we cannot
   produce a 3MF from it without a CAD kernel, so no link is offered. The offer
   and the converter share one list precisely so they cannot drift.

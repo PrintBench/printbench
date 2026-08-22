@@ -201,11 +201,10 @@ export function humanizeName(input: string): string {
      * the following letter looks like the start of a new word, giving
      * "PokéMon". Any accented name hits this.
      */
-    .replace(/(^|[\s\-–—/])(\p{Ll})/gu, (_, prefix: string, letter: string) =>
-      `${prefix}${letter.toUpperCase()}`,
+    .replace(
+      /(^|[\s\-–—/])(\p{Ll})/gu,
+      (_, prefix: string, letter: string) => `${prefix}${letter.toUpperCase()}`,
     )
 
   return titled || withoutExtension
 }
-
-

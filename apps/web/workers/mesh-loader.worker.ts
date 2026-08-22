@@ -51,10 +51,16 @@ async function load(request: MeshLoadRequest): Promise<void> {
 
     if (positions.length === 0) throw new Error('This file contains no geometry')
 
-    let minX = Infinity, minY = Infinity, minZ = Infinity
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity
+    let maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity
     for (let i = 0; i < positions.length; i += 3) {
-      const x = positions[i]!, y = positions[i + 1]!, z = positions[i + 2]!
+      const x = positions[i]!,
+        y = positions[i + 1]!,
+        z = positions[i + 2]!
       // Skip non-finite values rather than letting one bad vertex collapse the
       // whole bounding box, which would frame the model as a dot.
       if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue
@@ -170,7 +176,9 @@ function mergeScene(root: Object3D): Float32Array {
     const transformed = new Float32Array(flat.length)
 
     for (let i = 0; i < flat.length; i += 3) {
-      const x = flat[i]!, y = flat[i + 1]!, z = flat[i + 2]!
+      const x = flat[i]!,
+        y = flat[i + 1]!,
+        z = flat[i + 2]!
       transformed[i] = m[0]! * x + m[4]! * y + m[8]! * z + m[12]!
       transformed[i + 1] = m[1]! * x + m[5]! * y + m[9]! * z + m[13]!
       transformed[i + 2] = m[2]! * x + m[6]! * y + m[10]! * z + m[14]!

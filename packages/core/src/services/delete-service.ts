@@ -171,10 +171,7 @@ export interface Exclusion {
 }
 
 /** What has been removed, so it can be found again and put back. */
-export async function listExclusions(
-  db: Database,
-  libraryId?: string,
-): Promise<Exclusion[]> {
+export async function listExclusions(db: Database, libraryId?: string): Promise<Exclusion[]> {
   const rows = await db.execute<{
     library_id: string
     library_name: string
@@ -214,10 +211,7 @@ export async function restoreExclusion(
   const result = await db
     .delete(schema.modelExclusions)
     .where(
-      and(
-        eq(schema.modelExclusions.libraryId, libraryId),
-        eq(schema.modelExclusions.path, path),
-      ),
+      and(eq(schema.modelExclusions.libraryId, libraryId), eq(schema.modelExclusions.path, path)),
     )
   return (result.rowCount ?? 0) > 0
 }

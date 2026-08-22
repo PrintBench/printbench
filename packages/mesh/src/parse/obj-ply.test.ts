@@ -65,18 +65,20 @@ describe('readObj', () => {
     const stats = await readObj(chunked(Buffer.from(text)), () => {})
     expect(stats.triangleCount).toBe(2)
 
-    const pentagon = [
-      'v 0 0 0', 'v 2 0 0', 'v 3 1 0', 'v 1 2 0', 'v -1 1 0',
-      'f 1 2 3 4 5',
-    ].join('\n')
+    const pentagon = ['v 0 0 0', 'v 2 0 0', 'v 3 1 0', 'v 1 2 0', 'v -1 1 0', 'f 1 2 3 4 5'].join(
+      '\n',
+    )
     const five = await readObj(chunked(Buffer.from(pentagon)), () => {})
     expect(five.triangleCount).toBe(3)
   })
 
   it('handles v/vt/vn face syntax', async () => {
     const text = [
-      'v 0 0 0', 'v 1 0 0', 'v 0 1 0',
-      'vt 0 0', 'vn 0 0 1',
+      'v 0 0 0',
+      'v 1 0 0',
+      'v 0 1 0',
+      'vt 0 0',
+      'vn 0 0 1',
       'f 1/1/1 2/1/1 3/1/1',
     ].join('\n')
     const stats = await readObj(chunked(Buffer.from(text)), () => {})
@@ -105,7 +107,9 @@ describe('readObj', () => {
       'g group1',
       's off',
       'usemtl red',
-      'v 0 0 0', 'v 1 0 0', 'v 0 1 0',
+      'v 0 0 0',
+      'v 1 0 0',
+      'v 0 1 0',
       'f 1 2 3',
     ].join('\n')
     const stats = await readObj(chunked(Buffer.from(text)), () => {})
@@ -218,13 +222,19 @@ describe('readPly', () => {
 
   it('triangulates quad faces', async () => {
     const text = [
-      'ply', 'format ascii 1.0',
+      'ply',
+      'format ascii 1.0',
       'element vertex 4',
-      'property float x', 'property float y', 'property float z',
+      'property float x',
+      'property float y',
+      'property float z',
       'element face 1',
       'property list uchar int vertex_indices',
       'end_header',
-      '0 0 0', '1 0 0', '1 1 0', '0 1 0',
+      '0 0 0',
+      '1 0 0',
+      '1 1 0',
+      '0 1 0',
       '4 0 1 2 3',
       '',
     ].join('\n')

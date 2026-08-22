@@ -23,9 +23,12 @@ function boxOf(mesh: Mesh): BoundingBox {
     const x = mesh.triangles[i * 3]!
     const y = mesh.triangles[i * 3 + 1]!
     const z = mesh.triangles[i * 3 + 2]!
-    box.minX = Math.min(box.minX, x); box.maxX = Math.max(box.maxX, x)
-    box.minY = Math.min(box.minY, y); box.maxY = Math.max(box.maxY, y)
-    box.minZ = Math.min(box.minZ, z); box.maxZ = Math.max(box.maxZ, z)
+    box.minX = Math.min(box.minX, x)
+    box.maxX = Math.max(box.maxX, x)
+    box.minY = Math.min(box.minY, y)
+    box.maxY = Math.max(box.maxY, y)
+    box.minZ = Math.min(box.minZ, z)
+    box.maxZ = Math.max(box.maxZ, z)
   }
   return box
 }
@@ -52,12 +55,17 @@ function coverage(target: { pixels: Uint8ClampedArray }): number {
 
 /** Bounding box of the drawn pixels, in the target's own coordinates. */
 function drawnBounds(target: { width: number; height: number; pixels: Uint8ClampedArray }) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity
   for (let y = 0; y < target.height; y++) {
     for (let x = 0; x < target.width; x++) {
       if (target.pixels[(y * target.width + x) * 4 + 3]! > 0) {
-        minX = Math.min(minX, x); maxX = Math.max(maxX, x)
-        minY = Math.min(minY, y); maxY = Math.max(maxY, y)
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
       }
     }
   }
@@ -288,11 +296,15 @@ describe('renderThumbnail', () => {
 
   it('renders from ASCII STL, OBJ and 3MF too', async () => {
     const ascii = toAsciiStl(cube(10))
-    expect((await renderThumbnail('stl', streamOf(ascii), { size: 48, byteLength: ascii.length })).data.length)
-      .toBeGreaterThan(0)
+    expect(
+      (await renderThumbnail('stl', streamOf(ascii), { size: 48, byteLength: ascii.length })).data
+        .length,
+    ).toBeGreaterThan(0)
 
     const obj = toObj(cube(10))
-    expect((await renderThumbnail('obj', streamOf(obj), { size: 48 })).data.length).toBeGreaterThan(0)
+    expect((await renderThumbnail('obj', streamOf(obj), { size: 48 })).data.length).toBeGreaterThan(
+      0,
+    )
 
     const threemf = Buffer.from(toThreeMf(cube(10)))
     const result = await renderThumbnail('3mf', streamOf(threemf), { size: 48 })
@@ -307,7 +319,12 @@ describe('renderThumbnail', () => {
   it('prefers an embedded 3MF thumbnail over rendering', async () => {
     // A real PNG, so sharp can actually decode it.
     const png = await sharp({
-      create: { width: 32, height: 32, channels: 4, background: { r: 200, g: 30, b: 30, alpha: 1 } },
+      create: {
+        width: 32,
+        height: 32,
+        channels: 4,
+        background: { r: 200, g: 30, b: 30, alpha: 1 },
+      },
     })
       .png()
       .toBuffer()

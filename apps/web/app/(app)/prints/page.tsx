@@ -49,8 +49,7 @@ export default async function PrintsPage({
   ])
 
   const hasMore = prints.length === PAGE_SIZE
-  const link = (target: number): Route =>
-    `/prints?filter=${filter.key}&page=${target}` as Route
+  const link = (target: number): Route => `/prints?filter=${filter.key}&page=${target}` as Route
 
   return (
     <>
@@ -59,7 +58,12 @@ export default async function PrintsPage({
         description={
           stats.total === 0
             ? 'Every print you log appears here.'
-            : summarise(stats.total, stats.successRate, stats.totalFilamentG, stats.totalDurationMin)
+            : summarise(
+                stats.total,
+                stats.successRate,
+                stats.totalFilamentG,
+                stats.totalDurationMin,
+              )
         }
       />
 
@@ -110,7 +114,11 @@ export default async function PrintsPage({
                   page > 1 ? link(page - 1) : stats.total === 0 ? '/models' : ('/prints' as Route)
                 }
               >
-                {page > 1 ? 'Previous page' : stats.total === 0 ? 'Browse models' : 'Show everything'}
+                {page > 1
+                  ? 'Previous page'
+                  : stats.total === 0
+                    ? 'Browse models'
+                    : 'Show everything'}
               </Link>
             </Button>
           }
@@ -170,7 +178,11 @@ function summarise(
   // Null, not zero: nothing has settled yet, so there is no rate to quote.
   if (successRate != null) parts.push(`${Math.round(successRate * 100)}% success`)
   if (filamentG > 0) {
-    parts.push(filamentG >= 1000 ? `${(filamentG / 1000).toFixed(2)} kg filament` : `${Math.round(filamentG)} g filament`)
+    parts.push(
+      filamentG >= 1000
+        ? `${(filamentG / 1000).toFixed(2)} kg filament`
+        : `${Math.round(filamentG)} g filament`,
+    )
   }
   if (durationMin > 0) parts.push(`${Math.round(durationMin / 60)} hours on the plate`)
   return parts.join(' · ')

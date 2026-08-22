@@ -21,7 +21,10 @@ type InviteResult = { ok: true; token: string } | { ok: false; error: string }
 /** Every action here is admin-only, and re-checks rather than trusting the page. */
 async function requireAdmin() {
   const actor = await requireUser()
-  assertCan({ id: actor.id, role: actor.role ?? null, banned: actor.banned ?? false }, 'user:manage')
+  assertCan(
+    { id: actor.id, role: actor.role ?? null, banned: actor.banned ?? false },
+    'user:manage',
+  )
   return actor
 }
 
@@ -198,7 +201,11 @@ export async function setSuspended(userId: string, suspended: boolean): Promise<
     const db = getDb()
     const updated = await db
       .update(schema.user)
-      .set({ banned: suspended, banReason: suspended ? 'Suspended by an admin' : null, updatedAt: new Date() })
+      .set({
+        banned: suspended,
+        banReason: suspended ? 'Suspended by an admin' : null,
+        updatedAt: new Date(),
+      })
       .where(eq(schema.user.id, userId))
 
     if (updated.rowCount === 0) return { ok: false, error: 'That account no longer exists.' }

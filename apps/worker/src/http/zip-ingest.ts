@@ -1,6 +1,12 @@
 import { readFile, stat } from 'node:fs/promises'
 import { unzipSync } from 'fflate'
-import { isIgnoredPath, isSafeRelativePath, joinPath, normalizePath, type StorageAdapter } from '@pb/core'
+import {
+  isIgnoredPath,
+  isSafeRelativePath,
+  joinPath,
+  normalizePath,
+  type StorageAdapter,
+} from '@pb/core'
 
 /**
  * Extracting an uploaded zip into a library.
@@ -82,7 +88,9 @@ export async function extractZipIntoLibrary(
 
   if (files.length === 0) throw new ZipIngestError('That zip has nothing worth extracting in it.')
   if (files.length > MAX_ZIP_ENTRIES) {
-    throw new ZipIngestError(`That zip has too many files (over ${MAX_ZIP_ENTRIES.toLocaleString()}).`)
+    throw new ZipIngestError(
+      `That zip has too many files (over ${MAX_ZIP_ENTRIES.toLocaleString()}).`,
+    )
   }
 
   /*
@@ -180,7 +188,9 @@ async function destinationInUse(storage: StorageAdapter, destination: string): P
  */
 function unwrapCommonRoot(names: string[]): (name: string) => string {
   const firstSegments = new Set(
-    names.map((name) => normalizePath(name).split('/')[0]).filter((segment): segment is string => Boolean(segment)),
+    names
+      .map((name) => normalizePath(name).split('/')[0])
+      .filter((segment): segment is string => Boolean(segment)),
   )
 
   if (firstSegments.size !== 1) return (name) => name
@@ -195,6 +205,9 @@ function unwrapCommonRoot(names: string[]): (name: string) => string {
 
 function formatBytes(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB']
-  const exponent = Math.min(Math.floor(Math.log(Math.max(bytes, 1)) / Math.log(1024)), units.length - 1)
+  const exponent = Math.min(
+    Math.floor(Math.log(Math.max(bytes, 1)) / Math.log(1024)),
+    units.length - 1,
+  )
   return `${(bytes / 1024 ** exponent).toFixed(exponent === 0 ? 0 : 1)} ${units[exponent]}`
 }

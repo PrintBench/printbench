@@ -23,7 +23,12 @@ export function FacetPanel({
   params: ParsedSearchParams
   raw: RawParams
 }) {
-  const groups: { key: string; title: string; options: { value: string; label: string; count: number }[]; selected: string[] }[] = [
+  const groups: {
+    key: string
+    title: string
+    options: { value: string; label: string; count: number }[]
+    selected: string[]
+  }[] = [
     { key: 'library', title: 'Library', options: facets.libraries, selected: params.library },
     { key: 'creator', title: 'Creator', options: facets.creators, selected: params.creator },
     { key: 'tag', title: 'Tag', options: facets.tags, selected: params.tag },

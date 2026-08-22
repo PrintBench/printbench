@@ -62,7 +62,9 @@ describe('extractZipIntoLibrary', () => {
 
     expect(result.filesExtracted).toBe(2)
     expect(await readFile(path.join(library, 'Dragon', 'body.stl'), 'utf8')).toBe('stl-data')
-    expect(await readFile(path.join(library, 'Dragon', 'images', 'photo.jpg'), 'utf8')).toBe('jpg-data')
+    expect(await readFile(path.join(library, 'Dragon', 'images', 'photo.jpg'), 'utf8')).toBe(
+      'jpg-data',
+    )
   })
 
   it('unwraps a single common root folder', async () => {

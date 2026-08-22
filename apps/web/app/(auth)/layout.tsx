@@ -29,8 +29,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         />
         <div className="absolute inset-0 flex items-center justify-center p-16">
           <blockquote className="max-w-md text-balance text-xl font-medium leading-relaxed text-[var(--color-ink-muted)]">
-            Every STL, 3MF and print in one place — indexed where it already
-            lives, and findable in a keystroke.
+            Every STL, 3MF and print in one place — indexed where it already lives, and findable in
+            a keystroke.
           </blockquote>
         </div>
       </div>

@@ -139,10 +139,7 @@ export async function getSetting<K extends keyof Settings>(
 }
 
 /** Writes a partial update, validating each value first. */
-export async function updateSettings(
-  db: Database,
-  patch: Partial<Settings>,
-): Promise<Settings> {
+export async function updateSettings(db: Database, patch: Partial<Settings>): Promise<Settings> {
   const entries = Object.entries(patch).filter(([key]) => key in DEFAULT_SETTINGS)
 
   // Validate everything before writing anything, so a form with one bad field

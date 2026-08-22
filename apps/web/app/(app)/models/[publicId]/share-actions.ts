@@ -3,19 +3,12 @@
 import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
-import {
-  PolicyError,
-  assertCan,
-  getSettings,
-  shareModel,
-  unshareModel,
-} from '@pb/core'
+import { PolicyError, assertCan, getSettings, shareModel, unshareModel } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
 
 type ShareResult =
-  | { ok: true; url: string }
-  | { ok: false; error: string; sharingDisabled?: boolean }
+  { ok: true; url: string } | { ok: false; error: string; sharingDisabled?: boolean }
 
 async function modelIdFor(publicId: string): Promise<string | null> {
   const rows = await getDb()

@@ -128,10 +128,7 @@ export async function revokeInvite(db: Database, id: string): Promise<boolean> {
  * credential, and distinguishing "expired" from "never existed" tells someone
  * probing tokens that they found a real one.
  */
-export async function inviteByToken(
-  db: Database,
-  token: string,
-): Promise<OpenInvitation | null> {
+export async function inviteByToken(db: Database, token: string): Promise<OpenInvitation | null> {
   if (!token || token.length > 64) return null
 
   const rows = await db
@@ -162,11 +159,7 @@ export async function inviteByToken(
  * at once must not both get an account. Whoever's UPDATE matches a row first
  * wins, and the other is told the link is spent.
  */
-export async function consumeInvite(
-  db: Database,
-  id: string,
-  userId: string,
-): Promise<boolean> {
+export async function consumeInvite(db: Database, id: string, userId: string): Promise<boolean> {
   const result = await db
     .update(schema.invitations)
     .set({ acceptedAt: new Date(), acceptedBy: userId })

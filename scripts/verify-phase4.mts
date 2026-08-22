@@ -92,7 +92,12 @@ try {
   }, 'the scan')
   check('library scanned', run.status === 'succeeded', run.status)
 
-  const files = await db.execute<{ id: string; filename: string; size: string; model_id: string }>(sql`
+  const files = await db.execute<{
+    id: string
+    filename: string
+    size: string
+    model_id: string
+  }>(sql`
     SELECT f.id, f.filename, f.size, f.model_id FROM model_files f
     JOIN models m ON m.id = f.model_id
     WHERE m.library_id = ${LIBRARY_ID} AND f.extension = 'stl' AND f.size > 1000
@@ -105,10 +110,17 @@ try {
   const whole = await get(`/api/files/${file.id}/raw`)
   const wholeBytes = Buffer.from(await whole.arrayBuffer())
   check('returns 200', whole.status === 200, `HTTP ${whole.status}`)
-  check('sends the complete file', wholeBytes.length === fileSize, `${wholeBytes.length}/${fileSize}`)
+  check(
+    'sends the complete file',
+    wholeBytes.length === fileSize,
+    `${wholeBytes.length}/${fileSize}`,
+  )
   check('declares its length', whole.headers.get('content-length') === String(fileSize))
   check('advertises range support', whole.headers.get('accept-ranges') === 'bytes')
-  check('offers a filename', (whole.headers.get('content-disposition') ?? '').includes('attachment'))
+  check(
+    'offers a filename',
+    (whole.headers.get('content-disposition') ?? '').includes('attachment'),
+  )
   check('sends an etag', (whole.headers.get('etag') ?? '').length > 2)
 
   section('Conditional request')
@@ -135,12 +147,17 @@ try {
    */
   const suffix = await get(`/api/files/${file.id}/raw`, { range: 'bytes=-500' })
   const suffixBytes = Buffer.from(await suffix.arrayBuffer())
-  check('a suffix range returns the END of the file',
-    suffixBytes.equals(wholeBytes.subarray(fileSize - 500)), `${suffixBytes.length} bytes`)
+  check(
+    'a suffix range returns the END of the file',
+    suffixBytes.equals(wholeBytes.subarray(fileSize - 500)),
+    `${suffixBytes.length} bytes`,
+  )
 
   const openEnded = await get(`/api/files/${file.id}/raw`, { range: `bytes=${fileSize - 10}-` })
-  check('an open-ended range runs to the end',
-    Buffer.from(await openEnded.arrayBuffer()).equals(wholeBytes.subarray(fileSize - 10)))
+  check(
+    'an open-ended range runs to the end',
+    Buffer.from(await openEnded.arrayBuffer()).equals(wholeBytes.subarray(fileSize - 10)),
+  )
 
   const past = await get(`/api/files/${file.id}/raw`, { range: `bytes=${fileSize + 100}-` })
   check('an unsatisfiable range returns 416', past.status === 416, `HTTP ${past.status}`)
@@ -148,7 +165,10 @@ try {
 
   section('Inline mode for the viewer')
   const inline = await get(`/api/files/${file.id}/raw?inline=1`)
-  check('inline disposition', (inline.headers.get('content-disposition') ?? '').startsWith('inline'))
+  check(
+    'inline disposition',
+    (inline.headers.get('content-disposition') ?? '').startsWith('inline'),
+  )
   await inline.arrayBuffer()
 
   section('Authorisation')
@@ -159,12 +179,21 @@ try {
   check('unknown file returns 404', missing.status === 404, `HTTP ${missing.status}`)
 
   section('Whole-model ZIP')
-  const model = await db.execute<{ id: string; public_id: string; name: string; file_count: number }>(sql`
+  const model = await db.execute<{
+    id: string
+    public_id: string
+    name: string
+    file_count: number
+  }>(sql`
     SELECT id, public_id, name, file_count FROM models
     WHERE library_id = ${LIBRARY_ID} AND missing_at IS NULL AND file_count > 1
     ORDER BY file_count DESC LIMIT 1`)
   const target = model.rows[0]!
-  check('found a multi-file model', target.file_count > 1, `${target.name} (${target.file_count} files)`)
+  check(
+    'found a multi-file model',
+    target.file_count > 1,
+    `${target.name} (${target.file_count} files)`,
+  )
 
   const secret = process.env.BETTER_AUTH_SECRET!
   const expires = Date.now() + 60_000
@@ -175,24 +204,39 @@ try {
   )
   check('zip endpoint returns 200', zipResponse.status === 200, `HTTP ${zipResponse.status}`)
   check('served as a zip', zipResponse.headers.get('content-type') === 'application/zip')
-  check('names the archive after the model',
-    (zipResponse.headers.get('content-disposition') ?? '').includes('.zip'))
+  check(
+    'names the archive after the model',
+    (zipResponse.headers.get('content-disposition') ?? '').includes('.zip'),
+  )
 
   const zipBytes = new Uint8Array(await zipResponse.arrayBuffer())
   check('archive has content', zipBytes.byteLength > 0, `${zipBytes.byteLength} bytes`)
 
   const entries = unzipSync(zipBytes)
   const names = Object.keys(entries)
-  check('archive contains every file', names.length === target.file_count,
-    `${names.length}/${target.file_count}: ${names.join(', ')}`)
-  check('folder structure is preserved', names.some((n) => n.includes('/')), names.join(', '))
-  check('entries have real content', Object.values(entries).every((d) => d.byteLength > 0))
+  check(
+    'archive contains every file',
+    names.length === target.file_count,
+    `${names.length}/${target.file_count}: ${names.join(', ')}`,
+  )
+  check(
+    'folder structure is preserved',
+    names.some((n) => n.includes('/')),
+    names.join(', '),
+  )
+  check(
+    'entries have real content',
+    Object.values(entries).every((d) => d.byteLength > 0),
+  )
 
   // Compression is off on purpose: STL is dense float data and 3MF is already a
   // zip, so deflating spends CPU for almost nothing.
   const totalUncompressed = Object.values(entries).reduce((sum, d) => sum + d.byteLength, 0)
-  check('stored rather than deflated', zipBytes.byteLength >= totalUncompressed,
-    `${zipBytes.byteLength} archive vs ${totalUncompressed} content`)
+  check(
+    'stored rather than deflated',
+    zipBytes.byteLength >= totalUncompressed,
+    `${zipBytes.byteLength} archive vs ${totalUncompressed} content`,
+  )
 
   section('ZIP link security')
   const tampered = await get(
@@ -205,10 +249,16 @@ try {
   const swapped = await get(
     `/api/download/model?model=${otherModel.rows[0]!.id}&expires=${expires}&token=${token}`,
   )
-  check('reusing a token for another model is rejected', swapped.status === 403, `HTTP ${swapped.status}`)
+  check(
+    'reusing a token for another model is rejected',
+    swapped.status === 403,
+    `HTTP ${swapped.status}`,
+  )
 
   const expiredAt = Date.now() - 1000
-  const expiredToken = createHmac('sha256', secret).update(`${target.id}:${expiredAt}`).digest('hex')
+  const expiredToken = createHmac('sha256', secret)
+    .update(`${target.id}:${expiredAt}`)
+    .digest('hex')
   const expired = await get(
     `/api/download/model?model=${target.id}&expires=${expiredAt}&token=${expiredToken}`,
   )

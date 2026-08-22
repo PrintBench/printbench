@@ -9,14 +9,7 @@
  * complexity this project exists to avoid.
  */
 
-export type FileCategory =
-  | 'model'
-  | 'image'
-  | 'archive'
-  | 'document'
-  | 'slicer'
-  | 'video'
-  | 'other'
+export type FileCategory = 'model' | 'image' | 'archive' | 'document' | 'slicer' | 'video' | 'other'
 
 export interface MediaTypeInfo {
   category: FileCategory

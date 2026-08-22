@@ -76,7 +76,10 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
         {parent && (
           <>
             <span aria-hidden>/</span>
-            <Link href={`/collections/${parent.slug}` as Route} className="hover:text-[var(--color-ink)]">
+            <Link
+              href={`/collections/${parent.slug}` as Route}
+              className="hover:text-[var(--color-ink)]"
+            >
               {parent.name}
             </Link>
           </>

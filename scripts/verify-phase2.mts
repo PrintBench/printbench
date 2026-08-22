@@ -77,7 +77,10 @@ const library = (): LibraryLocation => ({
 })
 
 const runScan = (options = {}) =>
-  scanLibrary({ db, storage: new LocalAdapter(library()), library: library() }, { mode: 'deep', ...options })
+  scanLibrary(
+    { db, storage: new LocalAdapter(library()), library: library() },
+    { mode: 'deep', ...options },
+  )
 
 async function models(): Promise<{ path: string; name: string; files: number }[]> {
   const result = await db.execute<{ path: string; name: string; file_count: number }>(sql`
@@ -119,9 +122,11 @@ try {
   check('finds 7 models', found.length === 7, `found ${found.length}`)
   check('pack folders become containers, not models', !paths.includes('Loot Studios'))
   check('models inside a pack are indexed', paths.includes('Loot Studios/Dragon Knight'))
-  check('common subfolders are absorbed into one model',
+  check(
+    'common subfolders are absorbed into one model',
     found.find((m) => m.path === 'Loot Studios/Dragon Knight')?.files === 4,
-    `${found.find((m) => m.path === 'Loot Studios/Dragon Knight')?.files} files`)
+    `${found.find((m) => m.path === 'Loot Studios/Dragon Knight')?.files} files`,
+  )
   check('unicode and emoji folder names survive', paths.includes('Terrain/Pokémon Gym 🏟'))
   check('apostrophes and ampersands survive', paths.includes("Terrain/Bob's Bridge & Tower"))
   check('loose root files each become a model', paths.includes('benchy.stl'))
@@ -145,8 +150,11 @@ try {
     SELECT f.filename FROM models m JOIN model_files f ON f.id = m.preview_file_id
     WHERE m.path = 'Loot Studios/Dragon Knight' AND m.library_id = ${LIBRARY_ID}
   `)
-  check('a creator-supplied image is chosen as the preview',
-    preview.rows[0]?.filename === 'images/preview.png', preview.rows[0]?.filename ?? 'none')
+  check(
+    'a creator-supplied image is chosen as the preview',
+    preview.rows[0]?.filename === 'images/preview.png',
+    preview.rows[0]?.filename ?? 'none',
+  )
 
   section('Search finds what was just indexed')
   for (const [query, expected] of [
@@ -159,9 +167,11 @@ try {
       SELECT name FROM models WHERE library_id = ${LIBRARY_ID}
         AND search_vector @@ websearch_to_tsquery('pb_search', ${query}) LIMIT 5
     `)
-    check(`search "${query}" finds ${expected}`,
+    check(
+      `search "${query}" finds ${expected}`,
       hit.rows.some((r) => r.name === expected),
-      hit.rows.map((r) => r.name).join(', ') || 'nothing')
+      hit.rows.map((r) => r.name).join(', ') || 'nothing',
+    )
   }
 
   section('Rescanning is idempotent')
@@ -186,8 +196,11 @@ try {
   await mkdir(path.join(root, 'Terrain', 'New Keep'), { recursive: true })
   await writeFile(path.join(root, 'Terrain', 'New Keep', 'keep.stl'), 'k'.repeat(300))
   const added = await runScan({ mode: 'fast' })
-  check('a fast scan finds a model added below an unchanged parent',
-    added.modelsCreated === 1, `${added.modelsCreated} created`)
+  check(
+    'a fast scan finds a model added below an unchanged parent',
+    added.modelsCreated === 1,
+    `${added.modelsCreated} created`,
+  )
 
   section('SAFETY: unmounted volume must not wipe metadata')
   const before = (await models()).length
@@ -214,7 +227,11 @@ try {
   const mass = await runScan()
   check('scan aborts when too much would disappear', mass.status === 'aborted')
   check('abort reason is mass_disappearance', mass.abortReason === 'mass_disappearance')
-  check('explains the scale of the loss', /\d+ of \d+/.test(mass.abortDetail ?? ''), mass.abortDetail ?? '')
+  check(
+    'explains the scale of the loss',
+    /\d+ of \d+/.test(mass.abortDetail ?? ''),
+    mass.abortDetail ?? '',
+  )
   check('models are preserved pending confirmation', (await models()).length === restored)
 
   section('An admin can confirm a genuine deletion')
@@ -228,16 +245,21 @@ try {
   await buildLibrary()
   const revived = await runScan()
   check('scan succeeds', revived.status === 'succeeded')
-  check('restored folders are revived', (await missingCount()) < missingBefore,
-    `${missingBefore} -> ${await missingCount()}`)
+  check(
+    'restored folders are revived',
+    (await missingCount()) < missingBefore,
+    `${missingBefore} -> ${await missingCount()}`,
+  )
   // "Terrain/New Keep" was created during the incremental test and is not part
   // of buildLibrary(), so it correctly stays missing.
   const stillMissing = await db.execute<{ path: string }>(sql`
     SELECT path FROM models WHERE library_id = ${LIBRARY_ID} AND missing_at IS NOT NULL
   `)
-  check('only the genuinely absent folder is still missing',
+  check(
+    'only the genuinely absent folder is still missing',
     stillMissing.rows.every((r) => r.path === 'Terrain/New Keep'),
-    stillMissing.rows.map((r) => r.path).join(', ') || 'none')
+    stillMissing.rows.map((r) => r.path).join(', ') || 'none',
+  )
 } catch (error) {
   console.error('\nUNEXPECTED ERROR:', error)
   failed++

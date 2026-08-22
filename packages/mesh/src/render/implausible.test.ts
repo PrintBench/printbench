@@ -82,18 +82,18 @@ describe('analyzeMesh', () => {
 
   it('refuses random bytes claiming to be an STL', async () => {
     const junk = randomBytes(256 * 1024)
-    await expect(
-      analyzeMesh('stl', streamOf(junk), { byteLength: junk.length }),
-    ).rejects.toThrow(MeshParseError)
+    await expect(analyzeMesh('stl', streamOf(junk), { byteLength: junk.length })).rejects.toThrow(
+      MeshParseError,
+    )
   })
 
   it('says what is actually wrong', async () => {
     const junk = randomBytes(256 * 1024)
     // The message reaches the health report and the model page, so it has to
     // read as an explanation rather than as a stack trace.
-    await expect(
-      analyzeMesh('stl', streamOf(junk), { byteLength: junk.length }),
-    ).rejects.toThrow(/does not look like a mesh/i)
+    await expect(analyzeMesh('stl', streamOf(junk), { byteLength: junk.length })).rejects.toThrow(
+      /does not look like a mesh/i,
+    )
   })
 })
 

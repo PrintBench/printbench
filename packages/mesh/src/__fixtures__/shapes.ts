@@ -26,8 +26,14 @@ function build(vertices: number[][]): Mesh {
 export function cube(size = 10): Mesh {
   const s = size
   const v = [
-    [0, 0, 0], [s, 0, 0], [s, s, 0], [0, s, 0], // bottom
-    [0, 0, s], [s, 0, s], [s, s, s], [0, s, s], // top
+    [0, 0, 0],
+    [s, 0, 0],
+    [s, s, 0],
+    [0, s, 0], // bottom
+    [0, 0, s],
+    [s, 0, s],
+    [s, s, s],
+    [0, s, s], // top
   ]
   const quads: [number, number, number, number][] = [
     [0, 3, 2, 1], // bottom
@@ -237,16 +243,23 @@ export function toBinaryPly(mesh: Mesh): Buffer {
 
 /** Expected bounding box, computed independently of any parser. */
 export function expectedBounds(mesh: Mesh) {
-  let minX = Infinity, minY = Infinity, minZ = Infinity
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity
+  let maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity
   for (let i = 0; i < mesh.triangleCount * 3; i++) {
     const x = mesh.triangles[i * 3]!
     const y = mesh.triangles[i * 3 + 1]!
     const z = mesh.triangles[i * 3 + 2]!
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue
-    minX = Math.min(minX, x); maxX = Math.max(maxX, x)
-    minY = Math.min(minY, y); maxY = Math.max(maxY, y)
-    minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z)
+    minX = Math.min(minX, x)
+    maxX = Math.max(maxX, x)
+    minY = Math.min(minY, y)
+    maxY = Math.max(maxY, y)
+    minZ = Math.min(minZ, z)
+    maxZ = Math.max(maxZ, z)
   }
   return { minX, minY, minZ, maxX, maxY, maxZ }
 }
@@ -254,7 +267,6 @@ export function expectedBounds(mesh: Mesh) {
 // ---------------------------------------------------------------------------
 // 3MF
 // ---------------------------------------------------------------------------
-
 
 export interface ThreeMfOptions {
   unit?: string

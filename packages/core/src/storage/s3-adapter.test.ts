@@ -146,6 +146,8 @@ describe('error messages', () => {
   })
 
   it('reads an HTTP status when there is no error name', () => {
-    expect(describeS3Error({ $metadata: { httpStatusCode: 403 } }, 'prints')).toMatch(/not allowed/i)
+    expect(describeS3Error({ $metadata: { httpStatusCode: 403 } }, 'prints')).toMatch(
+      /not allowed/i,
+    )
   })
 })

@@ -24,7 +24,10 @@ export interface ParsedRange {
  * Returns `null` for "no range requested" and `'unsatisfiable'` for a range
  * that cannot be served, which must produce a 416 rather than a 200.
  */
-export function parseRange(header: string | null, size: number): ParsedRange | null | 'unsatisfiable' {
+export function parseRange(
+  header: string | null,
+  size: number,
+): ParsedRange | null | 'unsatisfiable' {
   if (!header) return null
 
   const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim())
@@ -64,17 +67,18 @@ export function parseRange(header: string | null, size: number): ParsedRange | n
  * is given alongside the RFC 5987 `filename*` form.
  */
 export function contentDisposition(filename: string, disposition: 'inline' | 'attachment'): string {
-  const fallback = filename
-    .normalize('NFKD')
-    // Strip combining marks, then anything still outside printable ASCII.
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\x20-\x7e]/g, '_')
-    // Quotes and backslashes would terminate or escape the quoted string.
-    .replace(/["\\]/g, '_')
-    // Collapse runs: a single emoji is a surrogate pair and would otherwise
-    // become two underscores.
-    .replace(/_{2,}/g, '_')
-    .trim() || 'download'
+  const fallback =
+    filename
+      .normalize('NFKD')
+      // Strip combining marks, then anything still outside printable ASCII.
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\x20-\x7e]/g, '_')
+      // Quotes and backslashes would terminate or escape the quoted string.
+      .replace(/["\\]/g, '_')
+      // Collapse runs: a single emoji is a surrogate pair and would otherwise
+      // become two underscores.
+      .replace(/_{2,}/g, '_')
+      .trim() || 'download'
 
   return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`
 }

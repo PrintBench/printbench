@@ -194,7 +194,14 @@ function resolveObject(
     const target = component.path ? parts.get(normalisePart(component.path)) : part
     if (!target) continue
 
-    resolveObject(parts, target, component.objectId, multiply(transform, component.transform), emit, depth + 1)
+    resolveObject(
+      parts,
+      target,
+      component.objectId,
+      multiply(transform, component.transform),
+      emit,
+      depth + 1,
+    )
   }
 }
 
@@ -402,7 +409,11 @@ function attr(node: Record<string, unknown>, name: string): string | undefined {
   if (typeof direct === 'string') return direct
 
   for (const [key, value] of Object.entries(node)) {
-    if (key.startsWith('@') && key.toLowerCase().endsWith(`:${name}`) && typeof value === 'string') {
+    if (
+      key.startsWith('@') &&
+      key.toLowerCase().endsWith(`:${name}`) &&
+      typeof value === 'string'
+    ) {
       return value
     }
   }
@@ -448,7 +459,6 @@ function toIndex(value: unknown): number {
   return Number.isInteger(parsed) ? parsed : -1
 }
 
-
 /**
  * Finds an embedded thumbnail.
  *
@@ -467,9 +477,7 @@ function findThumbnail(
   const relsKey = Object.keys(entries).find((key) => key.toLowerCase() === '_rels/.rels')
   if (relsKey && entries[relsKey]) {
     const xml = decodeUtf8(entries[relsKey])
-    const match = xml.match(
-      /<Relationship[^>]*Type="[^"]*\/thumbnail"[^>]*Target="([^"]+)"/i,
-    )
+    const match = xml.match(/<Relationship[^>]*Type="[^"]*\/thumbnail"[^>]*Target="([^"]+)"/i)
     const target = match?.[1]
     if (target) {
       const normalized = target.replace(/^\//, '')
@@ -487,9 +495,7 @@ function findThumbnail(
     .sort((a, b) => score(b) - score(a))
 
   const best = candidates[0]
-  return best
-    ? { data: entries[best]!, contentType: contentTypeFor(best), path: best }
-    : undefined
+  return best ? { data: entries[best]!, contentType: contentTypeFor(best), path: best } : undefined
 }
 
 function score(path: string): number {

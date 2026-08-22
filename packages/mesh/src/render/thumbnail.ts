@@ -134,9 +134,12 @@ export async function renderThumbnail(
     stats,
     async (visit) => {
       switch (format) {
-        case 'stl': return void (await readStl(source, visit, options))
-        case 'obj': return void (await readObj(source, visit, options))
-        case 'ply': return void (await readPly(source, visit, options))
+        case 'stl':
+          return void (await readStl(source, visit, options))
+        case 'obj':
+          return void (await readObj(source, visit, options))
+        case 'ply':
+          return void (await readPly(source, visit, options))
       }
     },
     options,
@@ -224,7 +227,11 @@ function noop(): void {}
  * returning a smaller image.
  */
 function squareCrop(
-  target: { width: number; height: number; bounds: { minX: number; minY: number; maxX: number; maxY: number } },
+  target: {
+    width: number
+    height: number
+    bounds: { minX: number; minY: number; maxX: number; maxY: number }
+  },
   margin: number,
 ): { left: number; top: number; width: number; height: number } {
   const { minX, minY, maxX, maxY } = target.bounds

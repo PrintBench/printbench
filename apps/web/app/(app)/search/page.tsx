@@ -109,11 +109,7 @@ export default async function SearchPage({
                     libraryName={hit.libraryName}
                     previewExtension={hit.previewExtension}
                     thumbFileId={hit.thumbFileId}
-                    dimensions={formatDimensions(
-                      hit.bboxX ?? 0,
-                      hit.bboxY ?? 0,
-                      hit.bboxZ ?? 0,
-                    )}
+                    dimensions={formatDimensions(hit.bboxX ?? 0, hit.bboxY ?? 0, hit.bboxZ ?? 0)}
                   />
                 ))}
               </div>

@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  accelMounts,
-  accelRedirectPath,
-  contentDisposition,
-  parseRange,
-} from './delivery'
+import { accelMounts, accelRedirectPath, contentDisposition, parseRange } from './delivery'
 
 describe('parseRange', () => {
   const SIZE = 1000
@@ -147,9 +142,9 @@ describe('accelRedirectPath', () => {
   })
 
   it('normalises Windows separators, since dev runs there', () => {
-    expect(accelRedirectPath(String.raw`C:\libs`, 'a.stl', [{ prefix: '/p/', root: 'C:/libs' }])).toBe(
-      '/p/a.stl',
-    )
+    expect(
+      accelRedirectPath(String.raw`C:\libs`, 'a.stl', [{ prefix: '/p/', root: 'C:/libs' }]),
+    ).toBe('/p/a.stl')
   })
 
   /*

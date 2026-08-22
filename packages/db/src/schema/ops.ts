@@ -1,12 +1,4 @@
-import {
-  index,
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from 'drizzle-orm/pg-core'
+import { index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { libraries } from './libraries'
 import { problemKind, problemSeverity, scanMode, scanStatus } from './enums'
 
@@ -62,10 +54,7 @@ export const problems = pgTable(
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
     ignoredAt: timestamp('ignored_at', { withTimezone: true }),
   },
-  (t) => [
-    index('problems_kind_idx').on(t.kind),
-    index('problems_model_idx').on(t.modelId),
-  ],
+  (t) => [index('problems_kind_idx').on(t.kind), index('problems_model_idx').on(t.modelId)],
 )
 
 /** Site-wide key/value settings. Read-through cached, invalidated via NOTIFY. */

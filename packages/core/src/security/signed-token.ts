@@ -31,7 +31,9 @@ export function signToken(
 ): SignedToken {
   const expires = Date.now() + ttlMs
   return {
-    token: createHmac('sha256', secret).update(payload(purpose, subject, expires)).digest('hex'),
+    token: createHmac('sha256', secret)
+      .update(payload(purpose, subject, expires))
+      .digest('hex'),
     expires,
   }
 }
@@ -55,7 +57,9 @@ export function verifyToken(
   if (Date.now() > expires) return false
 
   const expected = Buffer.from(
-    createHmac('sha256', secret).update(payload(purpose, subject, expires)).digest('hex'),
+    createHmac('sha256', secret)
+      .update(payload(purpose, subject, expires))
+      .digest('hex'),
   )
   const actual = Buffer.from(token)
   return expected.length === actual.length && timingSafeEqual(expected, actual)

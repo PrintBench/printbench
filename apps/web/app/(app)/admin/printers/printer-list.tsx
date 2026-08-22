@@ -228,7 +228,11 @@ function PrinterForm({
     <form onSubmit={submit} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Name" htmlFor="host-name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Workshop MK4" />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Workshop MK4"
+          />
         </Field>
 
         <Field label="Type" htmlFor="host-protocol" hint={selected.hint}>
@@ -260,7 +264,9 @@ function PrinterForm({
         <Field
           label="API key"
           htmlFor="host-key"
-          hint={host?.hasApiKey ? 'Leave blank to keep the stored key.' : 'Optional on a trusted LAN.'}
+          hint={
+            host?.hasApiKey ? 'Leave blank to keep the stored key.' : 'Optional on a trusted LAN.'
+          }
         >
           <Input
             type="password"

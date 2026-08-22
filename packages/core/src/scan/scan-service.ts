@@ -16,7 +16,12 @@ import { nanoid } from 'nanoid'
 import { excludedPaths } from '../services/delete-service'
 import type { Database } from '@pb/db'
 import { schema } from '@pb/db'
-import { groupModels, looksPresupported, pickPreviewFile, type GroupedModel } from '../library/grouping'
+import {
+  groupModels,
+  looksPresupported,
+  pickPreviewFile,
+  type GroupedModel,
+} from '../library/grouping'
 import { walkLibrary, type DirFingerprint } from '../library/walker'
 import { lookup } from '../library/media-types'
 import { basename, slugify } from '../library/paths'
@@ -34,10 +39,7 @@ export const MASS_DISAPPEARANCE_THRESHOLD = 0.2
 /** Below this, proportional checks are meaningless. */
 const MIN_MODELS_FOR_THRESHOLD = 5
 
-export type AbortReason =
-  | 'storage_unavailable'
-  | 'empty_root'
-  | 'mass_disappearance'
+export type AbortReason = 'storage_unavailable' | 'empty_root' | 'mass_disappearance'
 
 export interface ScanOptions {
   mode?: 'fast' | 'deep'
@@ -172,7 +174,8 @@ export async function scanLibrary(
     })
 
     const grouped = groupModels(walk.tree, {
-      mode: (library as { groupingMode?: 'deepest' | 'top_level' | 'flat' }).groupingMode ?? 'deepest',
+      mode:
+        (library as { groupingMode?: 'deepest' | 'top_level' | 'flat' }).groupingMode ?? 'deepest',
     })
 
     // ---- Guard 3: mass disappearance --------------------------------------
@@ -414,7 +417,9 @@ async function upsertFiles(
           size: file.size,
           mtimeMs: file.mtimeMs,
           // Contents changed, so anything derived from them is now stale.
-          ...(changed ? { digest: null, analysisState: 'pending' as const, thumbState: 'pending' as const } : {}),
+          ...(changed
+            ? { digest: null, analysisState: 'pending' as const, thumbState: 'pending' as const }
+            : {}),
         })
         .where(eq(schema.modelFiles.id, row.id))
       byFilename.delete(filename)
@@ -481,7 +486,11 @@ async function foldRenamedModels(
   excluded: Set<string>,
 ): Promise<number> {
   const live = await db
-    .select({ id: schema.models.id, path: schema.models.path, isFileModel: schema.models.isFileModel })
+    .select({
+      id: schema.models.id,
+      path: schema.models.path,
+      isFileModel: schema.models.isFileModel,
+    })
     .from(schema.models)
     .where(and(eq(schema.models.libraryId, libraryId), isNull(schema.models.missingAt)))
 
@@ -502,7 +511,10 @@ async function foldRenamedModels(
     .from(schema.modelFiles)
     .where(
       and(
-        inArray(schema.modelFiles.modelId, missing.map((row) => row.id)),
+        inArray(
+          schema.modelFiles.modelId,
+          missing.map((row) => row.id),
+        ),
         isNull(schema.modelFiles.missingAt),
       ),
     )
@@ -534,7 +546,9 @@ async function foldRenamedModels(
     const prefix = `${model.path}/`
     const fingerprint = fingerprintOf(
       model.files.map((file) => ({
-        filename: file.path.startsWith(prefix) ? file.path.slice(prefix.length) : basename(file.path),
+        filename: file.path.startsWith(prefix)
+          ? file.path.slice(prefix.length)
+          : basename(file.path),
         size: file.size,
       })),
     )
@@ -561,7 +575,11 @@ function fingerprintOf(files: { filename: string; size: number }[]): string {
 }
 
 /** Denormalised counts and the preview pick, both used by the grid. */
-async function updateModelRollups(db: Database, modelId: string, model: GroupedModel): Promise<void> {
+async function updateModelRollups(
+  db: Database,
+  modelId: string,
+  model: GroupedModel,
+): Promise<void> {
   const files = await db
     .select({
       id: schema.modelFiles.id,

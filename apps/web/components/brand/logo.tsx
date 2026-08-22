@@ -62,13 +62,7 @@ export function PrintBenchMark({ className }: { className?: string }) {
   const gradientId = useId()
 
   return (
-    <svg
-      viewBox="0 0 107 128"
-      fill="none"
-      role="img"
-      aria-label="PrintBench"
-      className={className}
-    >
+    <svg viewBox="0 0 107 128" fill="none" role="img" aria-label="PrintBench" className={className}>
       <defs>
         {/* Blue at the foot rising to teal at the bowl, as on the brand sheet. */}
         <linearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">

@@ -12,13 +12,7 @@ import { toggleLiked } from '../../lists/actions'
  * to see it register makes it feel broken. If the server disagrees the state
  * snaps back when the transition settles.
  */
-export function LikeButton({
-  publicId,
-  liked: initial,
-}: {
-  publicId: string
-  liked: boolean
-}) {
+export function LikeButton({ publicId, liked: initial }: { publicId: string; liked: boolean }) {
   const [pending, startTransition] = useTransition()
   const [liked, setLiked] = useOptimistic(initial)
 

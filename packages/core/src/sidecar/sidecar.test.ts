@@ -38,10 +38,12 @@ describe('sidecar serialisation', () => {
   })
 
   it('detects unchanged content regardless of order', () => {
-    expect(
-      sidecarUnchanged({ name: 'X', tags: ['a', 'b'] }, { name: 'X', tags: ['b', 'a'] }),
-    ).toBe(true)
-    expect(sidecarUnchanged({ name: 'X', tags: ['a'] }, { name: 'X', tags: ['a', 'b'] })).toBe(false)
+    expect(sidecarUnchanged({ name: 'X', tags: ['a', 'b'] }, { name: 'X', tags: ['b', 'a'] })).toBe(
+      true,
+    )
+    expect(sidecarUnchanged({ name: 'X', tags: ['a'] }, { name: 'X', tags: ['a', 'b'] })).toBe(
+      false,
+    )
     expect(sidecarUnchanged(null, { name: 'X' })).toBe(false)
   })
 
@@ -243,9 +245,7 @@ describeDb('sidecar round trip', () => {
 
     await scan()
 
-    const after = await db.execute<{ name: string }>(
-      sql`SELECT name FROM models WHERE id = ${id}`,
-    )
+    const after = await db.execute<{ name: string }>(sql`SELECT name FROM models WHERE id = ${id}`)
     expect(after.rows[0]!.name).toBe('Newer Name')
   })
 

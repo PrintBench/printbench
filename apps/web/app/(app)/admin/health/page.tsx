@@ -35,9 +35,8 @@ export default async function HealthPage({
   const params = await searchParams
   const db = getDb()
 
-  const kind = (
-    Object.keys(PROBLEM_META).includes(params.kind ?? '') ? params.kind : undefined
-  ) as ProblemKind | undefined
+  const kind = (Object.keys(PROBLEM_META).includes(params.kind ?? '') ? params.kind : undefined) as
+    ProblemKind | undefined
   const showIgnored = params.ignored === '1'
 
   const [summary, problems, libraries] = await Promise.all([
@@ -79,9 +78,9 @@ export default async function HealthPage({
       />
 
       {/*
-        * Ordered by severity, so a missing drive is the first thing on the page
-        * and four hundred untagged models are the last.
-        */}
+       * Ordered by severity, so a missing drive is the first thing on the page
+       * and four hundred untagged models are the last.
+       */}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {summary
           .filter((row) => row.open > 0)
@@ -102,14 +101,20 @@ export default async function HealthPage({
       </div>
 
       <nav className="mb-4 flex flex-wrap items-center gap-1.5 text-sm">
-        <FilterLink href={`/admin/health${params.library ? `?library=${params.library}` : ''}`} active={!kind}>
+        <FilterLink
+          href={`/admin/health${params.library ? `?library=${params.library}` : ''}`}
+          active={!kind}
+        >
           All kinds
         </FilterLink>
 
         {libraries.length > 1 && (
           <>
             <span className="mx-1 text-[var(--color-ink-faint)]">·</span>
-            <FilterLink href={`/admin/health${kind ? `?kind=${kind}` : ''}`} active={!params.library}>
+            <FilterLink
+              href={`/admin/health${kind ? `?kind=${kind}` : ''}`}
+              active={!params.library}
+            >
               All libraries
             </FilterLink>
             {libraries.map((library) => (

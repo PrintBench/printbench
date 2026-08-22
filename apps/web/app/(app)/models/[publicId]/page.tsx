@@ -224,9 +224,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 <ShareButton
                   publicId={model.public_id}
                   shared={model.share_token != null}
-                  shareUrl={
-                    model.share_token ? `${appOrigin}/share/${model.share_token}` : null
-                  }
+                  shareUrl={model.share_token ? `${appOrigin}/share/${model.share_token}` : null}
                 />
               )}
               {can(policyUser, 'model:delete') && (
@@ -476,9 +474,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
             </CardContent>
           </Card>
 
-          <p className="text-xs text-[var(--color-ink-faint)]">
-            Drag to rotate, scroll to zoom.
-          </p>
+          <p className="text-xs text-[var(--color-ink-faint)]">Drag to rotate, scroll to zoom.</p>
         </aside>
       </div>
     </>

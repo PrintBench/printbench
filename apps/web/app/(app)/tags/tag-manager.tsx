@@ -86,7 +86,11 @@ export function TagManager({ tags, canEdit }: { tags: TagView[]; canEdit: boolea
                     }}
                     className="h-8 max-w-56"
                   />
-                  <Button size="sm" disabled={pending} onClick={() => run(() => rename(tag.id, draft))}>
+                  <Button
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => run(() => rename(tag.id, draft))}
+                  >
                     {pending ? <Loader2 className="animate-spin" /> : <Check />}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>

@@ -190,8 +190,7 @@ export async function listPrints(
       : null,
   ].filter(Boolean) as ReturnType<typeof sql>[]
 
-  const where =
-    conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``
+  const where = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``
 
   const rows = await db.execute<{
     id: string

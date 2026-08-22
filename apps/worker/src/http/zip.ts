@@ -62,7 +62,10 @@ export async function handleZipRequest(
     return
   }
 
-  if (!/^[0-9a-f-]{36}$/i.test(modelId) || !verifyDownloadToken(modelId, expiresAt, token, secret)) {
+  if (
+    !/^[0-9a-f-]{36}$/i.test(modelId) ||
+    !verifyDownloadToken(modelId, expiresAt, token, secret)
+  ) {
     response.writeHead(403, { 'content-type': 'text/plain' })
     response.end('Invalid or expired download link')
     return

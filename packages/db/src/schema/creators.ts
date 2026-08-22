@@ -112,7 +112,10 @@ export const creatorTags = pgTable(
       .notNull()
       .references(() => tags.id, { onDelete: 'cascade' }),
   },
-  (t) => [primaryKey({ columns: [t.creatorId, t.tagId] }), index('creator_tags_tag_idx').on(t.tagId)],
+  (t) => [
+    primaryKey({ columns: [t.creatorId, t.tagId] }),
+    index('creator_tags_tag_idx').on(t.tagId),
+  ],
 )
 
 export const collectionTags = pgTable(

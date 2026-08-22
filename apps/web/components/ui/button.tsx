@@ -12,7 +12,8 @@ const button = cva(
           'bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:bg-[var(--color-accent-hover)]',
         secondary:
           'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)] hover:bg-[var(--color-surface-2)]',
-        ghost: 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]',
+        ghost:
+          'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]',
         danger: 'bg-[var(--color-danger)] text-white hover:opacity-90',
       },
       size: {
@@ -27,8 +28,7 @@ const button = cva(
 )
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof button> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof button> {
   asChild?: boolean
 }
 

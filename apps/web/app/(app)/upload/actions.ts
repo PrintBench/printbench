@@ -52,9 +52,7 @@ export async function listUploadTargets(): Promise<UploadTarget[]> {
     .map((row) => ({ id: row.id, name: row.name, backend: row.backend }))
 }
 
-type TicketResult =
-  | { ok: true; endpoint: string; libraryId: string }
-  | { ok: false; error: string }
+type TicketResult = { ok: true; endpoint: string; libraryId: string } | { ok: false; error: string }
 
 /**
  * Mints a signed ticket for the worker's upload endpoint.

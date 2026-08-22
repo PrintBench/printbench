@@ -111,7 +111,10 @@ try {
     sql`SELECT id FROM models WHERE library_id = ${LIBRARY_ID}`,
   )
   const { refreshModelSearchVectors } = await import('@pb/core')
-  await refreshModelSearchVectors(db, ids.rows.map((r) => r.id))
+  await refreshModelSearchVectors(
+    db,
+    ids.rows.map((r) => r.id),
+  )
   check('search vectors rebuilt', ids.rows.length > 0, `${ids.rows.length} models`)
 
   section('Search page')
@@ -166,7 +169,10 @@ try {
 
   section('Filter state is in the URL')
   // The point of URL state: a filtered search is shareable and survives reload.
-  check('filters survive a fresh request', (await text('/search?presupported=1')).includes('Dragon Knight'))
+  check(
+    'filters survive a fresh request',
+    (await text('/search?presupported=1')).includes('Dragon Knight'),
+  )
   check('a clear link is offered', faceted.includes('/search'))
 
   section('Sorting')
@@ -180,7 +186,11 @@ try {
   const api = await get('/api/search?q=dragon')
   const payload = (await api.json()) as { hits: { kind: string; label: string }[] }
   check('returns 200', api.status === 200, `HTTP ${api.status}`)
-  check('returns model hits', payload.hits.some((h) => h.kind === 'model'), JSON.stringify(payload.hits.slice(0, 3)))
+  check(
+    'returns model hits',
+    payload.hits.some((h) => h.kind === 'model'),
+    JSON.stringify(payload.hits.slice(0, 3)),
+  )
 
   const creatorHits = (await (await get('/api/search?q=loot')).json()) as {
     hits: { kind: string; label: string }[]
@@ -199,7 +209,11 @@ try {
 
   section('Query operators')
   const negated = await text('/search?q=dragon+-knight')
-  check('negation excludes the term', !negated.includes('Dragon Knight'), 'searched: dragon -knight')
+  check(
+    'negation excludes the term',
+    !negated.includes('Dragon Knight'),
+    'searched: dragon -knight',
+  )
 
   section('Pagination')
   const page2 = await text('/search?page=2')

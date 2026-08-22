@@ -134,12 +134,12 @@ describeDb('share links', () => {
      * Without a per-file check, a share token would be a way to fetch any file
      * id in the instance — which is the entire library.
      */
-    it('covers the shared model\'s own files', async () => {
+    it("covers the shared model's own files", async () => {
       const { token } = await shareModel(db, SHARED, USER)
       expect(await shareTokenCoversFile(db, token, sharedFileId)).toBe(true)
     })
 
-    it('does not cover another model\'s files', async () => {
+    it("does not cover another model's files", async () => {
       const { token } = await shareModel(db, SHARED, USER)
       expect(await shareTokenCoversFile(db, token, privateFileId)).toBe(false)
     })

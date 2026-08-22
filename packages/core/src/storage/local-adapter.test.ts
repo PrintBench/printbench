@@ -82,7 +82,9 @@ describe('LocalAdapter containment', () => {
 
     const adapter = new LocalAdapter(inPlace())
     await expect(adapter.stat('escape-hatch.txt')).rejects.toBeInstanceOf(PathEscapeError)
-    await expect(adapter.createReadStream('escape-hatch.txt')).rejects.toBeInstanceOf(PathEscapeError)
+    await expect(adapter.createReadStream('escape-hatch.txt')).rejects.toBeInstanceOf(
+      PathEscapeError,
+    )
     await rm(linkPath, { force: true })
   })
 
@@ -94,7 +96,10 @@ describe('LocalAdapter containment', () => {
   })
 
   it('supports byte ranges, for the viewer and resumable downloads', async () => {
-    const stream = await new LocalAdapter(inPlace()).createReadStream('benchy.stl', { start: 2, end: 5 })
+    const stream = await new LocalAdapter(inPlace()).createReadStream('benchy.stl', {
+      start: 2,
+      end: 5,
+    })
     const chunks: Buffer[] = []
     for await (const chunk of stream) chunks.push(chunk as Buffer)
     expect(Buffer.concat(chunks).toString()).toBe('zzzz')

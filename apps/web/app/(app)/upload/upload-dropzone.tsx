@@ -154,8 +154,8 @@ export function UploadDropzone({ targets }: { targets: UploadTarget[] }) {
         <FolderUp className="mx-auto mb-3 size-6 text-[var(--color-ink-faint)]" />
         <p className="text-sm font-medium">No library can accept uploads</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-[var(--color-ink-muted)]">
-          Uploads go into a <strong>managed</strong> library, which PrintBench owns and
-          organises. Your existing folders stay read-only so nothing is ever written into them.
+          Uploads go into a <strong>managed</strong> library, which PrintBench owns and organises.
+          Your existing folders stay read-only so nothing is ever written into them.
         </p>
         <Button asChild className="mt-4" variant="secondary">
           <a href="/admin/libraries/new">Create a managed library</a>
@@ -200,9 +200,9 @@ export function UploadDropzone({ targets }: { targets: UploadTarget[] }) {
         <Upload className="mx-auto mb-3 size-7 text-[var(--color-ink-faint)]" />
         <p className="text-sm font-medium">Drop files or folders here</p>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Folder structure is kept, so a model with its own stl and images folders stays together.
-          A .zip is extracted rather than stored whole, so a downloaded pack unpacks straight into
-          its own folder.
+          Folder structure is kept, so a model with its own stl and images folders stays together. A
+          .zip is extracted rather than stored whole, so a downloaded pack unpacks straight into its
+          own folder.
         </p>
 
         <div className="mt-4 flex justify-center gap-2">

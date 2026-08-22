@@ -42,7 +42,10 @@ function stub(handler: (url: string, init?: RequestInit) => Response | Promise<R
 }
 
 const ok = (body: unknown = {}) =>
-  new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })
 
 describe('endpoint validation', () => {
   it('accepts http and https', () => {
@@ -247,7 +250,9 @@ describe('errors people can act on', () => {
 
   it('explains a wrong address', async () => {
     const fetchImpl = stub(() => new Response('nope', { status: 404 }))
-    expect((await sendToPrinter(octoprint, gcode, {}, fetchImpl)).error).toMatch(/address|endpoint/i)
+    expect((await sendToPrinter(octoprint, gcode, {}, fetchImpl)).error).toMatch(
+      /address|endpoint/i,
+    )
   })
 
   /*

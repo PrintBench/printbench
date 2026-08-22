@@ -114,9 +114,8 @@ export class S3Adapter implements StorageAdapter {
 
   /** Bucket key back to a library-relative path. */
   private pathFor(key: string): string {
-    const withoutPrefix = this.prefix && key.startsWith(`${this.prefix}/`)
-      ? key.slice(this.prefix.length + 1)
-      : key
+    const withoutPrefix =
+      this.prefix && key.startsWith(`${this.prefix}/`) ? key.slice(this.prefix.length + 1) : key
     return withoutPrefix.normalize('NFC')
   }
 
@@ -223,9 +222,7 @@ export class S3Adapter implements StorageAdapter {
     // One request is cheaper than negotiating a multipart upload for a few
     // hundred bytes.
     if (typeof data === 'string' || Buffer.isBuffer(data)) {
-      await this.client.send(
-        new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data }),
-      )
+      await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data }))
       return
     }
 

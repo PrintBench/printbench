@@ -38,9 +38,12 @@ function boxOf(mesh: Mesh): BoundingBox {
     const x = mesh.triangles[i * 3]!
     const y = mesh.triangles[i * 3 + 1]!
     const z = mesh.triangles[i * 3 + 2]!
-    box.minX = Math.min(box.minX, x); box.maxX = Math.max(box.maxX, x)
-    box.minY = Math.min(box.minY, y); box.maxY = Math.max(box.maxY, y)
-    box.minZ = Math.min(box.minZ, z); box.maxZ = Math.max(box.maxZ, z)
+    box.minX = Math.min(box.minX, x)
+    box.maxX = Math.max(box.maxX, x)
+    box.minY = Math.min(box.minY, y)
+    box.maxY = Math.max(box.maxY, y)
+    box.minZ = Math.min(box.minZ, z)
+    box.maxZ = Math.max(box.maxZ, z)
   }
   return box
 }

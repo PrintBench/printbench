@@ -80,14 +80,14 @@ export function DeleteLibraryButton({
             {writesSidecars ? (
               <>
                 Tags, notes and creators come back if you add the folder again and rescan, because
-                this library writes them to a sidecar in each model folder. Anything added since
-                the last scan may not have been written yet.
+                this library writes them to a sidecar in each model folder. Anything added since the
+                last scan may not have been written yet.
               </>
             ) : (
               <>
-                This library does not write sidecars, so tags, notes, creators and print history
-                are lost for good. Adding the folder again gives you the models back, but not what
-                you recorded about them.
+                This library does not write sidecars, so tags, notes, creators and print history are
+                lost for good. Adding the folder again gives you the models back, but not what you
+                recorded about them.
               </>
             )}
           </p>

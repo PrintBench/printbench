@@ -119,9 +119,7 @@ export async function deletePrintHost(id: string): Promise<Result> {
   }
 }
 
-type ProbeResult =
-  | { ok: true; version?: string; state?: string }
-  | { ok: false; error: string }
+type ProbeResult = { ok: true; version?: string; state?: string } | { ok: false; error: string }
 
 /**
  * Asks the printer whether it is there.

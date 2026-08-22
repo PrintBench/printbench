@@ -290,10 +290,7 @@ export async function listProblems(
 }
 
 /** Open counts per kind, for the dashboard's summary tiles. */
-export async function problemSummary(
-  db: Database,
-  libraryId?: string,
-): Promise<ProblemCount[]> {
+export async function problemSummary(db: Database, libraryId?: string): Promise<ProblemCount[]> {
   const rows = await db.execute<{
     kind: ProblemKind
     severity: ProblemSeverity

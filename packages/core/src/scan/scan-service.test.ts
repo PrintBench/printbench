@@ -156,7 +156,11 @@ describeDb('scanLibrary', () => {
 
     it('creates a scan_run recording what happened', async () => {
       const outcome = await scan()
-      const run = await db.execute<{ status: string; models_created: number; dirs_walked: number }>(sql`
+      const run = await db.execute<{
+        status: string
+        models_created: number
+        dirs_walked: number
+      }>(sql`
         SELECT status, models_created, dirs_walked FROM scan_runs WHERE id = ${outcome.scanRunId}
       `)
       expect(run.rows[0]?.status).toBe('succeeded')
@@ -243,7 +247,11 @@ describeDb('scanLibrary', () => {
       await writeFile(path.join(root, 'Dragons', 'Blue Dragon', 'blue.stl'), 'y'.repeat(999))
       await scan()
 
-      const file = await db.execute<{ digest: string | null; analysis_state: string; size: string }>(sql`
+      const file = await db.execute<{
+        digest: string | null
+        analysis_state: string
+        size: string
+      }>(sql`
         SELECT f.digest, f.analysis_state, f.size FROM model_files f
         JOIN models m ON m.id = f.model_id
         WHERE m.path = 'Dragons/Blue Dragon' AND m.library_id = ${LIBRARY_ID}
@@ -415,10 +423,7 @@ describeDb('scanLibrary', () => {
       await scan()
       const before = await modelId('Terrain/Bridge')
 
-      await rename(
-        path.join(root, 'Terrain', 'Bridge'),
-        path.join(root, 'Terrain', 'Overpass'),
-      )
+      await rename(path.join(root, 'Terrain', 'Bridge'), path.join(root, 'Terrain', 'Overpass'))
       const outcome = await scan()
 
       expect(outcome.modelsRenamed).toBe(1)
@@ -458,10 +463,7 @@ describeDb('scanLibrary', () => {
       await db.execute(sql`UPDATE models SET notes = 'hand written' WHERE id = ${id}`)
       await db.execute(sql`INSERT INTO print_runs (model_id, status) VALUES (${id}, 'success')`)
 
-      await rename(
-        path.join(root, 'Terrain', 'Bridge'),
-        path.join(root, 'Terrain', 'Overpass'),
-      )
+      await rename(path.join(root, 'Terrain', 'Bridge'), path.join(root, 'Terrain', 'Overpass'))
       await scan()
 
       const row = await db.execute<{ notes: string; tag_count: number; print_count: number }>(sql`
@@ -481,10 +483,7 @@ describeDb('scanLibrary', () => {
           analysis_state = 'ok'
         FROM models m WHERE m.id = model_files.model_id AND m.path = 'Terrain/Bridge'`)
 
-      await rename(
-        path.join(root, 'Terrain', 'Bridge'),
-        path.join(root, 'Terrain', 'Overpass'),
-      )
+      await rename(path.join(root, 'Terrain', 'Bridge'), path.join(root, 'Terrain', 'Overpass'))
       await scan()
 
       // The file's own relative path never changed — only its model's — so
@@ -544,10 +543,7 @@ describeDb('scanLibrary', () => {
         INSERT INTO model_exclusions (library_id, path, name)
         VALUES (${LIBRARY_ID}, 'Terrain/Overpass', 'Overpass')`)
 
-      await rename(
-        path.join(root, 'Terrain', 'Bridge'),
-        path.join(root, 'Terrain', 'Overpass'),
-      )
+      await rename(path.join(root, 'Terrain', 'Bridge'), path.join(root, 'Terrain', 'Overpass'))
       const outcome = await scan()
 
       expect(outcome.modelsRenamed).toBe(0)

@@ -4,7 +4,12 @@ import type { Database } from '@pb/db'
 import { schema } from '@pb/db'
 import { slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
-import { readSidecar, sidecarUnchanged, writeSidecar, type SidecarContent } from '../sidecar/sidecar'
+import {
+  readSidecar,
+  sidecarUnchanged,
+  writeSidecar,
+  type SidecarContent,
+} from '../sidecar/sidecar'
 import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
 
 /**
@@ -95,7 +100,11 @@ export async function updateModel(
         )
         .limit(1)
       if (!belongs[0]) {
-        return { ok: false, error: 'That file does not belong to this model.', sidecarWritten: false }
+        return {
+          ok: false,
+          error: 'That file does not belong to this model.',
+          sidecarWritten: false,
+        }
       }
       updates.previewFileId = patch.previewFileId
     }
@@ -228,10 +237,7 @@ export async function syncSidecar(db: Database, modelId: string): Promise<boolea
   }
 }
 
-export async function buildSidecarContent(
-  db: Database,
-  modelId: string,
-): Promise<SidecarContent> {
+export async function buildSidecarContent(db: Database, modelId: string): Promise<SidecarContent> {
   const result = await db.execute<{
     name: string
     notes: string | null
@@ -306,7 +312,10 @@ export async function bulkUpdateModels(
       // Chunked: a thousand models times several tags exceeds sensible
       // parameter counts for one statement.
       for (let i = 0; i < pairs.length; i += 1000) {
-        await db.insert(schema.modelTags).values(pairs.slice(i, i + 1000)).onConflictDoNothing()
+        await db
+          .insert(schema.modelTags)
+          .values(pairs.slice(i, i + 1000))
+          .onConflictDoNothing()
       }
     }
   }

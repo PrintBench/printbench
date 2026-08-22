@@ -32,7 +32,11 @@ export function S3Fields({
         />
       </Field>
 
-      <Field label="Prefix" htmlFor="s3-prefix" hint="Optional. Only this folder within the bucket is indexed.">
+      <Field
+        label="Prefix"
+        htmlFor="s3-prefix"
+        hint="Optional. Only this folder within the bucket is indexed."
+      >
         <Input
           name="s3-prefix"
           value={value.prefix ?? ''}
@@ -66,7 +70,11 @@ export function S3Fields({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Access key ID" htmlFor="s3-access-key" hint="Leave blank to use the server's own credentials.">
+        <Field
+          label="Access key ID"
+          htmlFor="s3-access-key"
+          hint="Leave blank to use the server's own credentials."
+        >
           <Input
             name="s3-access-key"
             value={value.accessKeyId ?? ''}

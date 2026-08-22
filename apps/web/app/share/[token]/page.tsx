@@ -122,9 +122,9 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
                   {formatBytes(Number(file.size))}
                 </span>
                 {/*
-                  * The token travels with the request: this page is anonymous,
-                  * so there is no session for the file route to check.
-                  */}
+                 * The token travels with the request: this page is anonymous,
+                 * so there is no session for the file route to check.
+                 */}
                 <a
                   href={`/api/share/${token}/files/${file.id}`}
                   className="shrink-0 text-xs text-[var(--color-accent)] hover:underline"
@@ -138,11 +138,8 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
       </section>
 
       <footer className="mt-8 text-xs text-[var(--color-ink-faint)]">
-        <p>
-          This link shows one model. Whoever shared it can revoke the link at any time.
-        </p>
+        <p>This link shows one model. Whoever shared it can revoke the link at any time.</p>
       </footer>
     </main>
   )
 }
-

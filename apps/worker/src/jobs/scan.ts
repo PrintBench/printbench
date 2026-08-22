@@ -1,6 +1,11 @@
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '@pb/db'
-import { createStorageAdapter, libraryLocationFromRow, scanLibrary, type LibraryLocation } from '@pb/core'
+import {
+  createStorageAdapter,
+  libraryLocationFromRow,
+  scanLibrary,
+  type LibraryLocation,
+} from '@pb/core'
 import type { JobPayload } from '@pb/jobs'
 import { JOB, getQueue } from '@pb/jobs'
 
@@ -11,7 +16,9 @@ import { JOB, getQueue } from '@pb/jobs'
  * and reconciles. A replayed job simply scans again, which is a no-op when
  * nothing has changed.
  */
-export async function handleLibraryScan(payload: JobPayload<typeof JOB.libraryScan>): Promise<void> {
+export async function handleLibraryScan(
+  payload: JobPayload<typeof JOB.libraryScan>,
+): Promise<void> {
   const db = getDb()
 
   const rows = await db
@@ -40,7 +47,11 @@ export async function handleLibraryScan(payload: JobPayload<typeof JOB.librarySc
   const started = Date.now()
 
   const outcome = await scanLibrary(
-    { db, storage, library: { ...location, groupingMode: library.groupingMode } as LibraryLocation },
+    {
+      db,
+      storage,
+      library: { ...location, groupingMode: library.groupingMode } as LibraryLocation,
+    },
     {
       mode: payload.mode,
       force: payload.force,
@@ -95,4 +106,3 @@ export async function handleLibraryScan(payload: JobPayload<typeof JOB.librarySc
    */
   await getQueue().send(JOB.healthDetect, { libraryId: library.id, skipCosmetic: false })
 }
-

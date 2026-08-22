@@ -239,7 +239,10 @@ export default async function DashboardPage() {
           <Card className="overflow-hidden">
             <ul className="divide-y divide-[var(--color-border)]">
               {latestPrints.map((print, index) => (
-                <li key={`${print.public_id}-${index}`} className="flex items-center gap-3 px-4 py-2.5">
+                <li
+                  key={`${print.public_id}-${index}`}
+                  className="flex items-center gap-3 px-4 py-2.5"
+                >
                   <Printer className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
                   <Link
                     href={`/models/${print.public_id}`}

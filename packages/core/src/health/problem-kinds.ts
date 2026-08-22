@@ -1,4 +1,3 @@
-
 /**
  * Library health.
  *
@@ -113,4 +112,3 @@ export const PROBLEM_META: Record<
 
 /** Kinds that are about tidiness rather than breakage. */
 export const COSMETIC_KINDS: ProblemKind[] = ['no_license', 'no_creator', 'no_image', 'no_tags']
-

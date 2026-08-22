@@ -302,19 +302,20 @@ export function ModelViewer({
   useEffect(() => () => cleanupRef.current?.(), [])
 
   useEffect(() => {
-    const canvas = canvasRef.current as (HTMLCanvasElement & { __pmGrid?: { visible: boolean } }) | null
+    const canvas = canvasRef.current as
+      (HTMLCanvasElement & { __pmGrid?: { visible: boolean } }) | null
     if (canvas?.__pmGrid) canvas.__pmGrid.visible = showGrid
   }, [showGrid])
 
   useEffect(() => {
-    const canvas = canvasRef.current as (HTMLCanvasElement & { __pmBounds?: { visible: boolean } }) | null
+    const canvas = canvasRef.current as
+      (HTMLCanvasElement & { __pmBounds?: { visible: boolean } }) | null
     if (canvas?.__pmBounds) canvas.__pmBounds.visible = showBounds
   }, [showBounds])
 
   useEffect(() => {
     const canvas = canvasRef.current as
-      | (HTMLCanvasElement & { __pmMaterial?: { wireframe: boolean } })
-      | null
+      (HTMLCanvasElement & { __pmMaterial?: { wireframe: boolean } }) | null
     if (canvas?.__pmMaterial) canvas.__pmMaterial.wireframe = wireframe
   }, [wireframe])
 
@@ -328,7 +329,10 @@ export function ModelViewer({
     >
       <canvas
         ref={canvasRef}
-        className={cn('block size-full', phase === 'ready' ? 'cursor-grab active:cursor-grabbing' : 'invisible')}
+        className={cn(
+          'block size-full',
+          phase === 'ready' ? 'cursor-grab active:cursor-grabbing' : 'invisible',
+        )}
       />
 
       {phase !== 'ready' && (
@@ -357,7 +361,14 @@ export function ModelViewer({
               <>
                 <TriangleAlert className="size-6 text-[var(--color-warning)]" />
                 <p className="max-w-xs text-sm text-[var(--color-ink-muted)]">{error}</p>
-                <Button size="sm" variant="secondary" onClick={() => { setPhase('idle'); void start() }}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setPhase('idle')
+                    void start()
+                  }}
+                >
                   Try again
                 </Button>
               </>

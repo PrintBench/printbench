@@ -26,7 +26,10 @@ type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string
 
 async function assertAdmin() {
   const user = await requireUser()
-  assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'library:manage')
+  assertCan(
+    { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
+    'library:manage',
+  )
   return user
 }
 
@@ -151,7 +154,13 @@ export async function previewLibrary(input: {
      */
     const validated = await validateLibraryPath(input.path ?? '')
     if (!validated.ok) return { ...empty, error: validated.error }
-    location = { id: 'preview', kind: 'in_place', backend: 'local', allowWrites: false, path: validated.path }
+    location = {
+      id: 'preview',
+      kind: 'in_place',
+      backend: 'local',
+      allowWrites: false,
+      path: validated.path,
+    }
   }
 
   try {
@@ -202,7 +211,10 @@ export async function previewLibrary(input: {
       })),
     }
   } catch (error) {
-    return { ...empty, error: error instanceof Error ? error.message : 'Could not read that folder.' }
+    return {
+      ...empty,
+      error: error instanceof Error ? error.message : 'Could not read that folder.',
+    }
   }
 }
 
@@ -260,7 +272,9 @@ export async function createLibrary(input: {
           s3Endpoint: input.s3.endpoint?.trim() || null,
           s3AccessKeyId: input.s3.accessKeyId?.trim() || null,
           // Encrypted at rest, like every other stored credential — see printers.
-          s3SecretAccessKey: input.s3.secretAccessKey ? encryptSecret(input.s3.secretAccessKey) : null,
+          s3SecretAccessKey: input.s3.secretAccessKey
+            ? encryptSecret(input.s3.secretAccessKey)
+            : null,
           s3ForcePathStyle: input.s3.forcePathStyle ?? Boolean(input.s3.endpoint),
           groupingMode: input.groupingMode,
           groupingDepth: input.groupingDepth ?? null,
@@ -335,7 +349,10 @@ export async function createLibrary(input: {
     return { ok: true, data: { id: created!.id } }
   } catch (error) {
     if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
-    return { ok: false, error: error instanceof Error ? error.message : 'Could not create the library.' }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not create the library.',
+    }
   }
 }
 
@@ -345,7 +362,10 @@ export async function triggerScan(
 ): Promise<Result> {
   try {
     const user = await requireUser()
-    assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'scan:trigger')
+    assertCan(
+      { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
+      'scan:trigger',
+    )
 
     /*
      * getStartedQueue, not getQueue. The web process never boots the queue
@@ -420,7 +440,10 @@ export async function updateLibrarySchedule(
  * than this action reaching into the worker process directly — the two
  * processes share nothing but the database, on purpose.
  */
-export async function updateLibraryWatch(libraryId: string, watchEnabled: boolean): Promise<Result> {
+export async function updateLibraryWatch(
+  libraryId: string,
+  watchEnabled: boolean,
+): Promise<Result> {
   try {
     await assertAdmin()
 
@@ -443,9 +466,7 @@ export async function deleteLibrary(libraryId: string): Promise<Result> {
   try {
     await assertAdmin()
     // Removes the index only. The user's files are never touched.
-    const removed = await getDb()
-      .delete(schema.libraries)
-      .where(eq(schema.libraries.id, libraryId))
+    const removed = await getDb().delete(schema.libraries).where(eq(schema.libraries.id, libraryId))
 
     if (removed.rowCount === 0) return { ok: false, error: 'That library no longer exists.' }
 

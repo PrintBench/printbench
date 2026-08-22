@@ -315,7 +315,9 @@ export function pickPreviewFile(
   const slug = modelName.toLowerCase().replace(/[^a-z0-9]/g, '')
 
   const preferred = images.find((file) => {
-    const stem = basename(file.path).toLowerCase().replace(/\.[^.]+$/, '')
+    const stem = basename(file.path)
+      .toLowerCase()
+      .replace(/\.[^.]+$/, '')
     const normalized = stem.replace(/[^a-z0-9]/g, '')
     return (
       /^(preview|cover|thumb|thumbnail|render|main)/.test(stem) ||

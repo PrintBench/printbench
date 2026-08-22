@@ -132,7 +132,11 @@ try {
   const growth = peakHeap - baseline
   const roundTripped = await readAll(storage, 'Widget/big.stl')
 
-  check('128 MB stream uploads', roundTripped.byteLength === bigSize, `${roundTripped.byteLength} bytes`)
+  check(
+    '128 MB stream uploads',
+    roundTripped.byteLength === bigSize,
+    `${roundTripped.byteLength} bytes`,
+  )
   check('and comes back byte-identical', sha(roundTripped) === bigDigest)
   /*
    * The whole point of the change. 96 MiB is the 32 MiB in-flight window plus
@@ -152,7 +156,10 @@ try {
     const response = await fetch(delivery.url)
     const fetched = Buffer.from(await response.arrayBuffer())
     check('the URL serves the real bytes', sha(fetched) === bigDigest, `${response.status}`)
-    check('and names the download', (response.headers.get('content-disposition') ?? '').includes('big.stl'))
+    check(
+      'and names the download',
+      (response.headers.get('content-disposition') ?? '').includes('big.stl'),
+    )
   }
 
   section('Read-only guard')
@@ -178,7 +185,11 @@ try {
     }),
   )
   const extracted = await extractZipIntoLibrary(zipPath, storage, 'Pack')
-  check('extracts through the adapter', extracted.filesExtracted === 2, `${extracted.filesExtracted} files`)
+  check(
+    'extracts through the adapter',
+    extracted.filesExtracted === 2,
+    `${extracted.filesExtracted} files`,
+  )
   check('unwraps the common root', (await storage.stat('Pack/body.stl')) !== null)
   check('drops macOS junk', (await storage.stat('Pack/__MACOSX/._body.stl')) === null)
 
@@ -207,7 +218,11 @@ try {
 
   const scanStorage = createStorageAdapter(location)
   const outcome = await scanLibrary(
-    { db, storage: scanStorage, library: { ...location, groupingMode: 'deepest' } as LibraryLocation },
+    {
+      db,
+      storage: scanStorage,
+      library: { ...location, groupingMode: 'deepest' } as LibraryLocation,
+    },
     { mode: 'deep' },
   )
   check('scan succeeds', outcome.status === 'succeeded', outcome.abortReason ?? '')
@@ -217,8 +232,14 @@ try {
     WHERE library_id = ${LIBRARY_ID} AND missing_at IS NULL ORDER BY path`)
   const found = models.rows.map((row) => `${row.path}(${row.file_count})`)
   check('finds the uploaded models', found.length === 2, found.join(', '))
-  check('groups Widget from its files', found.some((entry) => entry.startsWith('Widget(')))
-  check('groups Pack from the extracted zip', found.some((entry) => entry.startsWith('Pack(')))
+  check(
+    'groups Widget from its files',
+    found.some((entry) => entry.startsWith('Widget(')),
+  )
+  check(
+    'groups Pack from the extracted zip',
+    found.some((entry) => entry.startsWith('Pack(')),
+  )
 
   section('Deleting')
   await storage.remove('Widget/notes.txt')

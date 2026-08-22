@@ -56,8 +56,12 @@ export function ModelCard({
           thumbFileId
             ? // A subtle tint behind the render, so a transparent thumbnail still
               // sits on something rather than floating on the card colour.
-              { background: `linear-gradient(160deg, oklch(96% 0.012 ${hue}), oklch(90% 0.02 ${hue + 20}))` }
-            : { background: `linear-gradient(145deg, oklch(72% 0.07 ${hue}) 0%, oklch(58% 0.09 ${hue + 24}) 100%)` }
+              {
+                background: `linear-gradient(160deg, oklch(96% 0.012 ${hue}), oklch(90% 0.02 ${hue + 20}))`,
+              }
+            : {
+                background: `linear-gradient(145deg, oklch(72% 0.07 ${hue}) 0%, oklch(58% 0.09 ${hue + 24}) 100%)`,
+              }
         }
       >
         {thumbFileId ? (
@@ -100,7 +104,9 @@ export function ModelCard({
           {formatBytes(totalSize)}
         </p>
         {dimensions && (
-          <p className="truncate text-xs tabular-nums text-[var(--color-ink-faint)]">{dimensions}</p>
+          <p className="truncate text-xs tabular-nums text-[var(--color-ink-faint)]">
+            {dimensions}
+          </p>
         )}
       </div>
     </Link>

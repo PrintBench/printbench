@@ -47,11 +47,22 @@ interface PlyHeader {
 }
 
 const SCALAR_SIZE: Record<string, number> = {
-  char: 1, uchar: 1, int8: 1, uint8: 1,
-  short: 2, ushort: 2, int16: 2, uint16: 2,
-  int: 4, uint: 4, int32: 4, uint32: 4,
-  float: 4, float32: 4,
-  double: 8, float64: 8,
+  char: 1,
+  uchar: 1,
+  int8: 1,
+  uint8: 1,
+  short: 2,
+  ushort: 2,
+  int16: 2,
+  uint16: 2,
+  int: 4,
+  uint: 4,
+  int32: 4,
+  uint32: 4,
+  float: 4,
+  float32: 4,
+  double: 8,
+  float64: 8,
 }
 
 export function parsePlyHeader(buffer: Buffer): PlyHeader {
@@ -121,9 +132,15 @@ export async function readPly(
   const emit = (a: number, b: number, c: number): void => {
     if (a < 0 || b < 0 || c < 0) return
     if (a >= vertexElement.count || b >= vertexElement.count || c >= vertexElement.count) return
-    triangle[0] = vertices[a * 3]!; triangle[1] = vertices[a * 3 + 1]!; triangle[2] = vertices[a * 3 + 2]!
-    triangle[3] = vertices[b * 3]!; triangle[4] = vertices[b * 3 + 1]!; triangle[5] = vertices[b * 3 + 2]!
-    triangle[6] = vertices[c * 3]!; triangle[7] = vertices[c * 3 + 1]!; triangle[8] = vertices[c * 3 + 2]!
+    triangle[0] = vertices[a * 3]!
+    triangle[1] = vertices[a * 3 + 1]!
+    triangle[2] = vertices[a * 3 + 2]!
+    triangle[3] = vertices[b * 3]!
+    triangle[4] = vertices[b * 3 + 1]!
+    triangle[5] = vertices[b * 3 + 2]!
+    triangle[6] = vertices[c * 3]!
+    triangle[7] = vertices[c * 3 + 1]!
+    triangle[8] = vertices[c * 3 + 2]!
 
     if (isDegenerate(triangle)) {
       stats.degenerateCount++
@@ -204,14 +221,36 @@ function readBinaryBody(
     // compiler checks that rather than a placeholder hiding a missed branch.
     let value: number
     switch (type) {
-      case 'char': case 'int8': value = buffer.readInt8(offset); break
-      case 'uchar': case 'uint8': value = buffer.readUInt8(offset); break
-      case 'short': case 'int16': value = buffer.readInt16LE(offset); break
-      case 'ushort': case 'uint16': value = buffer.readUInt16LE(offset); break
-      case 'int': case 'int32': value = buffer.readInt32LE(offset); break
-      case 'uint': case 'uint32': value = buffer.readUInt32LE(offset); break
-      case 'double': case 'float64': value = buffer.readDoubleLE(offset); break
-      default: value = buffer.readFloatLE(offset)
+      case 'char':
+      case 'int8':
+        value = buffer.readInt8(offset)
+        break
+      case 'uchar':
+      case 'uint8':
+        value = buffer.readUInt8(offset)
+        break
+      case 'short':
+      case 'int16':
+        value = buffer.readInt16LE(offset)
+        break
+      case 'ushort':
+      case 'uint16':
+        value = buffer.readUInt16LE(offset)
+        break
+      case 'int':
+      case 'int32':
+        value = buffer.readInt32LE(offset)
+        break
+      case 'uint':
+      case 'uint32':
+        value = buffer.readUInt32LE(offset)
+        break
+      case 'double':
+      case 'float64':
+        value = buffer.readDoubleLE(offset)
+        break
+      default:
+        value = buffer.readFloatLE(offset)
     }
     offset += size
     return value

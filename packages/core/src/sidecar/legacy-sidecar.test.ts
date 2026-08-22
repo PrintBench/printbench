@@ -139,7 +139,10 @@ describe('legacy sidecars', () => {
 
   it('never counts either sidecar as one of the model files', async () => {
     await writeFile(path.join(root, 'Red Dragon', LEGACY), serializeSidecar({ name: 'X' }))
-    await writeFile(path.join(root, 'Red Dragon', SIDECAR_FILENAME), serializeSidecar({ name: 'X' }))
+    await writeFile(
+      path.join(root, 'Red Dragon', SIDECAR_FILENAME),
+      serializeSidecar({ name: 'X' }),
+    )
 
     const walk = await walkLibrary(storage(), { mode: 'deep' })
     const grouped = groupModels(walk.tree, { mode: 'deepest' })

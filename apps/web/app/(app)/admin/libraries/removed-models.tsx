@@ -38,18 +38,15 @@ export function RemovedModels({ removed }: { removed: RemovedModel[] }) {
         <h2 className="text-sm font-semibold">Removed models</h2>
         <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
           Forgotten, but still on disk. Restoring brings one back at the next scan of its library —
-          rebuilt from the files and its sidecar, so notes and tags return only if they were
-          written to one.
+          rebuilt from the files and its sidecar, so notes and tags return only if they were written
+          to one.
         </p>
 
         {error && <p className="mt-2 text-xs text-[var(--color-danger)]">{error}</p>}
 
         <ul className="mt-3 divide-y divide-[var(--color-border)]">
           {removed.map((entry) => (
-            <li
-              key={`${entry.libraryId}:${entry.path}`}
-              className="flex items-center gap-3 py-2"
-            >
+            <li key={`${entry.libraryId}:${entry.path}`} className="flex items-center gap-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm">{entry.name ?? entry.path}</p>
                 <p className="truncate font-mono text-xs text-[var(--color-ink-faint)]">

@@ -79,10 +79,10 @@ export default async function CreatorsPage() {
           </div>
 
           {/*
-            * Creators with nothing attributed to them still exist — a tag was
-            * removed, or a model was deleted. Worth showing quietly so they can
-            * be noticed rather than silently orphaned.
-            */}
+           * Creators with nothing attributed to them still exist — a tag was
+           * removed, or a model was deleted. Worth showing quietly so they can
+           * be noticed rather than silently orphaned.
+           */}
           {empty.length > 0 && (
             <Card className="mt-6">
               <CardContent className="p-4">
