@@ -277,3 +277,10 @@ suite skips silently and a green run proves much less than it appears to.
 
 Security vulnerabilities go through [SECURITY.md](SECURITY.md), privately,
 rather than the issue tracker.
+
+## License
+
+[MIT](LICENSE) — © 2026 Owl Media.
+
+`reference/` is not part of the distribution: it is gitignored and never
+shipped, and the note above explains why.

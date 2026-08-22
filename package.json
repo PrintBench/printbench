@@ -22,6 +22,7 @@
     "url": "https://github.com/OWNER/printbench/issues"
   },
   "author": "Rich Howell",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22"
