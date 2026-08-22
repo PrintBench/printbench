@@ -1,0 +1,8 @@
+# Revisions to skip in `git blame` — mechanical, no authorship value.
+#
+# Enable locally with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub applies this file automatically in its blame view.
+
+# Reformat the tree with Prettier
+bf88ed11f85cdbc77e6d0ac27ccabfa5f6ba9b96

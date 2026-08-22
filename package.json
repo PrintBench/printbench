@@ -42,6 +42,7 @@
     "typecheck": "tsc --build && npm run typecheck -w @pb/web",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:phase1": "tsx scripts/verify-phase1.mts",

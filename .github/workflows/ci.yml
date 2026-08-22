@@ -39,6 +39,9 @@ jobs:
       - name: Apply migrations
         run: npm run db:migrate
 
+      - name: Format
+        run: npm run format:check
+
       - name: Lint
         run: npm run lint
 
