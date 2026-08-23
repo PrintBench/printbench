@@ -13,13 +13,13 @@
     "postgres",
     "3d-models"
   ],
-  "homepage": "https://github.com/OWNER/printbench#readme",
+  "homepage": "https://github.com/PrintBench/printbench#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/printbench.git"
+    "url": "git+https://github.com/PrintBench/printbench.git"
   },
   "bugs": {
-    "url": "https://github.com/OWNER/printbench/issues"
+    "url": "https://github.com/PrintBench/printbench/issues"
   },
   "author": "Owl Media",
   "license": "MIT",
