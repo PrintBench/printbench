@@ -68,7 +68,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.9.6",
     "tsx": "^4.20.6",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.11",
     "wait-on": "^9.1.0"
