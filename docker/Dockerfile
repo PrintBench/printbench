@@ -5,7 +5,7 @@
 # and fighting musl to save a few MB is a false economy.
 
 # ---- deps ------------------------------------------------------------------
-FROM node:24-slim AS deps
+FROM node:26-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
@@ -18,7 +18,7 @@ COPY packages/auth/package.json packages/auth/
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 # ---- build -----------------------------------------------------------------
-FROM node:24-slim AS build
+FROM node:26-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
@@ -26,7 +26,7 @@ COPY . .
 RUN npm run build -w @pb/web
 
 # ---- runtime ---------------------------------------------------------------
-FROM node:24-slim AS runtime
+FROM node:26-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update \
