@@ -1,0 +1,133 @@
+# Release automation.
+#
+# How this works:
+#
+#   1. Bump "version" in package.json and land it on main.
+#   2. Tag that commit and push the tag:
+#
+#        git tag v0.1.0 && git push origin v0.1.0
+#
+#   3. This workflow builds the image from the tagged commit, publishes it to
+#      ghcr.io, attests its provenance, and opens a GitHub Release with
+#      generated notes.
+#
+# Nothing is published by merging to main. Pushing a tag is the deliberate act
+# that ships a release, and the tag must match the version in package.json.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    name: Publish container image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub Release
+      packages: write # push to ghcr.io
+      id-token: write # sign the provenance attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history, so the generated release notes can see what changed.
+          fetch-depth: 0
+
+      - name: Derive the version from the tag
+        id: meta
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # OCI repository names must be lowercase, and github.repository
+          # preserves the case of the owner (PrintBench/printbench). Publishing
+          # it verbatim fails tag validation before any layer is built.
+          {
+            echo "version=$version"
+            echo "majorminor=${version%.*}"
+            echo "major=${version%%.*}"
+            echo "image=${GITHUB_REPOSITORY,,}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check the tag matches package.json
+        # Catches tagging without bumping, which would publish an image whose
+        # label disagrees with the version baked into it.
+        run: |
+          declared=$(node -p "require('./package.json').version")
+          tagged="${{ steps.meta.outputs.version }}"
+          if [ "$declared" != "$tagged" ]; then
+            echo "::error::tag v$tagged does not match package.json version $declared"
+            echo "Bump package.json to $tagged, land it on main, then re-tag."
+            exit 1
+          fi
+          echo "package.json and tag agree on $declared"
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          # The Dockerfile lives under docker/, but the context is the repo
+          # root: the build copies every workspace package.
+          file: docker/Dockerfile
+          push: true
+          # arm64 matters for Apple Silicon and for the cheaper ARM instances
+          # most small self-hosted deployments run on.
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Pinned, minor and major tags let deployers choose how much
+          # automatic upgrading they want. `latest` is for trying it out, not
+          # for production.
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.majorminor }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.major }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.title=PrintBench
+            org.opencontainers.image.description=Self-hosted web app for managing and finding your 3D print files (STL, 3MF, OBJ, PLY)
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+
+      - name: Attest build provenance
+        # Lets anyone verify the published image was built from this repository
+        # by this workflow: gh attestation verify oci://... --repo <owner>/<repo>
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # --generate-notes picks up from the previous release by itself,
+          # and falls back to the start of history when there is not one.
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
