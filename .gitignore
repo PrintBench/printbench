@@ -31,3 +31,9 @@ backups/
 # Claude Code worktrees. Local scratch checkouts, never part of a clone —
 # and a second tsconfig root that confuses eslint if it is walked.
 .claude/worktrees/
+
+# Next.js rewrites these on every dev/build run, unprompted. Tracking them
+# only means a dirty tree the first time anyone runs `npm run dev`.
+apps/web/next-env.d.ts
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
