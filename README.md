@@ -8,22 +8,6 @@ Postgres is the **only** infrastructure dependency. No Redis, no message broker,
 and no native 3D toolchain — thumbnails are rendered by a pure-TypeScript
 rasterizer, so there is nothing to compile and nothing to install.
 
-## Status
-
-All eight phases complete.
-
-| Phase | Scope                                            | State |
-| ----- | ------------------------------------------------ | ----- |
-| 0     | Monorepo, schema, migrations, Docker, CI         | done  |
-| 1     | Auth, roles, app shell                           | done  |
-| 2     | Libraries, scanning, browse                      | done  |
-| 3     | Geometry parsing and thumbnails                  | done  |
-| 4     | 3D viewer and downloads                          | done  |
-| 5     | Search and faceted filtering                     | done  |
-| 6     | Uploads and editing                              | done  |
-| 7     | Print history, open-in-slicer, send-to-printer   | done  |
-| 8     | Library health, settings, schedules, sharing, S3 | done  |
-
 ## Quick start (Docker)
 
 ```bash
@@ -260,23 +244,13 @@ writes a readable metadata export that restores into a rebuilt database by
 matching paths rather than ids. The sidecars are the real safety net — drop the
 database, migrate, rescan, and metadata comes back from disk.
 
-## Notes on `reference/`
-
-`reference/manyfold` is a vendored copy of [ManyFold](https://manyfold.app),
-used only as a **domain reference** for what a print library needs to model.
-
-ManyFold is AGPL-3.0 and its `AGENTS.md` asks that AI agents not contribute to
-that project. Neither affects this codebase, but both mean one firm rule: **no
-code is copied from it.** `reference/` is gitignored, dockerignored and excluded
-from the TypeScript build, and nothing here imports from it.
-
 ## Contributing
 
 Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md)
 covers setup, the checks CI runs, and the handful of invariants worth knowing
 before changing them.
 
-Two things to read first: the rule about `reference/` above, and the note in
+One thing to read first: the rule in
 CONTRIBUTING about `.env` — without one, the database-backed third of the test
 suite skips silently and a green run proves much less than it appears to.
 
@@ -286,6 +260,3 @@ rather than the issue tracker.
 ## License
 
 [MIT](LICENSE) — © 2026 Owl Media.
-
-`reference/` is not part of the distribution: it is gitignored and never
-shipped, and the note above explains why.
