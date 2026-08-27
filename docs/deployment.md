@@ -64,7 +64,10 @@ Coolify's Traefik handles certificates and proxies to the `nginx` service in
 this stack. Do not add a second TLS layer.
 
 1. **New Resource → Docker Compose**, pointed at this repository.
-2. Set the domain on the **`nginx`** service, port **80**. Not on `web` —
+2. Set the domain on the **`nginx`** service, port **80**. In Coolify's
+   Domains field for a service stack, that usually means entering the route as
+   `https://prints.example.com:80` so Traefik targets nginx's internal port.
+   Not on `web` —
    `web` does not serve files, and pointing at it directly loses the
    `X-Accel-Redirect` hand-off that keeps large downloads off the Node event
    loop.
