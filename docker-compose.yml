@@ -67,8 +67,8 @@ services:
     build: { context: ., dockerfile: docker/nginx.Dockerfile }
     restart: unless-stopped
     depends_on: [web, worker]
-    ports:
-      - '${PORT:-8080}:80'
+    expose:
+      - '80'
     volumes:
       - previews:/data:ro
       - ${LIBRARY_PATH:-./libraries}:/libraries:ro

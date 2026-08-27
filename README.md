@@ -14,7 +14,7 @@ rasterizer, so there is nothing to compile and nothing to install.
 cp .env.example .env
 # set POSTGRES_PASSWORD, BETTER_AUTH_SECRET (openssl rand -base64 32)
 # and LIBRARY_PATH to the folder holding your print files
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
 Then open <http://localhost:8080>.

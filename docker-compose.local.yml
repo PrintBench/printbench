@@ -1,0 +1,8 @@
+# Local-only port publishing. Coolify's Traefik reaches the `nginx` service
+# over Docker networking, so the production compose file intentionally avoids
+# binding a fixed host port.
+
+services:
+  nginx:
+    ports:
+      - '${PORT:-8080}:80'

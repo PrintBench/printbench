@@ -40,7 +40,7 @@ the mounts:
 | `ACCEL_MOUNTS`  | Maps nginx's internal locations to filesystem roots. **Must match `docker/nginx.conf`** — a mismatch shows up as downloads 404ing while the app thinks they succeeded. |
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
 The first run applies migrations and starts at `/setup`, which creates the
@@ -64,7 +64,7 @@ Coolify's Traefik handles certificates and proxies to the `nginx` service in
 this stack. Do not add a second TLS layer.
 
 1. **New Resource → Docker Compose**, pointed at this repository.
-2. Set the domain on the **`nginx`** service, port **8080**. Not on `web` —
+2. Set the domain on the **`nginx`** service, port **80**. Not on `web` —
    `web` does not serve files, and pointing at it directly loses the
    `X-Accel-Redirect` hand-off that keeps large downloads off the Node event
    loop.
