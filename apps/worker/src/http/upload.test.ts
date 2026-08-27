@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeUploadPath, signUploadToken, verifyUploadToken } from './upload'
+import { publicUploadBase, sanitizeUploadPath, signUploadToken, verifyUploadToken } from './upload'
 
 /**
  * The upload path comes from the browser — from a folder drag-and-drop, so it
@@ -144,5 +144,31 @@ describe('upload tokens', () => {
     expect(signUploadToken(LIBRARY, expires, SECRET)).not.toBe(
       signDownloadToken(LIBRARY, expires, SECRET),
     )
+  })
+})
+
+describe('publicUploadBase', () => {
+  it('uses forwarded request details when no public app url is configured', () => {
+    const original = process.env.APP_URL
+    delete process.env.APP_URL
+
+    try {
+      expect(publicUploadBase('https', 'prints.example.com')).toBe('https://prints.example.com')
+    } finally {
+      if (original === undefined) delete process.env.APP_URL
+      else process.env.APP_URL = original
+    }
+  })
+
+  it('does not leak a localhost app url when reached through a public host', () => {
+    const original = process.env.APP_URL
+    process.env.APP_URL = 'http://localhost:8080'
+
+    try {
+      expect(publicUploadBase('https', 'prints.example.com')).toBe('https://prints.example.com')
+    } finally {
+      if (original === undefined) delete process.env.APP_URL
+      else process.env.APP_URL = original
+    }
   })
 })

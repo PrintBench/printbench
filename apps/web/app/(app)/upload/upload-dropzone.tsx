@@ -100,7 +100,7 @@ export function UploadDropzone({ targets }: { targets: UploadTarget[] }) {
         removeFingerprintOnSuccess: true,
         fingerprint: async (file) =>
           [
-            'printbench-upload-v2',
+            'printbench-upload-v3',
             window.location.protocol,
             window.location.host,
             libraryId,

@@ -99,6 +99,29 @@ export function sanitizeUploadPath(relativePath: string): string | null {
 
 let server: Server | undefined
 
+export function publicUploadBase(proto: string, host: string): string {
+  const fallback = `${proto}://${host}`
+  const configured = process.env.APP_URL?.trim()
+  if (!configured) return fallback
+
+  try {
+    const url = new URL(configured)
+    const configuredHost = url.hostname.toLowerCase()
+    const requestHost = host.split(':')[0]?.toLowerCase()
+
+    if (
+      (configuredHost === 'localhost' || configuredHost === '127.0.0.1') &&
+      requestHost !== configuredHost
+    ) {
+      return fallback
+    }
+
+    return configured.replace(/\/+$/, '')
+  } catch {
+    return fallback
+  }
+}
+
 function getServer(stagingDir: string): Server {
   server ??= new Server({
     path: '/api/upload',
@@ -119,8 +142,7 @@ function getServer(stagingDir: string): Server {
      */
     generateUrl(request, { proto, host, path: basePath, id }) {
       const query = (request.url ?? '').split('?')[1]
-      const configuredBase = process.env.APP_URL?.replace(/\/+$/, '')
-      const url = `${configuredBase ?? `${proto}://${host}`}${basePath}/${id}`
+      const url = `${publicUploadBase(proto, host)}${basePath}/${id}`
       return query ? `${url}?${query}` : url
     },
 
