@@ -97,6 +97,19 @@ export function UploadDropzone({ targets }: { targets: UploadTarget[] }) {
         },
         // Lets tus resume this exact file after a reload instead of restarting.
         storeFingerprintForResuming: true,
+        removeFingerprintOnSuccess: true,
+        fingerprint: async (file) =>
+          [
+            'printbench-upload-v2',
+            window.location.protocol,
+            window.location.host,
+            libraryId,
+            file.name,
+            file.type,
+            file.size,
+            file.lastModified,
+            item.relativePath,
+          ].join('|'),
         onError: (uploadError) => {
           update(item.id, { status: 'failed', error: uploadError.message })
         },

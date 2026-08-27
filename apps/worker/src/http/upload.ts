@@ -119,7 +119,8 @@ function getServer(stagingDir: string): Server {
      */
     generateUrl(request, { proto, host, path: basePath, id }) {
       const query = (request.url ?? '').split('?')[1]
-      const url = `${proto}://${host}${basePath}/${id}`
+      const configuredBase = process.env.APP_URL?.replace(/\/+$/, '')
+      const url = `${configuredBase ?? `${proto}://${host}`}${basePath}/${id}`
       return query ? `${url}?${query}` : url
     },
 
