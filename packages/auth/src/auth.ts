@@ -22,10 +22,46 @@ export function getAuth(): ReturnType<typeof build> {
   return instance
 }
 
+function envUrl(name: string): string | undefined {
+  const raw = process.env[name]?.trim().replace(/\/+$/, '')
+  if (!raw) return undefined
+
+  try {
+    const { hostname } = new URL(raw)
+    if (
+      process.env.NODE_ENV === 'production' &&
+      (hostname === 'localhost' || hostname === '127.0.0.1')
+    ) {
+      return undefined
+    }
+  } catch {
+    return undefined
+  }
+
+  return raw
+}
+
+function configuredBaseUrl(): string | undefined {
+  return envUrl('BETTER_AUTH_URL') ?? envUrl('APP_URL')
+}
+
+function trustedOrigins(): string[] {
+  return [
+    configuredBaseUrl(),
+    ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? '')
+      .split(',')
+      .map((origin) => origin.trim().replace(/\/+$/, ''))
+      .filter(Boolean),
+  ].filter((origin): origin is string => Boolean(origin))
+}
+
 function build() {
+  const baseURL = configuredBaseUrl()
+
   return betterAuth({
     appName: 'PrintBench',
-    baseURL: process.env.BETTER_AUTH_URL ?? process.env.APP_URL ?? 'http://localhost:3000',
+    baseURL,
+    trustedOrigins: trustedOrigins(),
     secret: process.env.BETTER_AUTH_SECRET,
 
     database: drizzleAdapter(getDb(), {
@@ -79,7 +115,13 @@ function build() {
 
     advanced: {
       // Self-hosted deployments are frequently plain HTTP on a LAN.
-      useSecureCookies: (process.env.APP_URL ?? '').startsWith('https://'),
+      useSecureCookies: baseURL?.startsWith('https://') ?? false,
+      // Coolify/Traefik and Cloudflare both forward the public request details.
+      trustedProxyHeaders: true,
+      ipAddress: {
+        ipAddressHeaders: ['cf-connecting-ip', 'x-forwarded-for', 'x-real-ip'],
+        trustedProxies: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.1'],
+      },
     },
 
     plugins: [

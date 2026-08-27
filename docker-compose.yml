@@ -29,8 +29,8 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-printbench}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-printbench}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
-      BETTER_AUTH_URL: ${APP_URL:-http://localhost:8080}
-      APP_URL: ${APP_URL:-http://localhost:8080}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
+      APP_URL: ${APP_URL:-}
       FILE_DELIVERY: ${FILE_DELIVERY:-xaccel}
       DATA_DIR: /data
       # Where an admin may point a library. Confines the folder picker, so
