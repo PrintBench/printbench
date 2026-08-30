@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import type { Database } from '@pb/db'
+import { deletePrint, logPrint } from './print-service'
 import {
   MAX_BULK_REQUESTS,
   MAX_NAME,
@@ -82,6 +83,8 @@ export interface PrintRequest {
 
   dueAt: Date | null
   closedAt: Date | null
+  /** The print history entry this created when it was marked printed. */
+  printRunId: string | null
   createdBy: string | null
   createdByName: string | null
   createdAt: Date
@@ -308,21 +311,128 @@ export async function updateRequest(
  * `closed_at` is derived here rather than asked for, so reopening something
  * marked done by mistake clears it again and a row cannot end up claiming to
  * be both open and closed.
+ *
+ * Marking a linked request printed also writes it to the print history. The
+ * two would otherwise disagree: a model could have been printed on the
+ * strength of a queue entry and still report "never printed", and that is not
+ * cosmetic — the never-printed facet and the per-model success rate are both
+ * built on print_runs. A request with no model linked logs nothing, because
+ * print history is per-model and there is nothing to file it under.
  */
 export async function setRequestStatus(
   db: Database,
   requestId: string,
   status: PrintRequestStatus,
+  options: { userId?: string | null } = {},
 ): Promise<void> {
   const next = cleanStatus(status)
   const closed = CLOSED.includes(next)
+
+  const rows = await db.execute<{
+    status: PrintRequestStatus
+    model_id: string | null
+    model_file_id: string | null
+    material: string | null
+    color_hex: string | null
+    quantity: number
+    requested_by: string | null
+    notes: string | null
+    print_run_id: string | null
+  }>(sql`
+    SELECT status, model_id, model_file_id, material, color_hex, quantity,
+           requested_by, notes, print_run_id
+    FROM print_requests WHERE id = ${requestId} LIMIT 1`)
+
+  const current = rows.rows[0]
+  if (!current) throw new RequestValidationError('That request is no longer in the queue.')
+
+  let printRunId = current.print_run_id
+
+  if (next === 'done' && current.status !== 'done') {
+    /*
+     * Only when a model is linked, and only once — marking something printed
+     * twice is a double click, not a second print.
+     */
+    if (current.model_id && !printRunId) {
+      const run = await logPrint(db, {
+        modelId: current.model_id,
+        modelFileId: current.model_file_id,
+        userId: options.userId ?? null,
+        material: current.material,
+        colorHex: current.color_hex,
+        status: 'success',
+        /*
+         * Finished now, started unknown. Guessing a start time would invent a
+         * duration, and an invented duration pollutes the totals the print
+         * history exists to report.
+         */
+        finishedAt: new Date(),
+        notes: historyNote(current.requested_by, current.quantity, current.notes),
+      })
+      printRunId = run.id
+    }
+  } else if (current.status === 'done' && next !== 'done' && printRunId) {
+    /*
+     * Leaving `done` withdraws the entry this created — the history said the
+     * print happened only because the request did, and that claim has been
+     * taken back.
+     *
+     * Unless someone has since filled it in. A run carrying a rating, a
+     * filament weight or a printer name has been adopted as a real record of a
+     * real print, and deleting it would throw away work the queue never owned.
+     */
+    if (await isUntouchedRun(db, printRunId)) await deletePrint(db, printRunId)
+    printRunId = null
+  }
 
   await db.execute(sql`
     UPDATE print_requests
     SET status = ${next}::print_request_status,
         closed_at = ${closed ? sql`coalesce(closed_at, now())` : sql`NULL`},
+        print_run_id = ${printRunId},
         updated_at = now()
     WHERE id = ${requestId}`)
+}
+
+/**
+ * The note on an auto-created history entry.
+ *
+ * Enough for the row to explain itself months later — a bare print against a
+ * model, with no printer and no settings, is otherwise a mystery.
+ */
+function historyNote(
+  requestedBy: string | null,
+  quantity: number,
+  notes: string | null,
+): string | null {
+  const provenance = [
+    'Marked printed from the queue',
+    requestedBy ? `requested by ${requestedBy}` : null,
+    // One run, not one per copy: four clips on a plate is a single print.
+    quantity > 1 ? `×${quantity}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  return [provenance, notes].filter(Boolean).join('\n')
+}
+
+/**
+ * True when a print run still looks exactly as the queue created it.
+ *
+ * Checks the fields only a person would fill in. Material and colour are
+ * excluded deliberately: the queue sets those itself from the request, so
+ * their presence says nothing about whether anyone has been here since.
+ */
+async function isUntouchedRun(db: Database, printRunId: string): Promise<boolean> {
+  const rows = await db.execute<{ untouched: boolean }>(sql`
+    SELECT (rating IS NULL AND filament_used_g IS NULL AND duration_min IS NULL
+            AND printer_name IS NULL AND layer_height_mm IS NULL AND nozzle_mm IS NULL
+            AND photo_key IS NULL AND started_at IS NULL AND status = 'success') AS untouched
+    FROM print_runs WHERE id = ${printRunId} LIMIT 1`)
+
+  // Already gone — deleted from the model page. Nothing to withdraw.
+  return rows.rows[0]?.untouched === true
 }
 
 /** Attaches the request to a model, or clears the link when modelId is null. */
@@ -374,6 +484,7 @@ type Row = {
   color_hex: string | null
   due_at: string | null
   closed_at: string | null
+  print_run_id: string | null
   created_by: string | null
   created_by_name: string | null
   created_at: string
@@ -388,7 +499,8 @@ const SELECT_REQUEST = sql`
            ORDER BY f.size DESC LIMIT 1) AS thumb_file_id,
          r.model_file_id, mf.filename,
          r.quantity, r.priority, r.status, r.material, r.color_hex,
-         r.due_at, r.closed_at, r.created_by, u.name AS created_by_name, r.created_at
+         r.due_at, r.closed_at, r.print_run_id,
+         r.created_by, u.name AS created_by_name, r.created_at
   FROM print_requests r
   LEFT JOIN models m ON m.id = r.model_id
   LEFT JOIN model_files mf ON mf.id = r.model_file_id
@@ -415,6 +527,7 @@ function toRequest(row: Row): PrintRequest {
     colorHex: row.color_hex,
     dueAt: row.due_at ? new Date(row.due_at) : null,
     closedAt: row.closed_at ? new Date(row.closed_at) : null,
+    printRunId: row.print_run_id,
     createdBy: row.created_by,
     createdByName: row.created_by_name,
     createdAt: new Date(row.created_at),

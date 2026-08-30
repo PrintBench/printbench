@@ -179,6 +179,14 @@ web shell is replaceable without touching the app.
   the model's own page. Anyone signed in can raise a request, including a
   viewer; starting and finishing prints needs a member. Open requests also
   appear on the dashboard under **Waiting to print**.
+
+  Marking a linked request **printed** records it in the print history, so a
+  model printed off the back of a request does not go on reporting "never
+  printed". Reopening the request withdraws that entry again — unless somebody
+  has since rated or weighed it, in which case it has been adopted as a real
+  record and is left alone. A request with no model linked logs nothing, as
+  print history is per-model and there is nothing to file it under.
+
 - **Log a print** from any model page: printer, material, colour, layer height,
   nozzle, start and finish times, filament used, a 1–5 rating and notes. The
   duration is worked out from the timestamps unless you type one. `/prints`
