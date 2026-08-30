@@ -59,3 +59,20 @@ export const printHostProtocol = pgEnum('print_host_protocol', [
 ])
 
 export const listKind = pgEnum('list_kind', ['normal', 'liked'])
+
+/**
+ * Lifecycle of a requested print.
+ *
+ * Deliberately four states, not five: "someone asked" and "I agreed to do it"
+ * collapse into `requested`, because the difference is already carried by who
+ * can act — a viewer raises requests, a member is the one who starts them.
+ */
+export const printRequestStatus = pgEnum('print_request_status', [
+  'requested',
+  'printing',
+  'done',
+  'cancelled',
+])
+
+/** Declaration order is the sort order, so `ORDER BY priority DESC` is urgent-first. */
+export const printRequestPriority = pgEnum('print_request_priority', ['low', 'normal', 'high'])

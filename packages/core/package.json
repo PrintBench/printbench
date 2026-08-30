@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./policy": "./src/policy/policy.ts",
+    "./requests": "./src/services/request-lines.ts",
     "./schedule": "./src/scan/schedule-presets.ts",
     "./health": "./src/health/problem-kinds.ts"
   },

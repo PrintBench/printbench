@@ -54,6 +54,7 @@ npm run verify:phase5      # search, facets and the command palette, needs `npm 
 npm run verify:phase6      # uploads, editing and the restore drill, needs `npm run dev`
 npm run verify:phase7      # print history, slicer links and a stubbed printer, needs `npm run dev`
 npm run verify:phase8      # health, settings, schedules, sharing and prune, needs `npm run dev`
+npm run verify:phase9      # the print queue, its role split and auto-linking, needs `npm run dev`
 ```
 
 Lint the workspace:
@@ -167,6 +168,17 @@ web shell is replaceable without touching the app.
 
 ## Print workflow
 
+- **Print queue** at `/queue` — the list of things people have asked you to
+  print. Requests arrive in batches, so the add box takes a whole message and
+  makes one request per line; a count can ride along on either end
+  (`cable clip x4`, `4x cable clip`), and pasted list punctuation is stripped.
+  A request needs nothing but a title, because people ask for things before a
+  file exists — "something to hold the kitchen roll" is a valid entry. Where a
+  line names a model **exactly**, it is linked to it automatically; anything
+  less certain than that is left for you to link by hand from the row, or from
+  the model's own page. Anyone signed in can raise a request, including a
+  viewer; starting and finishing prints needs a member. Open requests also
+  appear on the dashboard under **Waiting to print**.
 - **Log a print** from any model page: printer, material, colour, layer height,
   nozzle, start and finish times, filament used, a 1–5 rating and notes. The
   duration is worked out from the timestamps unless you type one. `/prints`

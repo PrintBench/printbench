@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Boxes,
+  ClipboardList,
   FolderTree,
   HardDrive,
   Heart,
@@ -38,6 +39,7 @@ export type NavItem =
 
 const ICONS = {
   home: Home,
+  queue: ClipboardList,
   search: Search,
   boxes: Boxes,
   users: Users,
@@ -58,6 +60,7 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { href: '/', label: 'Dashboard', icon: 'home' },
       { href: '/search', label: 'Search', icon: 'search' },
       { href: '/models', label: 'Models', icon: 'boxes' },
+      { href: '/queue', label: 'Print queue', icon: 'queue', requires: 'request:create' },
       { href: '/upload', label: 'Upload', icon: 'upload', requires: 'file:upload' },
     ],
   },
