@@ -3,6 +3,7 @@ import { index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-c
 import { printRequestPriority, printRequestStatus } from './enums'
 import { user } from './auth'
 import { modelFiles, models } from './models'
+import { printRuns } from './prints'
 
 /**
  * The print queue — things people have asked to have printed.
@@ -52,6 +53,15 @@ export const printRequests = pgTable(
     material: text('material'),
     colorHex: text('color_hex'),
 
+    /**
+     * The print history entry created when this was marked printed.
+     *
+     * Kept so the entry can be withdrawn again if the request is reopened.
+     * `set null` because deleting the run by hand from the model page is
+     * legitimate and should not take the request with it.
+     */
+    printRunId: uuid('print_run_id').references(() => printRuns.id, { onDelete: 'set null' }),
+
     dueAt: timestamp('due_at', { withTimezone: true }),
     /** Set when the request reaches `done` or `cancelled`. */
     closedAt: timestamp('closed_at', { withTimezone: true }),
@@ -70,5 +80,9 @@ export const printRequests = pgTable(
       .on(t.modelId)
       .where(sql`${t.modelId} IS NOT NULL`),
     index('print_requests_creator_idx').on(t.createdBy),
+    // Only ever looked up from a request that has one, and most never will.
+    index('print_requests_print_run_idx')
+      .on(t.printRunId)
+      .where(sql`${t.printRunId} IS NOT NULL`),
   ],
 )

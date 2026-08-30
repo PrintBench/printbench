@@ -163,7 +163,11 @@ export async function setStatus(requestId: string, status: PrintRequestStatus): 
     const authorized = await authorize(requestId, need)
     if (!authorized.ok) return authorized
 
-    await setRequestStatus(getDb(), requestId, status)
+    /*
+     * The user is passed through so a print logged from here is attributed to
+     * whoever marked it printed, exactly as it would be from the model page.
+     */
+    await setRequestStatus(getDb(), requestId, status, { userId: authorized.user.id })
     revalidateFor(authorized.request)
     return { ok: true }
   } catch (error) {
@@ -257,6 +261,9 @@ export async function findModels(query: string): Promise<ModelChoice[]> {
 function revalidateFor(request: PrintRequest) {
   revalidatePath('/queue')
   revalidatePath('/')
+  // Marking a linked request printed writes to the print history, so the log
+  // and the model's own print list are both stale afterwards.
+  revalidatePath('/prints')
   if (request.modelPublicId) revalidatePath(`/models/${request.modelPublicId}`)
 }
 
