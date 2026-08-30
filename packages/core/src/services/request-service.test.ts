@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createDb } from '@pb/db'
+import { deletePrint, listPrints, printStats, updatePrint } from './print-service'
 import {
   RequestValidationError,
   createRequest,
@@ -162,11 +163,14 @@ describeDb('print queue', () => {
   })
 
   beforeEach(async () => {
+    // print_requests first: it references print_runs.
     await db.execute(sql`DELETE FROM print_requests`)
+    await db.execute(sql`DELETE FROM print_runs WHERE model_id IN (${DRAGON}, ${CLIP})`)
   })
 
   async function cleanup() {
     await db.execute(sql`DELETE FROM print_requests`)
+    await db.execute(sql`DELETE FROM print_runs WHERE model_id IN (${DRAGON}, ${CLIP})`)
     await db.execute(sql`DELETE FROM models WHERE library_id = ${LIB}`)
     await db.execute(sql`DELETE FROM libraries WHERE id = ${LIB}`)
     await db.execute(sql`DELETE FROM "user" WHERE id = ${USER}`)
@@ -378,6 +382,142 @@ describeDb('print queue', () => {
       const { id } = await createRequest(db, { title: 'Vase' }, USER)
       await deleteRequest(db, id)
       expect(await getRequest(db, id)).toBeNull()
+    })
+  })
+
+  /*
+   * The queue and the print history have to agree. A model printed on the
+   * strength of a queue entry that still reports "never printed" is not a
+   * cosmetic gap: the never-printed facet and the success rate are built on
+   * print_runs, so the wrong answer propagates.
+   */
+  describe('marking printed writes to the print history', () => {
+    it('logs a print when a model is linked', async () => {
+      const { id } = await createRequest(
+        db,
+        { title: 'Dragon', modelId: DRAGON, material: 'PETG', colorHex: '#1a2b3c' },
+        USER,
+      )
+
+      await setRequestStatus(db, id, 'done', { userId: USER })
+
+      const request = await getRequest(db, id)
+      expect(request?.printRunId).not.toBeNull()
+
+      const history = await listPrints(db, { modelId: DRAGON })
+      expect(history).toHaveLength(1)
+      expect(history[0]).toMatchObject({
+        status: 'success',
+        material: 'PETG',
+        colorHex: '#1a2b3c',
+        userName: 'Queue Tester',
+      })
+    })
+
+    it('carries the specific file through when one was named', async () => {
+      const { id } = await createRequest(
+        db,
+        { title: 'Dragon', modelId: DRAGON, modelFileId: dragonFileId },
+        USER,
+      )
+      await setRequestStatus(db, id, 'done', { userId: USER })
+
+      expect((await listPrints(db, { modelId: DRAGON }))[0]?.filename).toBe('dragon.stl')
+    })
+
+    it('explains itself in the note', async () => {
+      const { id } = await createRequest(
+        db,
+        { title: 'Clip', modelId: CLIP, requestedBy: 'Nan', quantity: 4 },
+        USER,
+      )
+      await setRequestStatus(db, id, 'done', { userId: USER })
+
+      const notes = (await listPrints(db, { modelId: CLIP }))[0]?.notes ?? ''
+      expect(notes).toContain('Marked printed from the queue')
+      expect(notes).toContain('Nan')
+      // One run for the plate, not four runs for four clips.
+      expect(notes).toContain('×4')
+      expect(await listPrints(db, { modelId: CLIP })).toHaveLength(1)
+    })
+
+    /* Nothing to file it under; print history is per-model. */
+    it('logs nothing when no model is linked', async () => {
+      const { id } = await createRequest(db, { title: 'Something unnameable' }, USER)
+      await setRequestStatus(db, id, 'done', { userId: USER })
+
+      expect((await getRequest(db, id))?.printRunId).toBeNull()
+      expect(await listPrints(db)).toHaveLength(0)
+    })
+
+    it('does not log twice when marked printed again', async () => {
+      const { id } = await createRequest(db, { title: 'Dragon', modelId: DRAGON }, USER)
+      await setRequestStatus(db, id, 'done', { userId: USER })
+      await setRequestStatus(db, id, 'done', { userId: USER })
+
+      expect(await listPrints(db, { modelId: DRAGON })).toHaveLength(1)
+    })
+
+    it('withdraws the entry when the request is reopened', async () => {
+      const { id } = await createRequest(db, { title: 'Dragon', modelId: DRAGON }, USER)
+      await setRequestStatus(db, id, 'done', { userId: USER })
+      expect(await listPrints(db, { modelId: DRAGON })).toHaveLength(1)
+
+      await setRequestStatus(db, id, 'requested', { userId: USER })
+
+      expect((await getRequest(db, id))?.printRunId).toBeNull()
+      expect(await listPrints(db, { modelId: DRAGON })).toHaveLength(0)
+    })
+
+    /*
+     * The one that stops this being destructive. A run someone has rated or
+     * weighed has been adopted as a real record, and the queue does not get to
+     * throw that away just because the request was reopened.
+     */
+    it('keeps an entry somebody has since filled in', async () => {
+      const { id } = await createRequest(db, { title: 'Dragon', modelId: DRAGON }, USER)
+      await setRequestStatus(db, id, 'done', { userId: USER })
+
+      const runId = (await getRequest(db, id))!.printRunId!
+      await updatePrint(db, runId, { rating: 5, filamentUsedG: 42 })
+
+      await setRequestStatus(db, id, 'requested', { userId: USER })
+
+      expect((await getRequest(db, id))?.printRunId).toBeNull()
+      const history = await listPrints(db, { modelId: DRAGON })
+      expect(history).toHaveLength(1)
+      expect(history[0]?.rating).toBe(5)
+    })
+
+    it('withdraws the entry when a printed request is cancelled', async () => {
+      const { id } = await createRequest(db, { title: 'Dragon', modelId: DRAGON }, USER)
+      await setRequestStatus(db, id, 'done', { userId: USER })
+      await setRequestStatus(db, id, 'cancelled', { userId: USER })
+
+      expect(await listPrints(db, { modelId: DRAGON })).toHaveLength(0)
+    })
+
+    /* Deleting the print by hand from the model page must not orphan the row. */
+    it('survives the print run being deleted underneath it', async () => {
+      const { id } = await createRequest(db, { title: 'Dragon', modelId: DRAGON }, USER)
+      await setRequestStatus(db, id, 'done', { userId: USER })
+
+      await deletePrint(db, (await getRequest(db, id))!.printRunId!)
+
+      const request = await getRequest(db, id)
+      expect(request).not.toBeNull()
+      expect(request?.printRunId).toBeNull()
+      expect(request?.status).toBe('done')
+    })
+
+    it('feeds the print stats for that model', async () => {
+      const { id } = await createRequest(db, { title: 'Dragon', modelId: DRAGON }, USER)
+      await setRequestStatus(db, id, 'done', { userId: USER })
+
+      const stats = await printStats(db, DRAGON)
+      expect(stats.total).toBe(1)
+      expect(stats.successes).toBe(1)
+      expect(stats.lastPrintedAt).toBeInstanceOf(Date)
     })
   })
 

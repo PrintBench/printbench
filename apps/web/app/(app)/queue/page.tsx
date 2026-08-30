@@ -66,6 +66,7 @@ export default async function QueuePage({
     colorHex: request.colorHex,
     dueAt: request.dueAt?.toISOString() ?? null,
     createdAt: request.createdAt.toISOString(),
+    printRunId: request.printRunId,
     modelPublicId: request.modelPublicId,
     modelName: request.modelName,
     modelMissing: request.modelMissing,

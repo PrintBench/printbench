@@ -15,15 +15,19 @@ import {
   can,
   createRequest,
   createRequests,
+  deletePrint,
   findExactModelMatch,
   getRequest,
   linkRequest,
+  listPrints,
   listRequests,
   loadRootEnv,
   openRequestsForModel,
   parseRequestLines,
+  printStats,
   queueStats,
   setRequestStatus,
+  updatePrint,
 } from '@pb/core'
 import { createDb } from '@pb/db'
 
@@ -184,6 +188,52 @@ try {
   const stats = await queueStats(db)
   check('waiting is counted', stats.waiting === 3, `${stats.waiting}`)
   check('nothing is falsely overdue', stats.overdue === 0, `${stats.overdue}`)
+
+  section('Marking printed reaches the print history')
+  const toPrint = await createRequest(
+    db,
+    { title: 'Phase Nine Clip', modelId: CLIP, requestedBy: 'Nan', quantity: 3, material: 'PETG' },
+    userId,
+  )
+  await setRequestStatus(db, toPrint.id, 'done', { userId })
+
+  const logged = await listPrints(db, { modelId: CLIP })
+  check('the print is logged against the model', logged.length === 1, `${logged.length}`)
+  check('with the material the request asked for', logged[0]?.material === 'PETG')
+  check('and a note explaining where it came from', logged[0]?.notes?.includes('queue') === true)
+  check('the model no longer reads as never printed', (await printStats(db, CLIP)).total === 1)
+  check(
+    'the request remembers its history entry',
+    (await getRequest(db, toPrint.id))?.printRunId != null,
+  )
+
+  const historyHtml = await (await get('/prints', cookie)).text()
+  check('and it shows on the print history page', historyHtml.includes('Phase Nine Clip'))
+
+  section('Reopening withdraws it again')
+  await setRequestStatus(db, toPrint.id, 'requested', { userId })
+  check('the entry is gone', (await listPrints(db, { modelId: CLIP })).length === 0)
+  check('and the link is cleared', (await getRequest(db, toPrint.id))?.printRunId == null)
+
+  section('But not once somebody has filled it in')
+  await setRequestStatus(db, toPrint.id, 'done', { userId })
+  const adopted = (await getRequest(db, toPrint.id))!.printRunId!
+  await updatePrint(db, adopted, { rating: 5, filamentUsedG: 42 })
+  await setRequestStatus(db, toPrint.id, 'requested', { userId })
+  const kept = await listPrints(db, { modelId: CLIP })
+  check('a rated print survives the reopen', kept.length === 1, `${kept.length}`)
+  check('with the rating intact', kept[0]?.rating === 5)
+
+  section('An unlinked request logs nothing')
+  const unlinked = await createRequest(db, { title: 'No model for this' }, userId)
+  await setRequestStatus(db, unlinked.id, 'done', { userId })
+  check('no history entry was invented', (await getRequest(db, unlinked.id))?.printRunId == null)
+
+  section('Deleting the print by hand does not orphan the request')
+  await deletePrint(db, kept[0]!.id)
+  const orphaned = await getRequest(db, toPrint.id)
+  check('the request survives', orphaned != null)
+  check('with its history link cleared', orphaned?.printRunId == null)
 
   section('The model page knows it is wanted')
   const openForDragon = await openRequestsForModel(db, DRAGON)

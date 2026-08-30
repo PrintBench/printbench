@@ -33,6 +33,8 @@ export interface QueueRow {
   /** ISO strings: Dates do not need to survive the round trip, only render. */
   dueAt: string | null
   createdAt: string
+  /** Set once marking it printed has written it to the print history. */
+  printRunId: string | null
   modelPublicId: string | null
   modelName: string | null
   modelMissing: boolean
@@ -163,7 +165,12 @@ export function RequestRow({ request, canRun }: { request: QueueRow; canRun: boo
       <div className="flex shrink-0 flex-wrap items-center gap-1">
         {closed ? (
           <>
-            <span className="mr-1 text-xs text-[var(--color-ink-faint)]">{meta.label}</span>
+            <span className="mr-1 text-xs text-[var(--color-ink-faint)]">
+              {meta.label}
+              {/* Say so rather than leaving it to be discovered: the print
+                  history gained a row because of this button. */}
+              {request.printRunId && ' · logged'}
+            </span>
             {canEdit && (
               <Button
                 variant="ghost"
@@ -210,7 +217,16 @@ export function RequestRow({ request, canRun }: { request: QueueRow; canRun: boo
                 variant="secondary"
                 size="sm"
                 disabled={pending}
-                aria-label={`Mark ${request.title} printed`}
+                aria-label={
+                  request.modelPublicId
+                    ? `Mark ${request.title} printed and add it to the print history`
+                    : `Mark ${request.title} printed`
+                }
+                title={
+                  request.modelPublicId
+                    ? 'Also records this in the print history'
+                    : 'Link a model to have this recorded in the print history'
+                }
                 onClick={() => run(() => setStatus(request.id, 'done'))}
               >
                 <Check />
