@@ -64,10 +64,9 @@ Coolify's Traefik handles certificates and proxies to the `nginx` service in
 this stack. Do not add a second TLS layer.
 
 1. **New Resource → Docker Compose**, pointed at this repository.
-2. Set the domain on the **`nginx`** service, port **80**. In Coolify's
-   Domains field for a service stack, that usually means entering the route as
-   `https://prints.example.com:80` so Traefik targets nginx's internal port.
-   Not on `web` —
+2. Set the domain on the **`nginx`** service. Because nginx listens on
+   container port **80**, the domain should usually be just
+   `https://prints.example.com` with no port suffix. Not on `web` —
    `web` does not serve files, and pointing at it directly loses the
    `X-Accel-Redirect` hand-off that keeps large downloads off the Node event
    loop.
@@ -151,20 +150,11 @@ Three differences worth knowing:
   S3 library relies on its scan schedule, or on the scan that is triggered
   automatically after an upload.
 
-### Checking a bucket works
-
-`npm run verify:s3` exercises the whole S3 path — multipart upload, presigned
-download, zip extraction, scanning, deletion and the read-only guard — against
-a real bucket. It defaults to the MinIO in `docker-compose.dev.yml`:
-
-```bash
-docker compose -f docker-compose.dev.yml --profile s3 up -d
-npm run verify:s3
-```
-
-Point it at any other S3 endpoint with `VERIFY_S3_ENDPOINT`,
-`VERIFY_S3_BUCKET`, `VERIFY_S3_ACCESS_KEY` and `VERIFY_S3_SECRET_KEY`. It
-writes only under a `verify-<timestamp>/` prefix and removes what it wrote.
+Nothing has to be enabled or deployed for this: the bucket, an IAM policy
+scoped to it, and a CORS rule (needed only by the 3D viewer, not by downloads)
+are the whole of the setup. **[docs/s3-storage.md](s3-storage.md)** has the
+policy JSON, the CORS rule, per-provider endpoints, `npm run verify:s3`, and
+what each error message means.
 
 ---
 

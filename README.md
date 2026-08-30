@@ -22,8 +22,10 @@ Then open <http://localhost:8080>.
 Your library is mounted **read-only**. The app indexes it and never moves,
 renames or deletes anything in it.
 
-For Coolify, S3, NAS mounts, backups and upgrades, see
-[docs/deployment.md](docs/deployment.md).
+For Coolify, NAS mounts, backups and upgrades, see
+[docs/deployment.md](docs/deployment.md). For putting a library in a bucket —
+bucket, IAM policy, CORS and per-provider settings — see
+[docs/s3-storage.md](docs/s3-storage.md).
 
 ## Local development
 
