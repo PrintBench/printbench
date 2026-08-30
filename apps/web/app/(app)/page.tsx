@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { sql } from 'drizzle-orm'
-import { Boxes, HardDrive, History, Printer, Wrench } from 'lucide-react'
-import { can, printStats } from '@pb/core'
+import { Boxes, ClipboardList, HardDrive, History, Printer, Wrench } from 'lucide-react'
+import { can, listRequests, printStats } from '@pb/core'
 import { getSessionUser } from '@pb/auth'
 import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
 import { ModelCard, formatDimensions } from '@/components/model/model-card'
@@ -127,11 +128,21 @@ export default async function DashboardPage() {
   const policyUser = { id: user.id, role: user.role ?? 'viewer' }
   const canManage = can(policyUser, 'library:manage')
 
-  const [stats, prints, models, latestPrints] = await Promise.all([
+  const canQueue = can(policyUser, 'request:create')
+
+  const [stats, prints, models, latestPrints, queued] = await Promise.all([
     counts(),
     printStats(getDb()),
     recentModels(),
     recentPrints(),
+    /*
+     * Open requests, most urgent first. This is the one section that is a to-do
+     * list rather than a record, so it sits above the rest — it is the reason
+     * someone opens the dashboard before starting a print.
+     */
+    canQueue
+      ? listRequests(getDb(), { status: ['requested', 'printing'], limit: 5 })
+      : Promise.resolve([]),
   ])
 
   return (
@@ -165,6 +176,50 @@ export default async function DashboardPage() {
           href={canManage ? '/admin/libraries' : undefined}
         />
       </div>
+
+      {queued.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Waiting to print</h2>
+            <Link href="/queue" className="text-sm text-[var(--color-accent)] hover:underline">
+              Print queue
+            </Link>
+          </div>
+
+          <Card className="overflow-hidden">
+            <ul className="divide-y divide-[var(--color-border)]">
+              {queued.map((request) => (
+                <li key={request.id} className="flex items-center gap-3 px-4 py-2.5">
+                  <ClipboardList className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {request.modelPublicId ? (
+                      <Link href={`/models/${request.modelPublicId}`} className="hover:underline">
+                        {request.title}
+                      </Link>
+                    ) : (
+                      request.title
+                    )}
+                    {request.quantity > 1 && (
+                      <span className="text-[var(--color-ink-faint)]"> × {request.quantity}</span>
+                    )}
+                  </span>
+
+                  {request.requestedBy && (
+                    <span className="hidden shrink-0 text-xs text-[var(--color-ink-muted)] sm:inline">
+                      for {request.requestedBy}
+                    </span>
+                  )}
+                  {request.status === 'printing' && <Badge tone="accent">On the printer</Badge>}
+                  {request.priority === 'high' && request.status !== 'printing' && (
+                    <Badge tone="danger">Urgent</Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
 
       {stats.libraries === 0 ? (
         <EmptyState

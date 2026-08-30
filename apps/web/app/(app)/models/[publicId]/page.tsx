@@ -14,6 +14,7 @@ import {
   isLiked,
   listCollections,
   listPrints,
+  openRequestsForModel,
   printStats,
   printSuggestions,
   slicersFor,
@@ -33,6 +34,7 @@ import { ShareButton } from './share-button'
 import { DeleteButton } from './delete-button'
 import { LikeButton } from './like-button'
 import { CollectionPicker } from './collection-picker'
+import { QueueButton } from './queue-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -143,13 +145,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const canLogPrints = can(policyUser, 'print:log')
   const canSend = can(policyUser, 'printhost:send')
 
-  const [prints, stats, suggestions, settings, memberships, liked] = await Promise.all([
+  const canQueue = can(policyUser, 'request:create')
+
+  const [prints, stats, suggestions, settings, memberships, liked, queued] = await Promise.all([
     listPrints(db, { modelId: model.id, limit: 50 }),
     printStats(db, model.id),
     printSuggestions(db),
     getSettings(db),
     collectionsForModel(db, model.id),
     user ? isLiked(db, user.id, model.id) : Promise.resolve(false),
+    canQueue ? openRequestsForModel(db, model.id) : Promise.resolve([]),
   ])
 
   const canCollect = can(policyUser, 'collection:edit')
@@ -213,6 +218,14 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 {model.file_count} files · {formatBytes(Number(model.total_size))}
               </Badge>
               {user && <LikeButton publicId={model.public_id} liked={liked} />}
+              {canQueue && (
+                <QueueButton
+                  modelId={model.id}
+                  modelPublicId={model.public_id}
+                  modelName={model.name}
+                  openCount={queued.length}
+                />
+              )}
               {canCollect && (
                 <CollectionPicker
                   publicId={model.public_id}

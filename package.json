@@ -56,6 +56,7 @@
     "verify:phase6": "tsx scripts/verify-phase6.mts",
     "verify:phase7": "tsx scripts/verify-phase7.mts",
     "verify:phase8": "tsx scripts/verify-phase8.mts",
+    "verify:phase9": "tsx scripts/verify-phase9.mts",
     "verify:s3": "tsx scripts/verify-s3.mts",
     "backup": "tsx scripts/backup.mts"
   },

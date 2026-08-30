@@ -32,9 +32,11 @@ export type Action =
   | 'creator:edit'
   | 'file:upload'
   | 'print:log'
+  | 'request:manage'
   // Personal, available to anyone signed in
   | 'list:manage'
   | 'like:toggle'
+  | 'request:create'
   // Operations
   | 'scan:trigger'
   | 'problem:resolve'
@@ -51,6 +53,12 @@ const MINIMUM: Record<Action, Role> = {
   'file:download': ROLES.viewer,
   'list:manage': ROLES.viewer,
   'like:toggle': ROLES.viewer,
+  /*
+   * Anyone signed in may ask for something to be printed — that is the whole
+   * point of the queue, and the person asking is usually the one with the
+   * least access. Working through it is 'request:manage' and needs a member.
+   */
+  'request:create': ROLES.viewer,
 
   'model:create': ROLES.member,
   'model:edit': ROLES.member,
@@ -60,6 +68,7 @@ const MINIMUM: Record<Action, Role> = {
   'creator:edit': ROLES.member,
   'file:upload': ROLES.member,
   'print:log': ROLES.member,
+  'request:manage': ROLES.member,
   'scan:trigger': ROLES.member,
   'problem:resolve': ROLES.member,
   'printhost:send': ROLES.member,
