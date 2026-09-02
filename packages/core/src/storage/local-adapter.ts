@@ -1,5 +1,15 @@
 import { createReadStream, type Stats } from 'node:fs'
-import { mkdir, opendir, rm, realpath, stat, writeFile } from 'node:fs/promises'
+import {
+  copyFile,
+  mkdir,
+  opendir,
+  rename,
+  rm,
+  realpath,
+  stat,
+  utimes,
+  writeFile,
+} from 'node:fs/promises'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -165,6 +175,43 @@ export class LocalAdapter implements StorageAdapter {
     await rm(absolute, { recursive: true, force: true })
   }
 
+  async move(from: string, to: string): Promise<void> {
+    this.assertWritable()
+    const source = await this.resolve(from, true)
+    const destination = await this.resolve(to)
+    await renameInto(source, destination)
+  }
+
+  /**
+   * Renames a file straight across from another local library.
+   *
+   * Worth the instanceof: two libraries on the same volume — a managed one and
+   * an in-place one under the same NAS mount is the ordinary case, not an
+   * exotic one — can hand a file over with a single `rename`, which costs the
+   * same for six bytes as for six gigabytes. Streaming it instead would read
+   * and rewrite every byte to end up with the identical result.
+   *
+   * Different volumes surface as EXDEV, which `renameInto` already falls back
+   * from; the copy it does then is no worse than the streaming path.
+   */
+  async adoptFrom(source: StorageAdapter, from: string, to: string): Promise<boolean> {
+    if (!(source instanceof LocalAdapter)) return false
+
+    this.assertWritable()
+    // The source gives the file up, so it has to be writable too. Checked here
+    // rather than left to the caller: this method is what actually removes it.
+    source.assertWritable()
+
+    // `private` is per-class in TypeScript, so another LocalAdapter's resolve
+    // is reachable here — and it is the right one to use, since containment is
+    // relative to ITS root, not this library's.
+    const absoluteSource = await source.resolve(from, true)
+    const absoluteDestination = await this.resolve(to)
+
+    await renameInto(absoluteSource, absoluteDestination)
+    return true
+  }
+
   async downloadUrl(relativePath: string): Promise<Delivery> {
     const absolute = await this.resolve(relativePath, true)
 
@@ -199,6 +246,38 @@ export class LocalAdapter implements StorageAdapter {
       return { ok: false, reason: describe(error, this.root) }
     }
   }
+}
+
+/**
+ * Renames a file to an absolute destination, falling back to a copy across
+ * filesystems.
+ *
+ * `rename` fails with EXDEV between two volumes — the exact shape of a move
+ * from a library on local disk to one on a NAS mount — and the fallback there
+ * has to preserve mtime explicitly. A copy gives the new file the current
+ * time, which a later scan reads as "this file changed", re-queueing analysis
+ * and a fresh thumbnail render for bytes that are identical to the ones
+ * already rendered.
+ */
+async function renameInto(source: string, destination: string): Promise<void> {
+  await mkdir(path.dirname(destination), { recursive: true })
+
+  try {
+    await rename(source, destination)
+    return
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error
+  }
+
+  const original = await stat(source)
+  await copyFile(source, destination)
+  await utimes(destination, original.atime, original.mtime)
+  /*
+   * Only once the copy is safely on the other volume. Removing it first would
+   * turn a failed copy into a lost file, which is the one outcome a move must
+   * never produce.
+   */
+  await rm(source, { force: true })
 }
 
 function isInside(root: string, candidate: string): boolean {

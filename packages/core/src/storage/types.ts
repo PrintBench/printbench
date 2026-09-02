@@ -70,6 +70,39 @@ export interface StorageAdapter {
   /** Rejects unless the library is writable. */
   remove(relativePath: string): Promise<void>
 
+  /**
+   * Moves one file to another path in the SAME library.
+   *
+   * File-level rather than folder-level on purpose. A local rename would move
+   * a whole directory in one call, but S3 has no directories to move — the
+   * "folder" is a shared key prefix — so a folder-level API would mean two
+   * genuinely different operations wearing one name. Callers that move a model
+   * already iterate its `model_files` rows, exactly as `deleteModelFiles`
+   * does, and get identical behaviour from both backends by doing so.
+   *
+   * Refuses to overwrite: a move onto an occupied path destroys whatever was
+   * there, and silently is not how that should happen.
+   *
+   * Rejects unless the library is writable.
+   */
+  move(from: string, to: string): Promise<void>
+
+  /**
+   * Fast-path a move from another library into this one.
+   *
+   * Both libraries can turn out to share a filesystem or a bucket, in which
+   * case the bytes never need to travel: a rename across two local roots on
+   * one volume is instant however large the file, and an S3 copy between two
+   * buckets on the same endpoint happens server-side. Neither is something
+   * `moveFile` can spot from outside, because doing so would mean reaching
+   * into an `fs` path or an S3 client from above this layer.
+   *
+   * Returns false when no fast path applies, leaving the caller to stream the
+   * bytes through this process. Implementing it is optional for that reason —
+   * an adapter without one is slower, never wrong.
+   */
+  adoptFrom?(source: StorageAdapter, from: string, to: string): Promise<boolean>
+
   downloadUrl(relativePath: string, filename?: string): Promise<Delivery>
 
   /** Root exists and is readable. Checked before every scan. */
@@ -92,6 +125,20 @@ export class ReadOnlyLibraryError extends Error {
         `enable writes explicitly if that is really intended.`,
     )
     this.name = 'ReadOnlyLibraryError'
+  }
+}
+
+/**
+ * Thrown when a move would land on a path that is already occupied.
+ *
+ * Overwriting is never the right default here: the destination is somebody
+ * else's model, and a move that quietly replaced it would be indistinguishable
+ * from data loss.
+ */
+export class DestinationExistsError extends Error {
+  constructor(path: string) {
+    super(`Something is already at ${path}`)
+    this.name = 'DestinationExistsError'
   }
 }
 

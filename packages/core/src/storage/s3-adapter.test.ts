@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { S3Adapter, describeS3Error } from './s3-adapter'
+import { describe, expect, it, vi } from 'vitest'
+import { CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
+import { S3Adapter, copySource, describeS3Error, sameEndpoint } from './s3-adapter'
 import { PathEscapeError, ReadOnlyLibraryError, StorageUnavailableError } from './types'
 import type { LibraryLocation } from './types'
 
@@ -116,6 +117,192 @@ describe('the read-only promise', () => {
     expect(() =>
       (adapter as unknown as { assertWritable: () => void }).assertWritable(),
     ).not.toThrow()
+  })
+})
+
+/**
+ * Moves, without a bucket.
+ *
+ * The client is stubbed so the commands the adapter builds can be inspected
+ * directly: which bucket each one names, and - the part that decides whether a
+ * move is a move or a duplication - that the delete goes to the SOURCE and
+ * happens after the copy.
+ */
+function stubClient(adapter: S3Adapter, contentLength = 1024) {
+  const sent: { name: string; input: Record<string, unknown> }[] = []
+  const send = vi.fn(async (command: unknown) => {
+    const name = (command as object).constructor.name
+    sent.push({ name, input: (command as { input: Record<string, unknown> }).input })
+    return name === 'HeadObjectCommand' ? { ContentLength: contentLength } : {}
+  })
+  ;(adapter as unknown as { client: { send: unknown } }).client = { send }
+  return sent
+}
+
+const managed = (extra: Partial<LibraryLocation> = {}) =>
+  new S3Adapter({ ...base, kind: 'managed', ...extra })
+
+describe('moving within one bucket', () => {
+  it('copies then deletes, in that order', async () => {
+    const adapter = managed()
+    const sent = stubClient(adapter)
+
+    await adapter.move('Dragon/body.stl', 'Dragons/Red/body.stl')
+
+    expect(sent.map((command) => command.name)).toEqual([
+      HeadObjectCommand.name,
+      CopyObjectCommand.name,
+      DeleteObjectCommand.name,
+    ])
+    expect(sent[1]!.input).toMatchObject({
+      Bucket: 'prints',
+      Key: 'models/Dragons/Red/body.stl',
+      CopySource: 'prints/models/Dragon/body.stl',
+    })
+    // The delete names the OLD key. Naming the new one deletes what was just
+    // copied and leaves the original - a move that achieves nothing, twice.
+    expect(sent[2]!.input).toMatchObject({ Bucket: 'prints', Key: 'models/Dragon/body.stl' })
+  })
+
+  it('does nothing at all when the destination is the source', async () => {
+    // Copy-then-delete onto the same key deletes the object outright. There is
+    // no rename to fall back on here, so the guard is the only thing stopping
+    // it.
+    const adapter = managed()
+    const sent = stubClient(adapter)
+
+    await adapter.move('Dragon/body.stl', 'Dragon/body.stl')
+
+    expect(sent).toEqual([])
+  })
+
+  it('streams an object too big for a single CopyObject', async () => {
+    const adapter = managed()
+    const sent = stubClient(adapter, 6 * 1024 * 1024 * 1024)
+    const write = vi.fn(async () => {})
+    Object.assign(adapter, { write, createReadStream: async () => 'stream' })
+
+    await adapter.move('Dragon/huge.stl', 'Dragon/moved.stl')
+
+    expect(sent.map((command) => command.name)).toEqual([
+      HeadObjectCommand.name,
+      DeleteObjectCommand.name,
+    ])
+    expect(write).toHaveBeenCalledOnce()
+  })
+
+  it('refuses a move out of a read-only library, before any request', async () => {
+    const adapter = new S3Adapter(base)
+    const sent = stubClient(adapter)
+    await expect(adapter.move('a.stl', 'b.stl')).rejects.toThrow(ReadOnlyLibraryError)
+    expect(sent).toEqual([])
+  })
+})
+
+describe('adopting from another S3 library', () => {
+  it('copies server-side across buckets on the same endpoint', async () => {
+    const destination = managed({ s3Bucket: 'archive', s3Prefix: null })
+    const source = managed({ s3Bucket: 'prints' })
+    const sent = stubClient(destination)
+    const sourceSent = stubClient(source)
+
+    expect(await destination.adoptFrom(source, 'Dragon/body.stl', 'Dragon/body.stl')).toBe(true)
+
+    expect(sent[1]!.input).toMatchObject({
+      Bucket: 'archive',
+      Key: 'Dragon/body.stl',
+      CopySource: 'prints/models/Dragon/body.stl',
+    })
+    // Deleted through the SOURCE's own client, which is the one holding its
+    // credentials - and from the source bucket, not the destination.
+    expect(sourceSent.at(-1)).toMatchObject({
+      name: DeleteObjectCommand.name,
+      input: { Bucket: 'prints', Key: 'models/Dragon/body.stl' },
+    })
+  })
+
+  it('declines a source on a different endpoint', async () => {
+    // One request, signed once, has to read both buckets. A different endpoint
+    // or key pair cannot - so say so and let the caller stream instead.
+    const destination = managed()
+    for (const elsewhere of [
+      { s3Endpoint: 'https://other.example' },
+      { s3Region: 'us-east-1' },
+      { s3AccessKeyId: 'someone-else' },
+    ]) {
+      const sent = stubClient(destination)
+      expect(await destination.adoptFrom(managed(elsewhere), 'a.stl', 'a.stl')).toBe(false)
+      expect(sent).toEqual([])
+    }
+  })
+
+  it('declines a local source', async () => {
+    const destination = managed()
+    const local = { library: { id: 'x', backend: 'local' } } as never
+    expect(await destination.adoptFrom(local, 'a.stl', 'a.stl')).toBe(false)
+  })
+
+  it('declines rather than copying when the object is too large', async () => {
+    const destination = managed({ s3Bucket: 'archive' })
+    stubClient(destination, 6 * 1024 * 1024 * 1024)
+    const source = managed()
+    const sourceSent = stubClient(source)
+
+    expect(await destination.adoptFrom(source, 'huge.stl', 'huge.stl')).toBe(false)
+    // Declining has to leave the source alone: the caller is about to stream
+    // it, and a source already deleted has nothing left to stream.
+    expect(sourceSent).toEqual([])
+  })
+
+  it('refuses when either library is read-only', async () => {
+    const readOnlyDestination = new S3Adapter(base)
+    await expect(readOnlyDestination.adoptFrom(managed(), 'a.stl', 'a.stl')).rejects.toThrow(
+      ReadOnlyLibraryError,
+    )
+
+    const destination = managed({ s3Bucket: 'archive' })
+    stubClient(destination)
+    await expect(destination.adoptFrom(new S3Adapter(base), 'a.stl', 'a.stl')).rejects.toThrow(
+      ReadOnlyLibraryError,
+    )
+  })
+})
+
+describe('copy sources', () => {
+  it('names the bucket and key', () => {
+    expect(copySource('prints', 'models/Dragon/body.stl')).toBe('prints/models/Dragon/body.stl')
+  })
+
+  /*
+   * CopySource is URL-decoded by S3. A raw "+" comes back as a space, so the
+   * copy fails with NoSuchKey for a file that is plainly sitting there - and
+   * "Dragon + Wings" is an entirely ordinary folder name.
+   */
+  it('encodes characters that would otherwise be decoded into something else', () => {
+    expect(copySource('prints', 'Dragon + Wings/body #2.stl')).toBe(
+      'prints/Dragon%20%2B%20Wings/body%20%232.stl',
+    )
+  })
+
+  it('leaves the separators alone, so the key still points at the same object', () => {
+    expect(copySource('prints', 'a/b/c.stl')).toBe('prints/a/b/c.stl')
+  })
+})
+
+describe('reachability with one set of credentials', () => {
+  it('accepts two libraries on the same endpoint, region and key', () => {
+    expect(sameEndpoint(base, { ...base, s3Bucket: 'other', s3Prefix: 'elsewhere' })).toBe(true)
+  })
+
+  it('treats an absent endpoint and a null one as the same', () => {
+    // "Not set" means AWS proper for both; they are the same place.
+    expect(sameEndpoint({ ...base, s3Endpoint: null }, { ...base })).toBe(true)
+  })
+
+  it('rejects a difference in any of the three', () => {
+    expect(sameEndpoint(base, { ...base, s3Endpoint: 'https://minio.local' })).toBe(false)
+    expect(sameEndpoint(base, { ...base, s3Region: 'us-east-1' })).toBe(false)
+    expect(sameEndpoint(base, { ...base, s3AccessKeyId: 'other' })).toBe(false)
   })
 })
 
