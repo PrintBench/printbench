@@ -178,6 +178,17 @@ describeDb('print history', () => {
           finishedAt: new Date('2026-08-01T09:00:00Z'),
         },
       ],
+      ['infill above one hundred percent', { modelId: MODEL_A, infillPercent: 101 }],
+      ['negative infill', { modelId: MODEL_A, infillPercent: -1 }],
+      ['an implausible wall count', { modelId: MODEL_A, wallCount: 500 }],
+      ['a nozzle temperature past any hot end', { modelId: MODEL_A, nozzleTempC: 900 }],
+      ['a negative bed temperature', { modelId: MODEL_A, bedTempC: -5 }],
+      ['a negative cost', { modelId: MODEL_A, filamentCost: -1 }],
+      [
+        'a nozzle type that is not one of ours',
+        { modelId: MODEL_A, nozzleType: 'chocolate' as never },
+      ],
+      ['an adhesion type that is not one of ours', { modelId: MODEL_A, adhesion: 'glue' as never }],
     ]
 
     for (const [label, entry] of invalid) {
@@ -236,6 +247,76 @@ describeDb('print history', () => {
       expect(run!.material).toBe('PETG')
       expect(run!.rating).toBe(3)
       expect(run!.notes).toBe('Warped a little at the corner.')
+    })
+
+    it('saves the settings the form has always shown but never stored', async () => {
+      /*
+       * Layer height, nozzle, colour and the start time were all editable in
+       * the UI and all silently discarded, because updatePrint listed the
+       * columns it would write by hand and had fallen behind the form.
+       */
+      const { id } = await logPrint(db, { modelId: MODEL_A, layerHeightMm: 0.3, nozzleMm: 0.4 })
+
+      await updatePrint(db, id, {
+        layerHeightMm: 0.12,
+        nozzleMm: 0.6,
+        colorHex: '#1a2b3c',
+        startedAt: new Date('2026-08-01T09:00:00Z'),
+      })
+
+      const [run] = await listPrints(db, { modelId: MODEL_A })
+      expect(run!.layerHeightMm).toBe(0.12)
+      expect(run!.nozzleMm).toBe(0.6)
+      expect(run!.colorHex).toBe('#1a2b3c')
+      expect(run!.startedAt?.toISOString()).toBe('2026-08-01T09:00:00.000Z')
+    })
+
+    it('round-trips every print profile field', async () => {
+      const { id } = await logPrint(db, {
+        modelId: MODEL_A,
+        nozzleType: 'hardened_steel',
+        filamentBrand: 'Prusament',
+        colorName: 'Galaxy Black',
+        filamentCost: 1.25,
+        infillPercent: 15,
+        wallCount: 3,
+        supports: true,
+        adhesion: 'brim',
+        nozzleTempC: 215,
+        bedTempC: 60,
+        slicerName: 'PrusaSlicer',
+        slicerVersion: '2.8.0',
+        slicerProfile: '0.20mm SPEED @MK4S',
+      })
+
+      const [run] = await listPrints(db, { modelId: MODEL_A })
+      expect(run!.id).toBe(id)
+      expect(run).toMatchObject({
+        nozzleType: 'hardened_steel',
+        filamentBrand: 'Prusament',
+        colorName: 'Galaxy Black',
+        filamentCost: 1.25,
+        infillPercent: 15,
+        wallCount: 3,
+        supports: true,
+        adhesion: 'brim',
+        nozzleTempC: 215,
+        bedTempC: 60,
+        slicerName: 'PrusaSlicer',
+        slicerVersion: '2.8.0',
+        slicerProfile: '0.20mm SPEED @MK4S',
+      })
+    })
+
+    it('keeps "no supports" apart from "not recorded"', async () => {
+      await logPrint(db, { modelId: MODEL_A, supports: false, notes: 'deliberate' })
+      await logPrint(db, { modelId: MODEL_B, notes: 'unknown' })
+
+      const [withoutSupports] = await listPrints(db, { modelId: MODEL_A })
+      const [unrecorded] = await listPrints(db, { modelId: MODEL_B })
+
+      expect(withoutSupports!.supports).toBe(false)
+      expect(unrecorded!.supports).toBeNull()
     })
 
     it('can clear a rating explicitly', async () => {
@@ -395,6 +476,15 @@ describeDb('print history', () => {
       expect(materials.indexOf('PLA')).toBeLessThan(materials.indexOf('PETG'))
       expect(materials).toContain('ABS')
       expect(printers).toContain('Bambu P1S')
+    })
+
+    it('offers filament brands too', async () => {
+      for (const brand of ['Prusament', 'Prusament', 'Polymaker']) {
+        await logPrint(db, { modelId: MODEL_A, filamentBrand: brand })
+      }
+
+      const { filamentBrands } = await printSuggestions(db)
+      expect(filamentBrands.indexOf('Prusament')).toBeLessThan(filamentBrands.indexOf('Polymaker'))
     })
   })
 

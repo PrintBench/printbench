@@ -52,6 +52,25 @@ export const problemSeverity = pgEnum('problem_severity', ['info', 'warning', 'd
 
 export const printStatus = pgEnum('print_status', ['in_progress', 'success', 'partial', 'failed'])
 
+/**
+ * What the nozzle is made of.
+ *
+ * Not the same question as its diameter, and the one people actually get wrong:
+ * an abrasive filament through a brass nozzle is the difference between a good
+ * print and a ruined hot end. `other` exists so an unusual nozzle is still
+ * recordable rather than silently dropped.
+ */
+export const nozzleType = pgEnum('nozzle_type', [
+  'brass',
+  'hardened_steel',
+  'ruby',
+  'tungsten_carbide',
+  'other',
+])
+
+/** First-layer adhesion aid. `none` is a real answer, distinct from unknown. */
+export const bedAdhesion = pgEnum('bed_adhesion', ['none', 'skirt', 'brim', 'raft'])
+
 export const printHostProtocol = pgEnum('print_host_protocol', [
   'octoprint',
   'moonraker',
