@@ -113,12 +113,18 @@ export function PrinterList({ hosts }: { hosts: PrintHostView[] }) {
       ) : (
         <div className="grid gap-3">
           {hosts.map((host) => (
-            <Card key={host.id}>
+            // min-w-0: without it the card is a grid item sized to its
+            // min-content, and a long printer name widens it past the screen.
+            <Card key={host.id} className="min-w-0">
               <CardContent className="flex flex-wrap items-center gap-3 p-4">
                 <Printer className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
 
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-sm font-medium">
+                {/* basis-40 gives the details a readable width to claim, so the
+                    buttons wrap below them on a phone instead of squeezing. */}
+                <div className="min-w-0 flex-1 basis-40">
+                  {/* Wraps so a descriptive printer name and its badges stack
+                      on a phone rather than running off the card. */}
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                     {host.name}
                     <Badge tone="neutral">
                       {PROTOCOLS.find((p) => p.value === host.protocol)?.label.split(' ')[0] ??

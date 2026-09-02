@@ -52,7 +52,10 @@ export default async function CreatorsPage() {
               <Link
                 key={creator.id}
                 href={`/creators/${creator.slug}` as Route}
-                className="block rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] transition-shadow hover:shadow-[var(--shadow-card)]"
+                // min-w-0: the name below truncates, but without this the card
+                // is a grid item sized to its min-content and a long studio
+                // name pushes the whole grid past the viewport.
+                className="block min-w-0 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] transition-shadow hover:shadow-[var(--shadow-card)]"
               >
                 <div className="flex items-center gap-3 p-4">
                   {creator.previewFileId ? (

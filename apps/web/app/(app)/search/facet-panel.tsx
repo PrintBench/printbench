@@ -61,7 +61,9 @@ export function FacetPanel({
     groups.some((group) => group.selected.length > 0) || toggles.some((toggle) => toggle.active)
 
   return (
-    <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+    // min-w-0: as a grid item this is sized to its min-content, and a long tag
+    // name in a facet row would otherwise widen it past a phone screen.
+    <aside className="min-w-0 space-y-6 lg:sticky lg:top-6 lg:self-start">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
           Filters
