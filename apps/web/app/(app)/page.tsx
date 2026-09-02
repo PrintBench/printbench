@@ -200,10 +200,17 @@ export default async function DashboardPage() {
                     ) : (
                       request.title
                     )}
-                    {request.quantity > 1 && (
-                      <span className="text-[var(--color-ink-faint)]"> × {request.quantity}</span>
-                    )}
                   </span>
+                  {/*
+                    Outside the truncating span: inside it, a long title ate the
+                    whole line and pushed the quantity off the screen, which is
+                    the one number that changes what you do about the request.
+                  */}
+                  {request.quantity > 1 && (
+                    <span className="shrink-0 text-sm text-[var(--color-ink-faint)]">
+                      × {request.quantity}
+                    </span>
+                  )}
 
                   {request.requestedBy && (
                     <span className="hidden shrink-0 text-xs text-[var(--color-ink-muted)] sm:inline">

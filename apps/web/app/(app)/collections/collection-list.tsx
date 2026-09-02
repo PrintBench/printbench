@@ -121,7 +121,10 @@ export function CollectionList({
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/collections/${collection.slug}` as Route}
-                    className="truncate text-sm font-medium hover:underline"
+                    // block: truncate needs a block box to clip and ellipsise —
+                    // left inline, a long name simply ran under the count and
+                    // off the edge of the card.
+                    className="block truncate text-sm font-medium hover:underline"
                   >
                     {collection.name}
                   </Link>

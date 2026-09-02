@@ -76,59 +76,70 @@ export default async function UsersPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--color-border)] text-left text-xs uppercase tracking-wider text-[var(--color-ink-faint)]">
-              <th className="px-4 py-2.5 font-medium">User</th>
-              <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Joined</th>
-              <th className="px-4 py-2.5 font-medium">Role</th>
-              <th className="px-4 py-2.5 text-right font-medium">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((row) => (
-              <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{row.name}</span>
-                    {row.id === admin!.id && <Badge tone="accent">You</Badge>}
-                    {row.banned && <Badge tone="danger">Suspended</Badge>}
-                  </div>
-                  <span className="text-xs text-[var(--color-ink-faint)]">{row.email}</span>
-                </td>
-                <td className="hidden px-4 py-3 text-[var(--color-ink-muted)] sm:table-cell">
-                  {DATE.format(row.createdAt)}
-                </td>
-                <td className="px-4 py-3">
-                  <RoleSelect
-                    userId={row.id}
-                    role={row.role}
-                    // Removing your own admin rights can lock everyone out of
-                    // the instance, so the control is disabled for yourself.
-                    disabled={row.id === admin!.id}
-                  />
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {/*
+        {/*
+          The card clips, so without a scroller of its own a table too wide for
+          the screen loses its right-hand columns entirely — on a phone that
+          hid the role control and the row actions with no way to reach them.
+        */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--color-border)] text-left text-xs uppercase tracking-wider text-[var(--color-ink-faint)]">
+                <th className="px-4 py-2.5 font-medium">User</th>
+                <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Joined</th>
+                <th className="px-4 py-2.5 font-medium">Role</th>
+                <th className="px-4 py-2.5 text-right font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((row) => (
+                <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0">
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{row.name}</span>
+                      {row.id === admin!.id && <Badge tone="accent">You</Badge>}
+                      {row.banned && <Badge tone="danger">Suspended</Badge>}
+                    </div>
+                    {/* break-all: an address has no break opportunity, and a long
+                      one would otherwise set the width of the whole table. */}
+                    <span className="break-all text-xs text-[var(--color-ink-faint)]">
+                      {row.email}
+                    </span>
+                  </td>
+                  <td className="hidden px-4 py-3 text-[var(--color-ink-muted)] sm:table-cell">
+                    {DATE.format(row.createdAt)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <RoleSelect
+                      userId={row.id}
+                      role={row.role}
+                      // Removing your own admin rights can lock everyone out of
+                      // the instance, so the control is disabled for yourself.
+                      disabled={row.id === admin!.id}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {/*
                     Nothing offered for your own account: suspending or
                     deleting yourself is a lockout with no way back through
                     the UI, and the server refuses both regardless.
                   */}
-                  {row.id !== admin!.id && (
-                    <UserActions
-                      userId={row.id}
-                      name={row.name}
-                      email={row.email}
-                      suspended={row.banned}
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    {row.id !== admin!.id && (
+                      <UserActions
+                        userId={row.id}
+                        name={row.name}
+                        email={row.email}
+                        suspended={row.banned}
+                      />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       <p className="mt-4 text-xs text-[var(--color-ink-faint)]">

@@ -377,7 +377,9 @@ export function ModelViewer({
             {phase === 'idle' && tooLarge && (
               <>
                 <Box className="size-6 text-[var(--color-ink-faint)]" />
-                <p className="max-w-xs text-sm text-[var(--color-ink-muted)]">
+                {/* break-words: the filename leads the sentence and a long one
+                    has no break opportunity to wrap on. */}
+                <p className="max-w-xs break-words text-sm text-[var(--color-ink-muted)]">
                   {filename} is {formatSize(fileSize)}. Loading a mesh this large can use a lot of
                   memory, so it is not opened automatically.
                 </p>

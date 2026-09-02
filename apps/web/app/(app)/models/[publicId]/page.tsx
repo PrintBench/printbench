@@ -212,7 +212,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           model.missing_at ? (
             <Badge tone="danger">Missing from disk</Badge>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Badge tone="neutral">
                 <FileStack className="size-3" />
                 {model.file_count} files · {formatBytes(Number(model.total_size))}
@@ -280,8 +280,15 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
         </Card>
       )}
 
+      {/*
+        min-w-0 on both columns: a grid item's automatic minimum size is its
+        min-content width, and a full path like
+        "presupported/dragon_knight_body_v3_final.stl" has no break opportunity
+        — without this the column grows to fit it and the page scrolls
+        sideways on a phone, however much the file rows truncate.
+      */}
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {viewable ? (
             <ModelViewer
               fileId={viewable.id}
@@ -324,14 +331,22 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                       key={file.id}
                       className={
                         file.missing_at
-                          ? 'flex items-center gap-3 px-4 py-2.5 opacity-50'
-                          : 'flex items-center gap-3 px-4 py-2.5'
+                          ? 'flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 opacity-50'
+                          : 'flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5'
                       }
                     >
                       <span className="w-10 shrink-0 rounded bg-[var(--color-surface-2)] px-1.5 py-0.5 text-center text-[10px] font-medium uppercase text-[var(--color-ink-faint)]">
                         {file.extension || '—'}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-sm" title={file.filename}>
+                      {/*
+                        A basis wide enough to be worth reading, so on a phone
+                        the badges and actions wrap to a second row instead of
+                        squeezing a long path down to a single letter.
+                      */}
+                      <span
+                        className="min-w-0 flex-1 basis-40 truncate text-sm"
+                        title={file.filename}
+                      >
                         {file.filename}
                       </span>
                       {file.presupported && <Badge tone="accent">supported</Badge>}
@@ -383,7 +398,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           />
         </div>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <Card>
             <CardContent className="space-y-3 p-4 text-sm">
               <div>

@@ -15,7 +15,14 @@ export function PageHeader({
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {description && <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {/*
+        The action row wraps rather than holding one line: on a phone a model
+        page can carry seven buttons, and shrink-0 would push them off the
+        right edge instead of letting them fall onto a second row.
+      */}
+      {actions && (
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{actions}</div>
+      )}
     </header>
   )
 }
