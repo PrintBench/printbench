@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CheckCircle2, CircleDashed, Loader2, XCircle } from 'lucide-react'
 import type { PrintStatus } from '@pb/core'
+import { NOZZLE_TYPE_LABELS, type NozzleType } from '@pb/core/prints'
 import { cn } from '@/lib/cn'
 
 /**
@@ -22,6 +23,10 @@ export interface TimelinePrint {
   colorHex: string | null
   layerHeightMm: number | null
   nozzleMm: number | null
+  nozzleType: NozzleType | null
+  filamentBrand: string | null
+  infillPercent: number | null
+  slicerProfile: string | null
   status: PrintStatus
   durationMin: number | null
   filamentUsedG: number | null
@@ -47,11 +52,21 @@ export function PrintTimeline({ prints }: { prints: TimelinePrint[] }) {
         const meta = STATUS_META[print.status]
         const Icon = meta.icon
 
+        // Same shape as the per-model row, so the two lists read alike.
+        const nozzle = [
+          print.nozzleMm != null && `${print.nozzleMm} mm`,
+          print.nozzleType && NOZZLE_TYPE_LABELS[print.nozzleType].toLowerCase(),
+        ]
+          .filter(Boolean)
+          .join(' ')
+
         const settings = [
           print.printerName,
-          print.material,
+          [print.filamentBrand, print.material].filter(Boolean).join(' '),
           print.layerHeightMm != null && `${print.layerHeightMm} mm layers`,
-          print.nozzleMm != null && `${print.nozzleMm} mm nozzle`,
+          nozzle && `${nozzle} nozzle`,
+          print.infillPercent != null && `${print.infillPercent}% infill`,
+          print.slicerProfile,
           print.durationMin != null && formatDuration(print.durationMin),
           print.filamentUsedG != null && formatGrams(print.filamentUsedG),
         ].filter(Boolean) as string[]

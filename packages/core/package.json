@@ -10,7 +10,8 @@
     "./policy": "./src/policy/policy.ts",
     "./requests": "./src/services/request-lines.ts",
     "./schedule": "./src/scan/schedule-presets.ts",
-    "./health": "./src/health/problem-kinds.ts"
+    "./health": "./src/health/problem-kinds.ts",
+    "./prints": "./src/services/print-fields.ts"
   },
   "scripts": {
     "build": "tsc --build",

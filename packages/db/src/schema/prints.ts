@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   numeric,
@@ -8,7 +9,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
-import { printHostProtocol, printStatus } from './enums'
+import { bedAdhesion, nozzleType, printHostProtocol, printStatus } from './enums'
 import { user } from './auth'
 
 /**
@@ -29,6 +30,29 @@ export const printRuns = pgTable(
     colorHex: text('color_hex'),
     layerHeightMm: numeric('layer_height_mm', { precision: 5, scale: 3 }),
     nozzleMm: numeric('nozzle_mm', { precision: 4, scale: 2 }),
+    /* Diameter and material are separate questions; only one of them ruins a hot end. */
+    nozzleType: nozzleType('nozzle_type'),
+
+    /* Which spool, and what it cost. Cost is a bare number: a self-hosted
+     * instance has one owner and therefore one currency. */
+    filamentBrand: text('filament_brand'),
+    colorName: text('color_name'),
+    filamentCost: numeric('filament_cost', { precision: 10, scale: 2 }),
+
+    /* What the slicer was asked to do. Every one of these is nullable because
+     * a print logged by hand legitimately does not know them, and a guessed
+     * value is worse than an empty one. */
+    infillPercent: smallint('infill_percent'),
+    wallCount: smallint('wall_count'),
+    /** Null is unknown; false is a deliberate "no supports". */
+    supports: boolean('supports'),
+    adhesion: bedAdhesion('adhesion'),
+    nozzleTempC: smallint('nozzle_temp_c'),
+    bedTempC: smallint('bed_temp_c'),
+    slicerName: text('slicer_name'),
+    slicerVersion: text('slicer_version'),
+    /** The named profile inside the slicer, e.g. "0.20mm Standard @BBL X1C". */
+    slicerProfile: text('slicer_profile'),
 
     status: printStatus('status').notNull().default('success'),
     startedAt: timestamp('started_at', { withTimezone: true }),

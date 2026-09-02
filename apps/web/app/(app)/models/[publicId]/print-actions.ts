@@ -7,13 +7,20 @@ import {
   PolicyError,
   PrintValidationError,
   assertCan,
+  createStorageAdapter,
   deletePrint,
+  isParsableSlicerFile,
+  libraryLocationFromRow,
   logPrint,
   printBelongsToModel,
+  readGcodeMetadata,
   signToken,
   slicerUrl,
   slicersFor,
   updatePrint,
+  type BedAdhesion,
+  type GcodeMetadata,
+  type NozzleType,
   type PrintEntry,
   type PrintStatus,
 } from '@pb/core'
@@ -30,6 +37,19 @@ export interface PrintFormInput {
   colorHex?: string | null
   layerHeightMm?: number | null
   nozzleMm?: number | null
+  nozzleType?: NozzleType | null
+  filamentBrand?: string | null
+  colorName?: string | null
+  filamentCost?: number | null
+  infillPercent?: number | null
+  wallCount?: number | null
+  supports?: boolean | null
+  adhesion?: BedAdhesion | null
+  nozzleTempC?: number | null
+  bedTempC?: number | null
+  slicerName?: string | null
+  slicerVersion?: string | null
+  slicerProfile?: string | null
   status?: PrintStatus
   startedAt?: string | null
   finishedAt?: string | null
@@ -47,6 +67,19 @@ function toEntry(input: PrintFormInput): Omit<PrintEntry, 'modelId'> {
     colorHex: input.colorHex ?? null,
     layerHeightMm: input.layerHeightMm ?? null,
     nozzleMm: input.nozzleMm ?? null,
+    nozzleType: input.nozzleType ?? null,
+    filamentBrand: input.filamentBrand ?? null,
+    colorName: input.colorName ?? null,
+    filamentCost: input.filamentCost ?? null,
+    infillPercent: input.infillPercent ?? null,
+    wallCount: input.wallCount ?? null,
+    supports: input.supports ?? null,
+    adhesion: input.adhesion ?? null,
+    nozzleTempC: input.nozzleTempC ?? null,
+    bedTempC: input.bedTempC ?? null,
+    slicerName: input.slicerName ?? null,
+    slicerVersion: input.slicerVersion ?? null,
+    slicerProfile: input.slicerProfile ?? null,
     status: input.status ?? 'success',
     startedAt: input.startedAt ? new Date(input.startedAt) : null,
     finishedAt: input.finishedAt ? new Date(input.finishedAt) : null,
@@ -134,6 +167,76 @@ export async function removePrint(publicId: string, printId: string): Promise<Re
     return { ok: true }
   } catch (error) {
     return { ok: false, error: describe(error, 'Could not delete the print.') }
+  }
+}
+
+type SlicerSettings =
+  { ok: true; settings: GcodeMetadata; filename: string } | { ok: false; error: string }
+
+/**
+ * Reads the print settings a slicer left in a G-code file.
+ *
+ * The settings are already in the folder — the nozzle, the layer height, the
+ * filament, the estimated time — so the log-a-print form offers to fill itself
+ * in rather than asking someone to copy them across by hand.
+ *
+ * Scoped to the model in the URL like every other action here: the file id comes
+ * from the client, so without the ownership check this would read a file out of
+ * any library the caller could guess an id for.
+ */
+export async function readSlicerSettings(
+  publicId: string,
+  fileId: string,
+): Promise<SlicerSettings> {
+  try {
+    const user = await requireUser()
+    assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'print:log')
+
+    const db = getDb()
+    const rows = await db
+      .select({
+        file: schema.modelFiles,
+        model: schema.models,
+        library: schema.libraries,
+      })
+      .from(schema.modelFiles)
+      .innerJoin(schema.models, eq(schema.models.id, schema.modelFiles.modelId))
+      .innerJoin(schema.libraries, eq(schema.libraries.id, schema.models.libraryId))
+      .where(eq(schema.modelFiles.id, fileId))
+      .limit(1)
+
+    const row = rows[0]
+    if (!row) return { ok: false, error: 'That file no longer exists.' }
+    if (row.model.publicId !== publicId) {
+      return { ok: false, error: 'That file does not belong to this model.' }
+    }
+    if (row.file.missingAt) return { ok: false, error: 'That file is missing from disk.' }
+
+    /*
+     * Refused rather than attempted for anything else. .3mf project files carry
+     * the same settings and are a reasonable next step, but reading them means
+     * unzipping a second format family; .bgcode is compressed binary. Saying so
+     * is better than returning an empty result that reads as "no settings found".
+     */
+    if (!isParsableSlicerFile(row.file.extension)) {
+      return { ok: false, error: 'Settings can only be read from plain .gcode files.' }
+    }
+
+    // A model that is a single loose file has no folder of its own.
+    const relativePath = row.model.isFileModel
+      ? row.model.path
+      : `${row.model.path}/${row.file.filename}`
+
+    const storage = createStorageAdapter(libraryLocationFromRow(row.library))
+    const settings = await readGcodeMetadata(storage, relativePath, row.file.size)
+
+    if (Object.keys(settings).length === 0) {
+      return { ok: false, error: 'No settings found in that file.' }
+    }
+
+    return { ok: true, settings, filename: row.file.filename }
+  } catch (error) {
+    return { ok: false, error: describe(error, 'Could not read that file.') }
   }
 }
 

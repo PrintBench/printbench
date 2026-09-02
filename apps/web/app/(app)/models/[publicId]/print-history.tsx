@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CheckCircle2,
@@ -12,14 +12,33 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react'
-import type { PrintStatus } from '@pb/core'
+import type { GcodeMetadata, PrintStatus } from '@pb/core'
+/*
+ * Values come from the leaf export, not the package barrel. This is a client
+ * component, and importing a runtime value from '@pb/core' pulls fs, pg and the
+ * S3 client into the browser bundle with it.
+ */
+import {
+  BED_ADHESIONS,
+  BED_ADHESION_LABELS,
+  NOZZLE_TYPES,
+  NOZZLE_TYPE_LABELS,
+  type BedAdhesion,
+  type NozzleType,
+} from '@pb/core/prints'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/cn'
-import { editPrint, recordPrint, removePrint, type PrintFormInput } from './print-actions'
+import {
+  editPrint,
+  readSlicerSettings,
+  recordPrint,
+  removePrint,
+  type PrintFormInput,
+} from './print-actions'
 
 /**
  * Print history for one model.
@@ -39,6 +58,19 @@ export interface PrintRunView {
   colorHex: string | null
   layerHeightMm: number | null
   nozzleMm: number | null
+  nozzleType: NozzleType | null
+  filamentBrand: string | null
+  colorName: string | null
+  filamentCost: number | null
+  infillPercent: number | null
+  wallCount: number | null
+  supports: boolean | null
+  adhesion: BedAdhesion | null
+  nozzleTempC: number | null
+  bedTempC: number | null
+  slicerName: string | null
+  slicerVersion: string | null
+  slicerProfile: string | null
   status: PrintStatus
   startedAt: string | null
   finishedAt: string | null
@@ -64,7 +96,7 @@ interface Props {
   prints: PrintRunView[]
   stats: PrintStatsView
   files: { id: string; filename: string }[]
-  suggestions: { materials: string[]; printers: string[] }
+  suggestions: { materials: string[]; printers: string[]; filamentBrands: string[] }
   canLog: boolean
 }
 
@@ -141,6 +173,7 @@ export function PrintHistory({ publicId, prints, stats, files, suggestions, canL
           <CardContent className="p-4">
             <PrintForm
               key={editing?.id ?? 'new'}
+              publicId={publicId}
               initial={editing}
               files={files}
               suggestions={suggestions}
@@ -216,13 +249,45 @@ function PrintRow({
   const meta = STATUS_META[print.status]
   const Icon = meta.icon
 
+  /*
+   * Diameter and material read as one thing — "0.4 mm hardened steel nozzle" —
+   * because that is how anyone says it out loud, and either half alone is only
+   * half an answer about whether an abrasive filament was safe to run.
+   */
+  const nozzle = [
+    print.nozzleMm != null && `${print.nozzleMm} mm`,
+    print.nozzleType && NOZZLE_TYPE_LABELS[print.nozzleType].toLowerCase(),
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const filament = [print.filamentBrand, print.material].filter(Boolean).join(' ')
+
+  // The headline: what it ran on, and what it cost in time and plastic.
   const settings = [
     print.printerName,
-    print.material,
+    filament,
     print.layerHeightMm != null && `${print.layerHeightMm} mm layers`,
-    print.nozzleMm != null && `${print.nozzleMm} mm nozzle`,
+    nozzle && `${nozzle} nozzle`,
+    print.infillPercent != null && `${print.infillPercent}% infill`,
     print.durationMin != null && formatDuration(print.durationMin),
     print.filamentUsedG != null && formatGrams(print.filamentUsedG),
+  ].filter(Boolean) as string[]
+
+  /*
+   * A second, quieter line rather than a longer first one. These are the details
+   * you go looking for when reproducing a print, not the ones you scan a list
+   * for, and folding them into the line above buries the outcome.
+   */
+  const detail = [
+    print.wallCount != null && `${print.wallCount} walls`,
+    print.supports != null && (print.supports ? 'supports' : 'no supports'),
+    print.adhesion && BED_ADHESION_LABELS[print.adhesion].toLowerCase(),
+    print.nozzleTempC != null && `${print.nozzleTempC}/${print.bedTempC ?? '—'} °C`,
+    print.colorName,
+    print.filamentCost != null && `costs ${print.filamentCost.toFixed(2)}`,
+    print.slicerProfile,
+    [print.slicerName, print.slicerVersion].filter(Boolean).join(' '),
   ].filter(Boolean) as string[]
 
   return (
@@ -254,6 +319,9 @@ function PrintRow({
 
         {settings.length > 0 && (
           <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{settings.join(' · ')}</p>
+        )}
+        {detail.length > 0 && (
+          <p className="mt-0.5 text-xs text-[var(--color-ink-faint)]">{detail.join(' · ')}</p>
         )}
         {print.filename && (
           <p className="mt-0.5 truncate font-mono text-xs text-[var(--color-ink-faint)]">
@@ -304,6 +372,7 @@ function Rating({ value }: { value: number }) {
 }
 
 function PrintForm({
+  publicId,
   initial,
   files,
   suggestions,
@@ -312,9 +381,10 @@ function PrintForm({
   onCancel,
   onSubmit,
 }: {
+  publicId: string
   initial: PrintRunView | null
   files: { id: string; filename: string }[]
-  suggestions: { materials: string[]; printers: string[] }
+  suggestions: { materials: string[]; printers: string[]; filamentBrands: string[] }
   pending: boolean
   error: string | null
   onCancel: () => void
@@ -338,6 +408,89 @@ function PrintForm({
   const [rating, setRating] = useState<number | null>(initial?.rating ?? null)
   const [notes, setNotes] = useState(initial?.notes ?? '')
 
+  const [nozzleType, setNozzleType] = useState<NozzleType | ''>(initial?.nozzleType ?? '')
+  const [filamentBrand, setFilamentBrand] = useState(initial?.filamentBrand ?? '')
+  const [colorName, setColorName] = useState(initial?.colorName ?? '')
+  const [cost, setCost] = useState(initial?.filamentCost?.toString() ?? '')
+  const [infill, setInfill] = useState(initial?.infillPercent?.toString() ?? '')
+  const [walls, setWalls] = useState(initial?.wallCount?.toString() ?? '')
+  // Three states, not a checkbox: unknown is not the same answer as "no".
+  const [supports, setSupports] = useState<'' | 'yes' | 'no'>(
+    initial?.supports == null ? '' : initial.supports ? 'yes' : 'no',
+  )
+  const [adhesion, setAdhesion] = useState<BedAdhesion | ''>(initial?.adhesion ?? '')
+  const [nozzleTemp, setNozzleTemp] = useState(initial?.nozzleTempC?.toString() ?? '')
+  const [bedTemp, setBedTemp] = useState(initial?.bedTempC?.toString() ?? '')
+  const [slicerName, setSlicerName] = useState(initial?.slicerName ?? '')
+  const [slicerVersion, setSlicerVersion] = useState(initial?.slicerVersion ?? '')
+  const [slicerProfile, setSlicerProfile] = useState(initial?.slicerProfile ?? '')
+
+  const [reading, setReading] = useState(false)
+  const [filledFrom, setFilledFrom] = useState<string | null>(null)
+
+  /*
+   * The values the form started with, so autofill can tell a suggestion it
+   * pre-populated from something the user actually typed. Printer and material
+   * open pre-filled from the most-used past value, and a sliced file naming a
+   * different printer should win over that guess — but never over a real edit.
+   */
+  const opening = useRef({ printerName, material })
+
+  /** Fills a field from the file, unless the user has already answered it. */
+  function fill(current: string, opened: string, set: (value: string) => void, value?: unknown) {
+    if (value == null || value === '') return
+    if (current !== '' && current !== opened) return
+    set(String(value))
+  }
+
+  function applySettings(parsed: GcodeMetadata) {
+    fill(printerName, opening.current.printerName, setPrinterName, parsed.printerName)
+    fill(material, opening.current.material, setMaterial, parsed.material)
+    fill(colorHex, '', setColorHex, parsed.colorHex)
+    fill(layerHeight, '', setLayerHeight, parsed.layerHeightMm)
+    fill(nozzle, '', setNozzle, parsed.nozzleMm)
+    fill(duration, '', setDuration, parsed.durationMin)
+    fill(filament, '', setFilament, parsed.filamentUsedG)
+    fill(filamentBrand, '', setFilamentBrand, parsed.filamentBrand)
+    fill(cost, '', setCost, parsed.filamentCost)
+    fill(infill, '', setInfill, parsed.infillPercent)
+    fill(walls, '', setWalls, parsed.wallCount)
+    fill(nozzleTemp, '', setNozzleTemp, parsed.nozzleTempC)
+    fill(bedTemp, '', setBedTemp, parsed.bedTempC)
+    fill(slicerName, '', setSlicerName, parsed.slicerName)
+    fill(slicerVersion, '', setSlicerVersion, parsed.slicerVersion)
+    fill(slicerProfile, '', setSlicerProfile, parsed.slicerProfile)
+
+    if (nozzleType === '' && parsed.nozzleType) setNozzleType(parsed.nozzleType)
+    if (adhesion === '' && parsed.adhesion) setAdhesion(parsed.adhesion)
+    if (supports === '' && parsed.supports != null) setSupports(parsed.supports ? 'yes' : 'no')
+  }
+
+  /**
+   * Picking a sliced file offers to fill the form in from it.
+   *
+   * Silent when it finds nothing. This is a convenience on the way past — the
+   * form works exactly as it did before — so a file with no readable settings
+   * should cost a moment, not an error message about something the user was not
+   * asking for.
+   */
+  function chooseFile(id: string) {
+    setModelFileId(id)
+    setFilledFrom(null)
+
+    const file = files.find((entry) => entry.id === id)
+    if (!file || !isGcodeName(file.filename)) return
+
+    setReading(true)
+    void readSlicerSettings(publicId, id)
+      .then((result) => {
+        if (!result.ok) return
+        applySettings(result.settings)
+        setFilledFrom(result.filename)
+      })
+      .finally(() => setReading(false))
+  }
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     onSubmit({
@@ -347,6 +500,19 @@ function PrintForm({
       colorHex: colorHex || null,
       layerHeightMm: numberOrNull(layerHeight),
       nozzleMm: numberOrNull(nozzle),
+      nozzleType: nozzleType || null,
+      filamentBrand: filamentBrand || null,
+      colorName: colorName || null,
+      filamentCost: numberOrNull(cost),
+      infillPercent: numberOrNull(infill),
+      wallCount: numberOrNull(walls),
+      supports: supports === '' ? null : supports === 'yes',
+      adhesion: adhesion || null,
+      nozzleTempC: numberOrNull(nozzleTemp),
+      bedTempC: numberOrNull(bedTemp),
+      slicerName: slicerName || null,
+      slicerVersion: slicerVersion || null,
+      slicerProfile: slicerProfile || null,
       status,
       startedAt: startedAt ? new Date(startedAt).toISOString() : null,
       finishedAt: finishedAt ? new Date(finishedAt).toISOString() : null,
@@ -371,8 +537,12 @@ function PrintForm({
         </Field>
 
         {files.length > 0 && (
-          <Field label="File printed" htmlFor="print-file" hint="Optional">
-            <Select value={modelFileId} onChange={(e) => setModelFileId(e.target.value)}>
+          <Field
+            label="File printed"
+            htmlFor="print-file"
+            hint={reading ? 'Reading settings…' : 'Fills the settings in, for a .gcode file'}
+          >
+            <Select value={modelFileId} onChange={(e) => chooseFile(e.target.value)}>
               <option value="">Not recorded</option>
               {files.map((file) => (
                 <option key={file.id} value={file.id}>
@@ -464,6 +634,22 @@ function PrintForm({
           />
         </Field>
 
+        {/* In the main grid rather than behind a section: it is the one setting
+            that decides whether an abrasive filament ruins the hot end. */}
+        <Field label="Nozzle type" htmlFor="print-nozzle-type">
+          <Select
+            value={nozzleType}
+            onChange={(e) => setNozzleType(e.target.value as NozzleType | '')}
+          >
+            <option value="">Not recorded</option>
+            {NOZZLE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {NOZZLE_TYPE_LABELS[type]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
         <Field label="Started" htmlFor="print-started">
           <Input
             type="datetime-local"
@@ -533,6 +719,153 @@ function PrintForm({
         </div>
       </div>
 
+      {filledFrom && (
+        <p className="text-xs text-[var(--color-ink-muted)]">
+          Filled in from <span className="font-mono">{filledFrom}</span>. Anything you had already
+          typed was left alone.
+        </p>
+      )}
+
+      {/*
+       * Native <details>, not a modal or a third-party disclosure. It is
+       * keyboard accessible for free, it prints and it survives with JavaScript
+       * off — and this file already avoids dialogs on purpose.
+       */}
+      <details className="rounded-[var(--radius-control)] border border-[var(--color-border)]">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Filament details</summary>
+        <div className="grid gap-3 border-t border-[var(--color-border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Brand" htmlFor="print-brand">
+            <Input
+              list="brand-suggestions"
+              value={filamentBrand}
+              onChange={(e) => setFilamentBrand(e.target.value)}
+              placeholder="Prusament"
+            />
+          </Field>
+          <datalist id="brand-suggestions">
+            {suggestions.filamentBrands.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+
+          <Field label="Colour name" htmlFor="print-colour-name">
+            <Input
+              value={colorName}
+              onChange={(e) => setColorName(e.target.value)}
+              placeholder="Galaxy Black"
+            />
+          </Field>
+
+          <Field label="Cost" htmlFor="print-cost" hint="What this print used, not the spool">
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+            />
+          </Field>
+        </div>
+      </details>
+
+      <details className="rounded-[var(--radius-control)] border border-[var(--color-border)]">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Slicer settings</summary>
+        <div className="grid gap-3 border-t border-[var(--color-border)] p-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Infill (%)" htmlFor="print-infill">
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              value={infill}
+              onChange={(e) => setInfill(e.target.value)}
+              placeholder="15"
+            />
+          </Field>
+
+          <Field label="Walls" htmlFor="print-walls">
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              value={walls}
+              onChange={(e) => setWalls(e.target.value)}
+              placeholder="3"
+            />
+          </Field>
+
+          <Field label="Supports" htmlFor="print-supports">
+            <Select
+              value={supports}
+              onChange={(e) => setSupports(e.target.value as '' | 'yes' | 'no')}
+            >
+              <option value="">Not recorded</option>
+              <option value="yes">Used supports</option>
+              <option value="no">No supports</option>
+            </Select>
+          </Field>
+
+          <Field label="Bed adhesion" htmlFor="print-adhesion">
+            <Select
+              value={adhesion}
+              onChange={(e) => setAdhesion(e.target.value as BedAdhesion | '')}
+            >
+              <option value="">Not recorded</option>
+              {BED_ADHESIONS.map((type) => (
+                <option key={type} value={type}>
+                  {BED_ADHESION_LABELS[type]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Nozzle temp (°C)" htmlFor="print-nozzle-temp">
+            <Input
+              type="number"
+              min="0"
+              max="500"
+              value={nozzleTemp}
+              onChange={(e) => setNozzleTemp(e.target.value)}
+              placeholder="215"
+            />
+          </Field>
+
+          <Field label="Bed temp (°C)" htmlFor="print-bed-temp">
+            <Input
+              type="number"
+              min="0"
+              max="500"
+              value={bedTemp}
+              onChange={(e) => setBedTemp(e.target.value)}
+              placeholder="60"
+            />
+          </Field>
+
+          <Field label="Slicer" htmlFor="print-slicer">
+            <Input
+              value={slicerName}
+              onChange={(e) => setSlicerName(e.target.value)}
+              placeholder="PrusaSlicer"
+            />
+          </Field>
+
+          <Field label="Slicer version" htmlFor="print-slicer-version">
+            <Input
+              value={slicerVersion}
+              onChange={(e) => setSlicerVersion(e.target.value)}
+              placeholder="2.8.0"
+            />
+          </Field>
+
+          <Field label="Profile" htmlFor="print-profile" hint="The named preset in the slicer">
+            <Input
+              value={slicerProfile}
+              onChange={(e) => setSlicerProfile(e.target.value)}
+              placeholder="0.20mm SPEED @MK4S"
+            />
+          </Field>
+        </div>
+      </details>
+
       <Field label="Notes" htmlFor="print-notes" hint="Anything worth knowing next time">
         <textarea
           id="print-notes"
@@ -561,6 +894,17 @@ function PrintForm({
 
 function findFile(files: { id: string; filename: string }[], print: PrintRunView): string {
   return files.find((file) => file.filename === print.filename)?.id ?? ''
+}
+
+/**
+ * Whether picking this file is worth a round-trip.
+ *
+ * Checked here as well as on the server so choosing an STL does not fire a
+ * request that can only come back "not a sliced file". Kept in step with
+ * isParsableSlicerFile in the core service, which is the one that decides.
+ */
+function isGcodeName(filename: string): boolean {
+  return /\.(gcode|gco|g|ngc)$/i.test(filename)
 }
 
 function numberOrNull(value: string): number | null {
