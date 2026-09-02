@@ -1,5 +1,6 @@
 import type { Readable } from 'node:stream'
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
@@ -53,6 +54,16 @@ import { isSafeRelativePath, normalizePath } from '../library/paths'
  */
 const MULTIPART_PART_BYTES = 8 * 1024 * 1024
 const MULTIPART_CONCURRENCY = 4
+
+/**
+ * The hard ceiling on a single CopyObject.
+ *
+ * Past this an object can still be copied server-side, but only by driving a
+ * multipart UploadPartCopy by hand. Both move paths below fall back to
+ * streaming the bytes through this process instead — slower, and reached only
+ * by an object bigger than the upload endpoint will accept in the first place.
+ */
+const COPY_OBJECT_MAX_BYTES = 5 * 1024 * 1024 * 1024
 export class S3Adapter implements StorageAdapter {
   readonly library: LibraryLocation
   private readonly client: S3Client
@@ -256,6 +267,84 @@ export class S3Adapter implements StorageAdapter {
   }
 
   /**
+   * Moves an object within this bucket.
+   *
+   * S3 has no rename: a move is a copy followed by a delete, and the copy is
+   * server-side, so no bytes reach this process. The delete is what makes it a
+   * move rather than a duplication, and it comes second deliberately — a
+   * failure between the two leaves two copies, which is recoverable, where the
+   * other order would leave none.
+   */
+  async move(from: string, to: string): Promise<void> {
+    this.assertWritable()
+    const sourceKey = this.keyFor(from)
+    const destinationKey = this.keyFor(to)
+    if (sourceKey === destinationKey) return
+
+    const copied = await this.copyWithin(this.bucket, sourceKey, destinationKey)
+    if (!copied) {
+      // Too large for a single CopyObject. `write` does a multipart upload, so
+      // peak memory stays bounded however big the object is.
+      await this.write(to, await this.createReadStream(from))
+    }
+
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: sourceKey }))
+  }
+
+  /**
+   * Copies straight out of another S3 library's bucket, server-side.
+   *
+   * Only possible when the other library is reachable with THESE credentials
+   * against the same endpoint and region — a copy names the source bucket in a
+   * request signed for the destination, so one client has to be able to read
+   * both. Two libraries on unrelated providers fail that test and the bytes go
+   * the long way round, through this process.
+   */
+  async adoptFrom(source: StorageAdapter, from: string, to: string): Promise<boolean> {
+    if (!(source instanceof S3Adapter)) return false
+    if (!sameEndpoint(source.library, this.library)) return false
+
+    this.assertWritable()
+    // The source has to give the object up, and this is what deletes it.
+    source.assertWritable()
+
+    const sourceKey = source.keyFor(from)
+    const copied = await this.copyWithin(source.bucket, sourceKey, this.keyFor(to))
+    if (!copied) return false
+
+    await source.client.send(new DeleteObjectCommand({ Bucket: source.bucket, Key: sourceKey }))
+    return true
+  }
+
+  /**
+   * Server-side copy, or false when the object is too big for one.
+   *
+   * The size check is a HEAD rather than a hopeful attempt: an oversized
+   * CopyObject fails with InvalidRequest, which is indistinguishable from
+   * several unrelated mistakes and would send a genuine misconfiguration down
+   * the streaming fallback to fail again more slowly.
+   */
+  private async copyWithin(
+    sourceBucket: string,
+    sourceKey: string,
+    destinationKey: string,
+  ): Promise<boolean> {
+    const head = await this.client.send(
+      new HeadObjectCommand({ Bucket: sourceBucket, Key: sourceKey }),
+    )
+    if ((head.ContentLength ?? 0) > COPY_OBJECT_MAX_BYTES) return false
+
+    await this.client.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        Key: destinationKey,
+        CopySource: copySource(sourceBucket, sourceKey),
+      }),
+    )
+    return true
+  }
+
+  /**
    * A presigned URL, so the bytes never pass through this process.
    *
    * This is the reason S3 is worth supporting for a large library: a
@@ -315,6 +404,34 @@ export class S3Adapter implements StorageAdapter {
   destroy(): void {
     this.client.destroy()
   }
+}
+
+/**
+ * A `bucket/key` reference for CopyObject, URL-encoded.
+ *
+ * Encoded per segment rather than wholesale, so the separators survive. It
+ * matters more than it looks: a key like "Dragon +Wings/body.stl" sent raw is
+ * read back with the plus as a space, and the copy fails with NoSuchKey for a
+ * file that is plainly there.
+ */
+export function copySource(bucket: string, key: string): string {
+  return `${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`
+}
+
+/**
+ * Whether one client's credentials can reach both libraries.
+ *
+ * A cross-bucket copy is signed once, for the destination, and names the
+ * source bucket inside it — so the same key pair has to be good for both. The
+ * region and endpoint have to match for the same reason: the request only goes
+ * to one of them.
+ */
+export function sameEndpoint(a: LibraryLocation, b: LibraryLocation): boolean {
+  return (
+    (a.s3Endpoint ?? null) === (b.s3Endpoint ?? null) &&
+    (a.s3Region ?? null) === (b.s3Region ?? null) &&
+    (a.s3AccessKeyId ?? null) === (b.s3AccessKeyId ?? null)
+  )
 }
 
 function isNotFound(error: unknown): boolean {

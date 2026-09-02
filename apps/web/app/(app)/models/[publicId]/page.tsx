@@ -32,6 +32,7 @@ import { SendToPrinter } from './send-to-printer'
 import { PrintHistory } from './print-history'
 import { ShareButton } from './share-button'
 import { DeleteButton } from './delete-button'
+import { MoveButton } from './move-button'
 import { LikeButton } from './like-button'
 import { CollectionPicker } from './collection-picker'
 import { QueueButton } from './queue-button'
@@ -238,6 +239,13 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   publicId={model.public_id}
                   shared={model.share_token != null}
                   shareUrl={model.share_token ? `${appOrigin}/share/${model.share_token}` : null}
+                />
+              )}
+              {canEdit && (
+                <MoveButton
+                  publicId={model.public_id}
+                  name={model.name}
+                  libraryName={model.library_name}
                 />
               )}
               {can(policyUser, 'model:delete') && (

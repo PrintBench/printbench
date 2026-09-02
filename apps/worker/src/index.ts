@@ -14,6 +14,7 @@ import { loadRootEnv } from '@pb/core'
 import { createDb } from '@pb/db'
 import { JOB, getQueue } from '@pb/jobs'
 import { handleLibraryScan } from './jobs/scan'
+import { handleModelMove } from './jobs/move'
 import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs/analyze'
 import { handleHealthDetect } from './jobs/health'
 import { handleMaintArchive, handleMaintReconcile } from './jobs/maintenance'
@@ -93,6 +94,7 @@ async function main(): Promise<void> {
   console.log('[worker] job queue ready')
 
   await queue.work(JOB.libraryScan, handleLibraryScan)
+  await queue.work(JOB.modelMove, handleModelMove)
   await queue.work(JOB.fileAnalyze, handleFileAnalyze)
   await queue.work(JOB.fileThumbnail, handleFileThumbnail)
   await queue.work(JOB.fileDigest, handleFileDigest)
@@ -101,7 +103,7 @@ async function main(): Promise<void> {
   await queue.work(JOB.maintArchive, handleMaintArchive)
   await queue.work(JOB.scheduleSweep, handleScheduleSweep)
   console.log(
-    '[worker] handlers: library.scan, file.analyze, file.thumbnail, file.digest, ' +
+    '[worker] handlers: library.scan, model.move, file.analyze, file.thumbnail, file.digest, ' +
       'health.detect, library.schedule, maint.reconcile, maint.archive',
   )
 
