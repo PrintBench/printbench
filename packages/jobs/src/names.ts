@@ -11,6 +11,7 @@ import { z } from 'zod'
 export const JOB = {
   libraryScan: 'library.scan',
   modelIndex: 'model.index',
+  modelMove: 'model.move',
   fileDigest: 'file.digest',
   fileAnalyze: 'file.analyze',
   fileThumbnail: 'file.thumbnail',
@@ -31,6 +32,12 @@ export const payloads = {
     force: z.boolean().default(false),
   }),
   [JOB.modelIndex]: z.object({ modelId: z.string().uuid() }),
+  [JOB.modelMove]: z.object({
+    modelId: z.string().uuid(),
+    destinationLibraryId: z.string().uuid(),
+    /** Absent means keep the path it already had. */
+    destinationPath: z.string().max(1000).optional(),
+  }),
   [JOB.fileDigest]: z.object({ fileId: z.string().uuid() }),
   [JOB.fileAnalyze]: z.object({ fileId: z.string().uuid() }),
   [JOB.fileThumbnail]: z.object({ fileId: z.string().uuid() }),
@@ -77,6 +84,19 @@ export const JOB_OPTIONS: Record<
 > = {
   [JOB.libraryScan]: { concurrency: 1, priority: 10, policy: 'stately' },
   [JOB.modelIndex]: { concurrency: 4, priority: 8, policy: 'standard' },
+  /*
+   * One move at a time, and the highest priority of anything here.
+   *
+   * Serial because two concurrent moves into the same library can each check
+   * a free destination path and then both take it. Highest because a move is
+   * the only job in this list a person is sitting and waiting for — everything
+   * else fills in behind a page that already renders.
+   *
+   * `stately` rather than `standard`: a replayed move is not harmless the way
+   * a replayed render is. The second run finds the files gone from the source
+   * and fails, which is safe but reports a failure for a move that worked.
+   */
+  [JOB.modelMove]: { concurrency: 1, priority: 12, policy: 'stately' },
   // Analysis is cheap and drives visible badges, so it outranks thumbnails.
   [JOB.fileAnalyze]: { concurrency: 2, priority: 6, policy: 'standard' },
   [JOB.fileThumbnail]: { concurrency: 2, priority: 4, policy: 'standard' },

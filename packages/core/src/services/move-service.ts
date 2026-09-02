@@ -85,27 +85,13 @@ export async function moveModelToLibrary(
   modelId: string,
   options: MoveModelOptions = {},
 ): Promise<MoveModelResult> {
-  const model = await loadModel(db, modelId)
-
-  if (model.libraryId !== source.library.id) {
-    // A caller that built the adapter from the wrong library would otherwise
-    // read files from one place and record the move against another.
-    throw new MoveError('That model is not in the library it was loaded from.')
-  }
-  if (source.library.id === destination.library.id) {
-    throw new MoveError('That model is already in that library.')
-  }
-
-  assertWritable(source, 'moved out of')
-  assertWritable(destination, 'moved into')
-
-  const destinationPath = normalizePath(options.destinationPath ?? model.path)
-  if (!isSafeRelativePath(destinationPath)) {
-    throw new MoveError('That destination path is not valid.')
-  }
-
-  await assertNoRunningScan(db, [source.library.id, destination.library.id])
-  await assertDestinationFree(db, destination, destinationPath)
+  const { model, destinationPath } = await assertMoveAllowed(
+    db,
+    source,
+    destination,
+    modelId,
+    options,
+  )
 
   const allFiles = await db
     .select({
@@ -214,6 +200,50 @@ export async function moveModelToLibrary(
     sourceFolderKept,
     filesSkipped: allFiles.length - files.length,
   }
+}
+
+/**
+ * Every reason a move would be refused, checked without moving anything.
+ *
+ * Split out because the refusals and the work belong in different places. The
+ * work is a worker job — a cross-backend move of a multi-gigabyte pack has no
+ * business in the process rendering pages — but a job that has been queued can
+ * only report "started", and "that library is read-only" arriving as a
+ * notification some seconds later is a worse answer than a disabled button.
+ *
+ * So the action calls this and tells the user immediately; the job calls it
+ * again, because everything it checks can change in between.
+ */
+export async function assertMoveAllowed(
+  db: Database,
+  source: StorageAdapter,
+  destination: StorageAdapter,
+  modelId: string,
+  options: MoveModelOptions = {},
+): Promise<{ model: ModelRow; destinationPath: string }> {
+  const model = await loadModel(db, modelId)
+
+  if (model.libraryId !== source.library.id) {
+    // A caller that built the adapter from the wrong library would otherwise
+    // read files from one place and record the move against another.
+    throw new MoveError('That model is not in the library it was loaded from.')
+  }
+  if (source.library.id === destination.library.id) {
+    throw new MoveError('That model is already in that library.')
+  }
+
+  assertWritable(source, 'moved out of')
+  assertWritable(destination, 'moved into')
+
+  const destinationPath = normalizePath(options.destinationPath ?? model.path)
+  if (!isSafeRelativePath(destinationPath)) {
+    throw new MoveError('That destination path is not valid.')
+  }
+
+  await assertNoRunningScan(db, [source.library.id, destination.library.id])
+  await assertDestinationFree(db, destination, destinationPath)
+
+  return { model, destinationPath }
 }
 
 async function loadModel(db: Database, modelId: string): Promise<ModelRow> {
