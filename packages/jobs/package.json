@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "pg-boss": "12.27.0",
+    "pg-boss": "12.28.0",
     "zod": "^4.4.3"
   }
 }
