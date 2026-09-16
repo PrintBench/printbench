@@ -119,6 +119,8 @@ export interface LikedModel {
   fileCount: number
   totalSize: number
   libraryName: string
+  previewExtension: string | null
+  previewImageFileId: string | null
   thumbFileId: string | null
   addedAt: Date
 }
@@ -138,11 +140,15 @@ export async function listLiked(
     file_count: number
     total_size: string
     library_name: string
+    preview_extension: string | null
+    preview_image_file_id: string | null
     thumb_file_id: string | null
     added_at: string
   }>(sql`
     SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size,
            l.name AS library_name, li.created_at AS added_at,
+           selected.extension AS preview_extension,
+           CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
            (SELECT f.id FROM model_files f
              WHERE f.model_id = m.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL
              ORDER BY f.size DESC LIMIT 1) AS thumb_file_id
@@ -150,6 +156,7 @@ export async function listLiked(
     JOIN lists lst ON lst.id = li.list_id
     JOIN models m ON m.id = li.model_id
     JOIN libraries l ON l.id = m.library_id
+    LEFT JOIN model_files selected ON selected.id = m.preview_file_id
     WHERE lst.user_id = ${userId} AND lst.kind = 'liked' AND m.missing_at IS NULL
     -- Most recently liked first: the reason you liked it is usually recent.
     ORDER BY li.created_at DESC
@@ -163,6 +170,8 @@ export async function listLiked(
     fileCount: row.file_count,
     totalSize: Number(row.total_size),
     libraryName: row.library_name,
+    previewExtension: row.preview_extension,
+    previewImageFileId: row.preview_image_file_id,
     thumbFileId: row.thumb_file_id,
     addedAt: new Date(row.added_at),
   }))
