@@ -6,8 +6,10 @@ import { slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
 import {
   readSidecar,
+  readPackageSidecar,
   sidecarUnchanged,
   writeSidecar,
+  writePackageSidecar,
   type SidecarContent,
 } from '../sidecar/sidecar'
 import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
@@ -227,7 +229,9 @@ export async function syncSidecar(db: Database, modelId: string): Promise<boolea
   if (!row || !row.library.writeSidecar) return false
   // A single loose file has no folder of its own to put a sidecar in.
   if (row.model.isFileModel) return false
-  if (await hasNestedModel(db, row.model.libraryId, row.model.path)) return false
+  if (!row.model.isPackage && (await hasNestedModel(db, row.model.libraryId, row.model.path))) {
+    return false
+  }
 
   const content = await buildSidecarContent(db, modelId)
 
@@ -238,11 +242,17 @@ export async function syncSidecar(db: Database, modelId: string): Promise<boolea
     allowWrites: true,
   })
 
-  const { data: existing } = await readSidecar(storage, row.model.path)
+  const { data: existing } = row.model.isPackage
+    ? await readPackageSidecar(storage, row.model.path)
+    : await readSidecar(storage, row.model.path)
   if (sidecarUnchanged(existing, content)) return false
 
   try {
-    await writeSidecar(storage, row.model.path, content)
+    if (row.model.isPackage) {
+      await writePackageSidecar(storage, row.model.path, content)
+    } else {
+      await writeSidecar(storage, row.model.path, content)
+    }
     return true
   } catch (error) {
     // A read-only mount or a permissions problem must not fail the edit: the

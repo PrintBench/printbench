@@ -72,7 +72,7 @@ function detector(kind: ProblemKind, libraryId?: string) {
       return sql`
         SELECT m.id AS id, NULL::uuid AS file_id, '{}'::jsonb AS detail
         FROM models m
-        WHERE m.missing_at IS NULL AND m.file_count = 0 ${lib}`
+        WHERE m.missing_at IS NULL AND m.file_count = 0 AND NOT m.is_package ${lib}`
 
     /*
      * Reported against the file, not the model, and only for the copies after
@@ -114,6 +114,7 @@ function detector(kind: ProblemKind, libraryId?: string) {
         SELECT m.id AS id, NULL::uuid AS file_id, '{}'::jsonb AS detail
         FROM models m
         WHERE m.missing_at IS NULL ${lib}
+          AND NOT m.is_package
           AND NOT EXISTS (
             SELECT 1 FROM model_files f
             WHERE f.model_id = m.id AND f.missing_at IS NULL
@@ -140,6 +141,7 @@ function detector(kind: ProblemKind, libraryId?: string) {
           ON parent.library_id = child.library_id
          AND parent.id <> child.id
          AND parent.missing_at IS NULL
+         AND NOT parent.is_package
          AND child.path LIKE parent.path || '/%'
         JOIN models m ON m.id = child.id
         WHERE child.missing_at IS NULL AND NOT child.is_file_model ${lib}`

@@ -6,8 +6,14 @@ import { LocalAdapter } from '../storage/local-adapter'
 import { isIndexable } from '../library/media-types'
 import { groupModels } from '../library/grouping'
 import { walkLibrary } from '../library/walker'
-import { SIDECAR_FILENAME, isIgnoredName } from '../library/paths'
-import { readSidecar, serializeSidecar, writeSidecar } from './sidecar'
+import { PACKAGE_SIDECAR_FILENAME, SIDECAR_FILENAME, isIgnoredName } from '../library/paths'
+import {
+  readPackageSidecar,
+  readSidecar,
+  serializeSidecar,
+  writePackageSidecar,
+  writeSidecar,
+} from './sidecar'
 
 /**
  * What a sidecar does to grouping, exercised over real files.
@@ -92,6 +98,28 @@ describe('a sidecar, walked from disk', () => {
     expect(pack.files.map((f) => f.path).sort()).toEqual(['Pack/Part A/a.stl', 'Pack/top.stl'])
   })
 
+  it('surfaces a package sidecar and preserves child models', async () => {
+    await mkdir(path.join(root, 'Bundle', 'Child'), { recursive: true })
+    await writeFile(path.join(root, 'Bundle', 'manual.pdf'), 'manual')
+    await writeFile(path.join(root, 'Bundle', 'Child', 'body.stl'), 'mesh')
+    await writePackageSidecar(storage(), 'Bundle', { name: 'Bundle' })
+
+    const walk = await walkLibrary(storage(), { mode: 'deep' })
+    const grouped = groupModels(walk.tree, { mode: 'deepest' })
+
+    expect(grouped.models.find((model) => model.path === 'Bundle')).toMatchObject({
+      isPackage: true,
+      files: [expect.objectContaining({ path: 'Bundle/manual.pdf' })],
+    })
+    expect(grouped.models.find((model) => model.path === 'Bundle/Child')).toMatchObject({
+      isPackage: false,
+      files: [expect.objectContaining({ path: 'Bundle/Child/body.stl' })],
+    })
+    expect(
+      walk.tree.dirs.find((entry) => entry.path === 'Bundle')?.files.map((file) => file.name),
+    ).toContain(PACKAGE_SIDECAR_FILENAME)
+  })
+
   it('is never counted as one of the model files', async () => {
     await writeFile(
       path.join(root, 'Red Dragon', SIDECAR_FILENAME),
@@ -119,6 +147,19 @@ describe('a sidecar, walked from disk', () => {
     const { data } = await readSidecar(storage(), 'Red Dragon')
     expect(data?.creator).toBe('Loot Studios')
     expect(data?.tags).toEqual(['dragon'])
+  })
+
+  it('round-trips package metadata through its distinct sidecar', async () => {
+    await writePackageSidecar(storage(), 'Red Dragon', {
+      name: 'Dragon Collection',
+      tags: ['bundle'],
+    })
+
+    expect(await readdir(path.join(root, 'Red Dragon'))).toContain(PACKAGE_SIDECAR_FILENAME)
+    expect((await readPackageSidecar(storage(), 'Red Dragon')).data).toMatchObject({
+      name: 'Dragon Collection',
+      tags: ['bundle'],
+    })
   })
 
   it('reports a corrupt sidecar rather than reading it as absent', async () => {

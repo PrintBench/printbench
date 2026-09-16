@@ -36,6 +36,7 @@ type RecentModel = {
   file_count: number
   total_size: string
   library_name: string
+  is_package: boolean
   thumb_file_id: string | null
   bbox_x: string | null
   bbox_y: string | null
@@ -45,7 +46,8 @@ type RecentModel = {
 /** The newest models, with whichever of their files has a rendered thumbnail. */
 async function recentModels(): Promise<RecentModel[]> {
   const result = await getDb().execute<RecentModel>(sql`
-    SELECT m.public_id, m.name, m.path, m.file_count, m.total_size, l.name AS library_name,
+    SELECT m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
+           l.name AS library_name,
            f.id AS thumb_file_id, f.bbox_x, f.bbox_y, f.bbox_z
     FROM models m
     JOIN libraries l ON l.id = m.library_id
@@ -277,6 +279,7 @@ export default async function DashboardPage() {
                 fileCount={model.file_count}
                 totalSize={Number(model.total_size)}
                 libraryName={model.library_name}
+                isPackage={model.is_package}
                 thumbFileId={model.thumb_file_id}
                 dimensions={formatDimensions(
                   Number(model.bbox_x ?? 0),

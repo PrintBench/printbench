@@ -89,6 +89,65 @@ describe('grouping', () => {
     expect(result.containers).toContain('Dragons Pack')
   })
 
+  it('keeps package files separate while preserving child model boundaries', () => {
+    const tree = dir(
+      '',
+      [],
+      [
+        dir(
+          'Cosmic Duo',
+          ['.printbench-package.json', 'Assembly Instructions.pdf', 'Complete Package.zip'],
+          [
+            dir('Cosmic Duo/images', ['preview.webp']),
+            dir(
+              'Cosmic Duo/Astro',
+              ['.printbench.json'],
+              [dir('Cosmic Duo/Astro/STL Files', ['astro.stl'])],
+            ),
+            dir(
+              'Cosmic Duo/Rocket',
+              ['.printbench.json'],
+              [dir('Cosmic Duo/Rocket/STL Files', ['rocket.stl'])],
+            ),
+          ],
+        ),
+      ],
+    )
+
+    const result = groupModels(tree)
+    expect(paths(result)).toEqual(['Cosmic Duo', 'Cosmic Duo/Astro', 'Cosmic Duo/Rocket'])
+
+    const packageModel = result.models.find((model) => model.path === 'Cosmic Duo')!
+    expect(packageModel.isPackage).toBe(true)
+    expect(filePaths(packageModel)).toEqual([
+      'Cosmic Duo/Assembly Instructions.pdf',
+      'Cosmic Duo/Complete Package.zip',
+      'Cosmic Duo/images/preview.webp',
+    ])
+
+    expect(filePaths(result.models.find((model) => model.path.endsWith('/Astro'))!)).toEqual([
+      'Cosmic Duo/Astro/STL Files/astro.stl',
+    ])
+    expect(filePaths(result.models.find((model) => model.path.endsWith('/Rocket'))!)).toEqual([
+      'Cosmic Duo/Rocket/STL Files/rocket.stl',
+    ])
+  })
+
+  it('allows a package with child models but no shared files yet', () => {
+    const tree = dir(
+      '',
+      [],
+      [dir('Bundle', ['.printbench-package.json'], [dir('Bundle/Child', ['child.stl'])])],
+    )
+
+    const result = groupModels(tree)
+    expect(result.models.find((model) => model.path === 'Bundle')).toMatchObject({
+      isPackage: true,
+      files: [],
+    })
+    expect(paths(result)).toEqual(['Bundle', 'Bundle/Child'])
+  })
+
   it('handles deep container nesting', () => {
     const tree = dir(
       '',
@@ -481,7 +540,7 @@ describe('paths', () => {
     ]) {
       expect(isIgnoredName(name), name).toBe(true)
     }
-    for (const name of ['body.stl', 'readme.txt', '.printbench.json']) {
+    for (const name of ['body.stl', 'readme.txt', '.printbench.json', '.printbench-package.json']) {
       expect(isIgnoredName(name), name).toBe(false)
     }
   })

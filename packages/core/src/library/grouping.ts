@@ -20,7 +20,15 @@
  */
 
 import { isModelFile } from './media-types'
-import { basename, humanizeName, isIgnoredName, isSidecarFilename, joinPath } from './paths'
+import {
+  basename,
+  humanizeName,
+  isIgnoredName,
+  isPackageSidecarFilename,
+  isPrintBenchMetadataFilename,
+  isSidecarFilename,
+  joinPath,
+} from './paths'
 
 /**
  * Folder names that are part of a model rather than a model of their own.
@@ -86,6 +94,8 @@ export interface GroupedModel {
   path: string
   name: string
   isFileModel: boolean
+  /** A package indexes only its own shared files and preserves child model boundaries. */
+  isPackage: boolean
   files: GroupedFile[]
   /** Directories that resolve to models nested inside this one. */
   nestedModelPaths: string[]
@@ -113,7 +123,7 @@ function collectOwnFiles(dir: WalkedDir): GroupedFile[] {
 
   for (const file of dir.files) {
     if (isIgnoredName(file.name)) continue
-    if (isSidecarFilename(file.name)) continue
+    if (isPrintBenchMetadataFilename(file.name)) continue
     // Size and mtime travel with the path: the scanner stores them, and the
     // digest step later uses them to decide what actually needs re-hashing.
     collected.push({ path: joinPath(dir.path, file.name), size: file.size, mtimeMs: file.mtimeMs })
@@ -142,6 +152,10 @@ function hasSidecar(dir: WalkedDir): boolean {
   return dir.files.some((file) => isSidecarFilename(file.name))
 }
 
+function hasPackageSidecar(dir: WalkedDir): boolean {
+  return dir.files.some((file) => isPackageSidecarFilename(file.name))
+}
+
 /** Does this directory hold model files of its own (including common subfolders)? */
 function hasDirectModelFiles(dir: WalkedDir): boolean {
   return collectOwnFiles(dir).some((file) => isModelFile(file.path))
@@ -165,13 +179,14 @@ export function groupModels(root: WalkedDir, options: GroupingOptions = {}): Gro
   const models: GroupedModel[] = []
   const containers: string[] = []
 
-  function emitModel(dir: WalkedDir, nested: string[] = []): void {
+  function emitModel(dir: WalkedDir, nested: string[] = [], isPackage = false): void {
     const files = collectOwnFiles(dir)
-    if (files.length === 0) return
+    if (files.length === 0 && !isPackage) return
     models.push({
       path: dir.path,
       name: humanizeDirName(dir.path),
       isFileModel: false,
+      isPackage,
       files,
       nestedModelPaths: nested,
     })
@@ -190,12 +205,27 @@ export function groupModels(root: WalkedDir, options: GroupingOptions = {}): Gro
       path: dir.path,
       name: humanizeDirName(dir.path),
       isFileModel: false,
+      isPackage: false,
       files,
       nestedModelPaths: [],
     })
   }
 
   function visit(dir: WalkedDir, depth: number): void {
+    /*
+     * A package is an explicit parent boundary. Its own files belong to the
+     * package, while every real child directory is still grouped normally.
+     * This is intentionally distinct from a model sidecar, which collapses
+     * the entire subtree into one model.
+     */
+    if (hasPackageSidecar(dir) && dir.path !== '') {
+      emitModel(dir, [], true)
+      for (const child of realSubdirs(dir).filter((entry) => subtreeHasModelFiles(entry))) {
+        visit(child, depth + 1)
+      }
+      return
+    }
+
     /*
      * 1. A sidecar is an explicit declaration; it always wins.
      *
@@ -285,6 +315,7 @@ export function groupModels(root: WalkedDir, options: GroupingOptions = {}): Gro
         path,
         name: humanizeDirName(path),
         isFileModel: true,
+        isPackage: false,
         files: [{ path, size: file.size, mtimeMs: file.mtimeMs }],
         nestedModelPaths: [],
       })

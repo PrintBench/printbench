@@ -50,9 +50,19 @@ const IGNORED_PATTERNS: RegExp[] = [
  * Grouping cares as well — a folder holding one is an explicit model root.
  */
 export const SIDECAR_FILENAME = '.printbench.json'
+/** Declares a directory as a package whose child model boundaries stay intact. */
+export const PACKAGE_SIDECAR_FILENAME = '.printbench-package.json'
 
 export function isSidecarFilename(name: string): boolean {
   return name === SIDECAR_FILENAME
+}
+
+export function isPackageSidecarFilename(name: string): boolean {
+  return name === PACKAGE_SIDECAR_FILENAME
+}
+
+export function isPrintBenchMetadataFilename(name: string): boolean {
+  return isSidecarFilename(name) || isPackageSidecarFilename(name)
 }
 
 /**
@@ -106,7 +116,7 @@ export function isIgnoredName(name: string): boolean {
   if (IGNORED_NAMES.has(lower)) return true
   if (IGNORED_DIRS.has(lower)) return true
   // Dotfiles and dot-directories, except our own sidecar.
-  if (name.startsWith('.') && !isSidecarFilename(name)) return true
+  if (name.startsWith('.') && !isPrintBenchMetadataFilename(name)) return true
   return IGNORED_PATTERNS.some((pattern) => pattern.test(name))
 }
 

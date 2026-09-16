@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Box, FileStack } from 'lucide-react'
+import { Box, FileStack, Package } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 export function formatBytes(bytes: number): string {
@@ -24,6 +24,7 @@ export interface ModelCardProps {
   totalSize: number
   libraryName?: string
   previewExtension?: string | null
+  isPackage?: boolean
   /** Set once a thumbnail has been rendered for the preview file. */
   thumbFileId?: string | null
   dimensions?: string | null
@@ -37,6 +38,7 @@ export function ModelCard({
   totalSize,
   libraryName,
   previewExtension,
+  isPackage,
   thumbFileId,
   dimensions,
 }: ModelCardProps) {
@@ -82,6 +84,12 @@ export function ModelCard({
         {previewExtension && (
           <span className="absolute bottom-2 right-2 rounded bg-black/35 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/90 backdrop-blur-sm">
             {previewExtension}
+          </span>
+        )}
+        {isPackage && (
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/90 backdrop-blur-sm">
+            <Package className="size-3" />
+            Package
           </span>
         )}
       </div>

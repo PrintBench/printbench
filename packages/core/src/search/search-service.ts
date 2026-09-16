@@ -55,6 +55,7 @@ export interface SearchHit {
   fileCount: number
   totalSize: number
   libraryName: string
+  isPackage: boolean
   thumbFileId: string | null
   previewExtension: string | null
   bboxX: number | null
@@ -141,6 +142,7 @@ export async function searchModels(
     file_count: number
     total_size: string
     library_name: string
+    is_package: boolean
     thumb_file_id: string | null
     preview_extension: string | null
     bbox_x: string | null
@@ -156,7 +158,7 @@ export async function searchModels(
     ), counted AS (
       SELECT count(*)::bigint AS total FROM matched
     )
-    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size,
+    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
            f.extension AS preview_extension,
            coalesce(
@@ -188,6 +190,7 @@ export async function searchModels(
       fileCount: row.file_count,
       totalSize: Number(row.total_size),
       libraryName: row.library_name,
+      isPackage: row.is_package,
       thumbFileId: row.thumb_file_id,
       previewExtension: row.preview_extension,
       bboxX: row.bbox_x === null ? null : Number(row.bbox_x),
@@ -279,14 +282,16 @@ function buildWhere(query: string, filters: SearchFilters): SQL {
   }
 
   if (filters.neverPrinted) {
-    clauses.push(sql`NOT EXISTS (SELECT 1 FROM print_runs p WHERE p.model_id = m.id)`)
+    clauses.push(
+      sql`NOT m.is_package AND NOT EXISTS (SELECT 1 FROM print_runs p WHERE p.model_id = m.id)`,
+    )
   }
 
   if (filters.missingPreview) {
-    clauses.push(sql`NOT EXISTS (
-      SELECT 1 FROM model_files f
-      WHERE f.model_id = m.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL
-    )`)
+    clauses.push(sql`NOT m.is_package AND NOT EXISTS (
+        SELECT 1 FROM model_files f
+        WHERE f.model_id = m.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL
+      )`)
   }
 
   if (filters.minSize != null) clauses.push(sql`m.total_size >= ${filters.minSize}`)

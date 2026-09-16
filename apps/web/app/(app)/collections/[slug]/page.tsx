@@ -19,6 +19,7 @@ type Row = {
   file_count: number
   total_size: string
   library_name: string
+  is_package: boolean
   thumb_file_id: string | null
   bbox_x: string | null
   bbox_y: string | null
@@ -49,7 +50,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
    * worth. The position column is the collection's own ordering.
    */
   const models = await db.execute<Row>(sql`
-    SELECT m.public_id, m.name, m.path, m.file_count, m.total_size,
+    SELECT m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
            f.id AS thumb_file_id, f.bbox_x, f.bbox_y, f.bbox_z
     FROM collection_models cm
@@ -126,6 +127,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
               fileCount={model.file_count}
               totalSize={Number(model.total_size)}
               libraryName={model.library_name}
+              isPackage={model.is_package}
               thumbFileId={model.thumb_file_id}
               dimensions={formatDimensions(
                 Number(model.bbox_x ?? 0),

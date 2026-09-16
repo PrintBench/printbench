@@ -119,6 +119,7 @@ export interface LikedModel {
   fileCount: number
   totalSize: number
   libraryName: string
+  isPackage: boolean
   thumbFileId: string | null
   addedAt: Date
 }
@@ -138,10 +139,11 @@ export async function listLiked(
     file_count: number
     total_size: string
     library_name: string
+    is_package: boolean
     thumb_file_id: string | null
     added_at: string
   }>(sql`
-    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size,
+    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name, li.created_at AS added_at,
            (SELECT f.id FROM model_files f
              WHERE f.model_id = m.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL
@@ -163,6 +165,7 @@ export async function listLiked(
     fileCount: row.file_count,
     totalSize: Number(row.total_size),
     libraryName: row.library_name,
+    isPackage: row.is_package,
     thumbFileId: row.thumb_file_id,
     addedAt: new Date(row.added_at),
   }))
