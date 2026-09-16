@@ -36,6 +36,8 @@ type RecentModel = {
   file_count: number
   total_size: string
   library_name: string
+  preview_extension: string | null
+  preview_image_file_id: string | null
   thumb_file_id: string | null
   bbox_x: string | null
   bbox_y: string | null
@@ -46,9 +48,12 @@ type RecentModel = {
 async function recentModels(): Promise<RecentModel[]> {
   const result = await getDb().execute<RecentModel>(sql`
     SELECT m.public_id, m.name, m.path, m.file_count, m.total_size, l.name AS library_name,
+           selected.extension AS preview_extension,
+           CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
            f.id AS thumb_file_id, f.bbox_x, f.bbox_y, f.bbox_z
     FROM models m
     JOIN libraries l ON l.id = m.library_id
+    LEFT JOIN model_files selected ON selected.id = m.preview_file_id
     LEFT JOIN LATERAL (
       SELECT id, bbox_x, bbox_y, bbox_z FROM model_files
       WHERE model_id = m.id AND thumb_state = 'ok' AND missing_at IS NULL
@@ -277,6 +282,8 @@ export default async function DashboardPage() {
                 fileCount={model.file_count}
                 totalSize={Number(model.total_size)}
                 libraryName={model.library_name}
+                previewExtension={model.preview_extension}
+                previewImageFileId={model.preview_image_file_id}
                 thumbFileId={model.thumb_file_id}
                 dimensions={formatDimensions(
                   Number(model.bbox_x ?? 0),
