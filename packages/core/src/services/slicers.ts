@@ -2,9 +2,9 @@
  * Opening a file directly in a desktop slicer.
  *
  * Every modern slicer registers a custom URL scheme, so a link can hand a file
- * straight to it. That covers Bambu Studio, Orca, PrusaSlicer, Cura and Lychee
- * for the price of one feature — and it works for any printer, including ones
- * with no network API at all.
+ * straight to it. That covers Bambu Studio, Creality Print, Orca, PrusaSlicer,
+ * Cura and Lychee for the price of one feature — and it works for any printer,
+ * including ones with no network API at all.
  *
  * It is also the honest answer for Bambu specifically: their printers have no
  * simple HTTP upload, and pushing to them means FTPS plus MQTT with LAN mode
@@ -28,7 +28,8 @@
  * about that from this end.
  */
 
-export type SlicerId = 'bambustudio' | 'orcaslicer' | 'prusaslicer' | 'cura' | 'lychee'
+export type SlicerId =
+  'bambustudio' | 'crealityprint' | 'orcaslicer' | 'prusaslicer' | 'cura' | 'lychee'
 
 export interface Slicer {
   id: SlicerId
@@ -53,6 +54,13 @@ export const SLICERS: readonly Slicer[] = [
     scheme: 'bambustudio://open',
     accepts: ['stl', '3mf', 'obj', 'step', 'stp'],
     hint: 'Bambu Studio 1.7 or later registers this link.',
+  },
+  {
+    id: 'crealityprint',
+    label: 'Creality Print',
+    scheme: 'crealityprintlink://open',
+    accepts: ['stl', '3mf', 'obj', 'amf'],
+    hint: 'Creality Print registers this link on install.',
   },
   {
     id: 'orcaslicer',
