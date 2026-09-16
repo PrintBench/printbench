@@ -153,8 +153,9 @@ web shell is replaceable without touching the app.
   produce a 3MF from it without a CAD kernel, so no link is offered. The offer
   and the converter share one list precisely so they cannot drift.
 - **Slicers are handed the file, not driven.** Every modern slicer registers a
-  URL scheme, so `Open in…` covers Bambu Studio, Orca, PrusaSlicer, Cura and
-  Lychee at once, and works for printers with no network API. This is also the
+  URL scheme, so `Open in…` covers Bambu Studio, Creality Print, Orca,
+  PrusaSlicer, Cura and Lychee at once, and works for printers with no network
+  API. This is also the
   honest answer for Bambu specifically: pushing to their printers means FTPS
   plus MQTT with LAN mode enabled, where Bambu Studio already knows how.
 - **Slicer links are signed.** A desktop slicer fetches the URL as a separate

@@ -56,6 +56,7 @@ export interface SearchHit {
   totalSize: number
   libraryName: string
   isPackage: boolean
+  previewImageFileId: string | null
   thumbFileId: string | null
   previewExtension: string | null
   bboxX: number | null
@@ -143,6 +144,7 @@ export async function searchModels(
     total_size: string
     library_name: string
     is_package: boolean
+    preview_image_file_id: string | null
     thumb_file_id: string | null
     preview_extension: string | null
     bbox_x: string | null
@@ -161,6 +163,7 @@ export async function searchModels(
     SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
            f.extension AS preview_extension,
+           CASE WHEN f.category = 'image' THEN f.id END AS preview_image_file_id,
            coalesce(
              CASE WHEN f.thumb_state = 'ok' THEN f.id END,
              (SELECT f2.id FROM model_files f2
@@ -191,6 +194,7 @@ export async function searchModels(
       totalSize: Number(row.total_size),
       libraryName: row.library_name,
       isPackage: row.is_package,
+      previewImageFileId: row.preview_image_file_id,
       thumbFileId: row.thumb_file_id,
       previewExtension: row.preview_extension,
       bboxX: row.bbox_x === null ? null : Number(row.bbox_x),

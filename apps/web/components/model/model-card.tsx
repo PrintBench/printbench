@@ -25,6 +25,8 @@ export interface ModelCardProps {
   libraryName?: string
   previewExtension?: string | null
   isPackage?: boolean
+  /** Selected creator-supplied image, served directly instead of as a generated mesh thumbnail. */
+  previewImageFileId?: string | null
   /** Set once a thumbnail has been rendered for the preview file. */
   thumbFileId?: string | null
   dimensions?: string | null
@@ -39,6 +41,7 @@ export function ModelCard({
   libraryName,
   previewExtension,
   isPackage,
+  previewImageFileId,
   thumbFileId,
   dimensions,
 }: ModelCardProps) {
@@ -55,7 +58,7 @@ export function ModelCard({
       <div
         className="relative flex aspect-[4/3] items-center justify-center overflow-hidden"
         style={
-          thumbFileId
+          previewImageFileId || thumbFileId
             ? // A subtle tint behind the render, so a transparent thumbnail still
               // sits on something rather than floating on the card colour.
               {
@@ -66,12 +69,16 @@ export function ModelCard({
               }
         }
       >
-        {thumbFileId ? (
+        {previewImageFileId || thumbFileId ? (
           // Plain img rather than next/image: these are already the right size,
           // already WebP, and immutably cached, so the optimiser adds only cost.
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={`/api/files/${thumbFileId}/thumb`}
+            src={
+              previewImageFileId
+                ? `/api/files/${previewImageFileId}/raw?inline=1`
+                : `/api/files/${thumbFileId}/thumb`
+            }
             alt=""
             loading="lazy"
             decoding="async"

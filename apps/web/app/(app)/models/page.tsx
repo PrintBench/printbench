@@ -22,6 +22,7 @@ type ModelRow = {
   library_name: string
   is_package: boolean
   preview_extension: string | null
+  preview_image_file_id: string | null
   thumb_file_id: string | null
   bbox_x: string | null
   bbox_y: string | null
@@ -50,6 +51,7 @@ export default async function ModelsPage({
     SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
            f.extension AS preview_extension,
+           CASE WHEN f.category = 'image' THEN f.id END AS preview_image_file_id,
            -- The preview file if it has a rendered thumbnail; otherwise any
            -- mesh in the model that does. A model whose chosen preview is an
            -- image still gets a render from one of its meshes.
@@ -128,6 +130,7 @@ export default async function ModelsPage({
                 libraryName={row.library_name}
                 previewExtension={row.preview_extension}
                 isPackage={row.is_package}
+                previewImageFileId={row.preview_image_file_id}
                 thumbFileId={row.thumb_file_id}
                 dimensions={formatDimensions(
                   Number(row.bbox_x ?? 0),

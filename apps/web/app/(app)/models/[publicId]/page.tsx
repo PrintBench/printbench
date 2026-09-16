@@ -53,6 +53,7 @@ type ModelDetail = {
   is_package: boolean
   missing_at: string | null
   share_token: string | null
+  preview_file_id: string | null
   library_name: string
   library_path: string
   /** Only a library this app owns may have its files deleted. */
@@ -99,6 +100,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     SELECT m.id, m.library_id, m.public_id, m.name, m.path, m.notes, m.license,
            m.file_count, m.total_size, m.is_file_model, m.is_package,
            m.missing_at, m.share_token,
+           m.preview_file_id,
            l.name AS library_name, l.path AS library_path,
            (l.kind = 'managed' OR l.allow_writes) AS library_writable
     FROM models m JOIN libraries l ON l.id = m.library_id
@@ -204,6 +206,11 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const hero = files.rows
     .filter((f) => f.thumb_state === 'ok' && !f.missing_at)
     .sort((a, b) => Number(b.size) - Number(a.size))[0]
+
+  const selectedPreview = model.preview_file_id
+    ? files.rows.find((file) => file.id === model.preview_file_id && !file.missing_at)
+    : undefined
+  const selectedImage = selectedPreview?.category === 'image' ? selectedPreview : undefined
 
   const heroDimensions = hero
     ? formatDimensions(Number(hero.bbox_x ?? 0), Number(hero.bbox_y ?? 0), Number(hero.bbox_z ?? 0))
@@ -387,7 +394,18 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
             </section>
           )}
 
-          {viewable ? (
+          {selectedImage ? (
+            <Card className="overflow-hidden">
+              <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/files/${selectedImage.id}/raw?inline=1`}
+                  alt={`Preview of ${model.name}`}
+                  className="size-full object-contain"
+                />
+              </div>
+            </Card>
+          ) : viewable ? (
             <ModelViewer
               fileId={viewable.id}
               format={viewable.extension.toLowerCase() as 'stl' | '3mf' | 'obj' | 'ply'}

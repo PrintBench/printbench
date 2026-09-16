@@ -20,6 +20,8 @@ type Row = {
   total_size: string
   library_name: string
   is_package: boolean
+  preview_extension: string | null
+  preview_image_file_id: string | null
   thumb_file_id: string | null
   bbox_x: string | null
   bbox_y: string | null
@@ -52,10 +54,13 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
   const models = await db.execute<Row>(sql`
     SELECT m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
+           selected.extension AS preview_extension,
+           CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
            f.id AS thumb_file_id, f.bbox_x, f.bbox_y, f.bbox_z
     FROM collection_models cm
     JOIN models m ON m.id = cm.model_id
     JOIN libraries l ON l.id = m.library_id
+    LEFT JOIN model_files selected ON selected.id = m.preview_file_id
     LEFT JOIN LATERAL (
       SELECT id, bbox_x, bbox_y, bbox_z FROM model_files
       WHERE model_id = m.id AND thumb_state = 'ok' AND missing_at IS NULL
@@ -128,6 +133,8 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
               totalSize={Number(model.total_size)}
               libraryName={model.library_name}
               isPackage={model.is_package}
+              previewExtension={model.preview_extension}
+              previewImageFileId={model.preview_image_file_id}
               thumbFileId={model.thumb_file_id}
               dimensions={formatDimensions(
                 Number(model.bbox_x ?? 0),

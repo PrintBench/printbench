@@ -21,6 +21,7 @@ const CREATOR_LOOT = '7c000000-0000-4000-8000-00000000000c'
 const CREATOR_FUNC = '7d000000-0000-4000-8000-00000000000d'
 const TAG_DRAGON = '7e000000-0000-4000-8000-00000000000e'
 const TAG_TERRAIN = '7f000000-0000-4000-8000-00000000000f'
+const PREVIEW_IMAGE = '7f000000-0000-4000-8000-000000000010'
 
 describeDb('searchModels', () => {
   let pool: ReturnType<typeof createDb>['pool']
@@ -109,6 +110,15 @@ describeDb('searchModels', () => {
       `)
     }
 
+    await db.execute(sql`
+      INSERT INTO model_files (id, model_id, filename, extension, category, size, media_type)
+      VALUES (${PREVIEW_IMAGE}, ${modelId('01')}, 'images/preview.webp', 'webp', 'image',
+              10000, 'image/webp')
+    `)
+    await db.execute(sql`
+      UPDATE models SET preview_file_id = ${PREVIEW_IMAGE} WHERE id = ${modelId('01')}
+    `)
+
     // A print against Benchy, so the never-printed filter has both sides.
     await db.execute(sql`
       INSERT INTO print_runs (model_id, status) VALUES (${modelId('07')}, 'success')
@@ -142,6 +152,12 @@ describeDb('searchModels', () => {
   }
 
   describe('relevance', () => {
+    it('returns a selected creator image separately from generated thumbnails', async () => {
+      const result = await search({ query: 'red dragon' })
+      expect(result.hits[0]?.previewImageFileId).toBe(PREVIEW_IMAGE)
+      expect(result.hits[0]?.previewExtension).toBe('webp')
+    })
+
     /*
      * Queries a person would actually type, with the result they expect first.
      * These are the assertions most likely to catch a bad weighting change.

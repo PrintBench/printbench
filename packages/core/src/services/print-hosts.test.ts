@@ -342,6 +342,7 @@ describe('slicer handoff', () => {
     // All of them read 3MF, and 3MF is what every hand-off is delivered as.
     const forStl = slicersFor('stl').map((s) => s.id)
     expect(forStl).toContain('bambustudio')
+    expect(forStl).toContain('crealityprint')
     expect(forStl).toContain('orcaslicer')
     expect(forStl).toContain('prusaslicer')
     expect(forStl).toContain('cura')
@@ -407,9 +408,17 @@ describe('slicer handoff', () => {
     expect(url).toContain('%3Ftoken%3Dx%26y%3D1')
   })
 
+  it("uses Creality Print's registered URL protocol", () => {
+    const slicer = SLICERS.find((candidate) => candidate.id === 'crealityprint')!
+    expect(slicerUrl(slicer, 'https://prints.example.com/model.3mf')).toBe(
+      'crealityprintlink://open?file=https%3A%2F%2Fprints.example.com%2Fmodel.3mf',
+    )
+  })
+
   it('covers every slicer the plan named', () => {
     expect(SLICERS.map((s) => s.id).sort()).toEqual([
       'bambustudio',
+      'crealityprint',
       'cura',
       'lychee',
       'orcaslicer',
