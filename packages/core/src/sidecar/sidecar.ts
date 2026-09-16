@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { SIDECAR_FILENAME } from '../library/paths'
+import { PACKAGE_SIDECAR_FILENAME, SIDECAR_FILENAME } from '../library/paths'
 import type { StorageAdapter } from '../storage/types'
 
 /**
@@ -52,6 +52,10 @@ export interface SidecarContent {
 
 export function sidecarPath(modelPath: string): string {
   return modelPath ? `${modelPath}/${SIDECAR_FILENAME}` : SIDECAR_FILENAME
+}
+
+export function packageSidecarPath(packagePath: string): string {
+  return packagePath ? `${packagePath}/${PACKAGE_SIDECAR_FILENAME}` : PACKAGE_SIDECAR_FILENAME
 }
 
 export function serializeSidecar(content: SidecarContent): string {
@@ -114,9 +118,23 @@ export async function readSidecar(
   storage: StorageAdapter,
   modelPath: string,
 ): Promise<{ data: SidecarContent | null; error?: string }> {
+  return readSidecarAt(storage, sidecarPath(modelPath))
+}
+
+export async function readPackageSidecar(
+  storage: StorageAdapter,
+  packagePath: string,
+): Promise<{ data: SidecarContent | null; error?: string }> {
+  return readSidecarAt(storage, packageSidecarPath(packagePath))
+}
+
+async function readSidecarAt(
+  storage: StorageAdapter,
+  path: string,
+): Promise<{ data: SidecarContent | null; error?: string }> {
   let text: string
   try {
-    const stream = await storage.createReadStream(sidecarPath(modelPath))
+    const stream = await storage.createReadStream(path)
     const chunks: Buffer[] = []
     let total = 0
     for await (const chunk of stream) {
@@ -143,6 +161,14 @@ export async function writeSidecar(
   content: SidecarContent,
 ): Promise<void> {
   await storage.write(sidecarPath(modelPath), serializeSidecar(content))
+}
+
+export async function writePackageSidecar(
+  storage: StorageAdapter,
+  packagePath: string,
+  content: SidecarContent,
+): Promise<void> {
+  await storage.write(packageSidecarPath(packagePath), serializeSidecar(content))
 }
 
 /**

@@ -26,7 +26,7 @@ import { walkLibrary, type DirFingerprint } from '../library/walker'
 import { lookup } from '../library/media-types'
 import { basename, slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
-import { readSidecar } from '../sidecar/sidecar'
+import { readPackageSidecar, readSidecar } from '../sidecar/sidecar'
 import type { LibraryLocation, StorageAdapter } from '../storage/types'
 
 /**
@@ -239,7 +239,13 @@ export async function scanLibrary(
          * the app — the database is authoritative once a model is known.
          */
         if (!model.isFileModel) {
-          const restored = await restoreFromSidecar(db, storage, result.modelId, model.path)
+          const restored = await restoreFromSidecar(
+            db,
+            storage,
+            result.modelId,
+            model.path,
+            model.isPackage,
+          )
           if (restored) outcome.sidecarsRestored++
         }
       } else {
@@ -345,7 +351,12 @@ async function upsertModel(
     // written notes, and a rescan must never overwrite their edits.
     await db
       .update(schema.models)
-      .set({ lastSeenAt: seenAt, missingAt: null, isFileModel: model.isFileModel })
+      .set({
+        lastSeenAt: seenAt,
+        missingAt: null,
+        isFileModel: model.isFileModel,
+        isPackage: model.isPackage,
+      })
       .where(eq(schema.models.id, modelId))
   } else {
     const inserted = await db
@@ -357,6 +368,7 @@ async function upsertModel(
         slug: slugify(model.name) || 'model',
         publicId: nanoid(12),
         isFileModel: model.isFileModel,
+        isPackage: model.isPackage,
         lastSeenAt: seenAt,
       })
       .returning({ id: schema.models.id })
@@ -747,8 +759,11 @@ async function restoreFromSidecar(
   storage: StorageAdapter,
   modelId: string,
   modelPath: string,
+  isPackage: boolean,
 ): Promise<boolean> {
-  const { data, error } = await readSidecar(storage, modelPath)
+  const { data, error } = isPackage
+    ? await readPackageSidecar(storage, modelPath)
+    : await readSidecar(storage, modelPath)
   if (error) {
     console.warn(`[scan] ignoring sidecar for ${modelPath}: ${error}`)
     return false
@@ -795,6 +810,25 @@ async function restoreFromSidecar(
       `)
     }
     updates.push(`${data.tags.length} tags`)
+  }
+
+  if (data.previewFile !== undefined) {
+    if (data.previewFile === null) {
+      await db.execute(sql`UPDATE models SET preview_file_id = NULL WHERE id = ${modelId}`)
+      updates.push('preview')
+    } else {
+      const preview = await db.execute<{ id: string }>(sql`
+        SELECT id FROM model_files
+        WHERE model_id = ${modelId} AND filename = ${data.previewFile} AND missing_at IS NULL
+        LIMIT 1
+      `)
+      if (preview.rows[0]) {
+        await db.execute(sql`
+          UPDATE models SET preview_file_id = ${preview.rows[0].id} WHERE id = ${modelId}
+        `)
+        updates.push('preview')
+      }
+    }
   }
 
   return updates.length > 0

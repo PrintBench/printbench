@@ -53,6 +53,7 @@ export default async function LikedPage() {
               fileCount={model.fileCount}
               totalSize={model.totalSize}
               libraryName={model.libraryName}
+              isPackage={model.isPackage}
               previewExtension={model.previewExtension}
               previewImageFileId={model.previewImageFileId}
               thumbFileId={model.thumbFileId}

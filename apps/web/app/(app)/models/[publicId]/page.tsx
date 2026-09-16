@@ -3,7 +3,7 @@ import type { Route } from 'next'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { sql } from 'drizzle-orm'
-import { Box, FileStack, FolderOpen, HardDrive, Layers } from 'lucide-react'
+import { Box, Boxes, FileStack, FolderOpen, HardDrive, Layers, Package } from 'lucide-react'
 import { getDb } from '@pb/db'
 import { getSessionUser } from '@pb/auth'
 import {
@@ -41,6 +41,7 @@ export const dynamic = 'force-dynamic'
 
 type ModelDetail = {
   id: string
+  library_id: string
   public_id: string
   name: string
   path: string
@@ -49,6 +50,7 @@ type ModelDetail = {
   file_count: number
   total_size: string
   is_file_model: boolean
+  is_package: boolean
   missing_at: string | null
   share_token: string | null
   preview_file_id: string | null
@@ -56,6 +58,14 @@ type ModelDetail = {
   library_path: string
   /** Only a library this app owns may have its files deleted. */
   library_writable: boolean
+}
+
+type PackageRelation = {
+  public_id: string
+  name: string
+  path: string
+  file_count: number
+  total_size: string
 }
 
 type FileRow = {
@@ -87,8 +97,9 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const db = getDb()
 
   const models = await db.execute<ModelDetail>(sql`
-    SELECT m.id, m.public_id, m.name, m.path, m.notes, m.license,
-           m.file_count, m.total_size, m.is_file_model, m.missing_at, m.share_token,
+    SELECT m.id, m.library_id, m.public_id, m.name, m.path, m.notes, m.license,
+           m.file_count, m.total_size, m.is_file_model, m.is_package,
+           m.missing_at, m.share_token,
            m.preview_file_id,
            l.name AS library_name, l.path AS library_path,
            (l.kind = 'managed' OR l.allow_writes) AS library_writable
@@ -98,6 +109,33 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const model = models.rows[0]
   if (!model) notFound()
+
+  const packageChildren = model.is_package
+    ? await db.execute<PackageRelation>(sql`
+        SELECT public_id, name, path, file_count, total_size
+        FROM models
+        WHERE library_id = ${model.library_id}
+          AND id <> ${model.id}
+          AND missing_at IS NULL
+          AND starts_with(path, ${`${model.path}/`})
+        ORDER BY path
+      `)
+    : { rows: [] as PackageRelation[] }
+
+  const parentPackage = !model.is_package
+    ? (
+        await db.execute<{ public_id: string; name: string }>(sql`
+          SELECT public_id, name
+          FROM models
+          WHERE library_id = ${model.library_id}
+            AND is_package = true
+            AND missing_at IS NULL
+            AND starts_with(${model.path}, path || '/')
+          ORDER BY length(path) DESC
+          LIMIT 1
+        `)
+      ).rows[0]
+    : undefined
 
   const files = await db.execute<FileRow>(sql`
     SELECT id, filename, extension, category, size, previewable, presupported, missing_at,
@@ -209,6 +247,17 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
         <Link href="/models" className="hover:text-[var(--color-ink)]">
           Models
         </Link>
+        {parentPackage && (
+          <>
+            <span aria-hidden>/</span>
+            <Link
+              href={`/models/${parentPackage.public_id}` as Route}
+              className="truncate hover:text-[var(--color-ink)]"
+            >
+              {parentPackage.name}
+            </Link>
+          </>
+        )}
         <span aria-hidden>/</span>
         <span className="truncate text-[var(--color-ink)]">{model.name}</span>
       </nav>
@@ -221,12 +270,18 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
             <Badge tone="danger">Missing from disk</Badge>
           ) : (
             <div className="flex flex-wrap items-center gap-3">
+              {model.is_package && (
+                <Badge tone="accent">
+                  <Package className="size-3" />
+                  Package
+                </Badge>
+              )}
               <Badge tone="neutral">
                 <FileStack className="size-3" />
                 {model.file_count} files · {formatBytes(Number(model.total_size))}
               </Badge>
               {user && <LikeButton publicId={model.public_id} liked={liked} />}
-              {canQueue && (
+              {canQueue && !model.is_package && (
                 <QueueButton
                   modelId={model.id}
                   modelPublicId={model.public_id}
@@ -241,21 +296,21 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   memberOf={memberships.map((c) => c.id)}
                 />
               )}
-              {settings.publicSharing && canEdit && (
+              {settings.publicSharing && canEdit && !model.is_package && (
                 <ShareButton
                   publicId={model.public_id}
                   shared={model.share_token != null}
                   shareUrl={model.share_token ? `${appOrigin}/share/${model.share_token}` : null}
                 />
               )}
-              {canEdit && (
+              {canEdit && !model.is_package && (
                 <MoveButton
                   publicId={model.public_id}
                   name={model.name}
                   libraryName={model.library_name}
                 />
               )}
-              {can(policyUser, 'model:delete') && (
+              {can(policyUser, 'model:delete') && !model.is_package && (
                 <DeleteButton
                   publicId={model.public_id}
                   name={model.name}
@@ -304,6 +359,41 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
       */}
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0 space-y-6">
+          {model.is_package && packageChildren.rows.length > 0 && (
+            <section>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                <Boxes className="size-4" />
+                Models in this package
+                <span className="font-normal text-[var(--color-ink-faint)]">
+                  {packageChildren.rows.length}
+                </span>
+              </h2>
+              <Card className="overflow-hidden">
+                <ul className="divide-y divide-[var(--color-border)]">
+                  {packageChildren.rows.map((child) => (
+                    <li key={child.public_id}>
+                      <Link
+                        href={`/models/${child.public_id}` as Route}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]"
+                      >
+                        <Box className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{child.name}</span>
+                          <span className="block truncate text-xs text-[var(--color-ink-faint)]">
+                            {child.path.slice(model.path.length + 1)}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">
+                          {child.file_count} files · {formatBytes(Number(child.total_size))}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
+          )}
+
           {selectedImage ? (
             <Card className="overflow-hidden">
               <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
@@ -404,24 +494,26 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
             </section>
           ))}
 
-          <PrintHistory
-            publicId={model.public_id}
-            canLog={canLogPrints}
-            files={files.rows
-              .filter((file) => !file.missing_at)
-              .map((file) => ({ id: file.id, filename: file.filename }))}
-            suggestions={suggestions}
-            stats={{
-              ...stats,
-              lastPrintedAt: stats.lastPrintedAt?.toISOString() ?? null,
-            }}
-            prints={prints.map((print) => ({
-              ...print,
-              startedAt: print.startedAt?.toISOString() ?? null,
-              finishedAt: print.finishedAt?.toISOString() ?? null,
-              createdAt: print.createdAt.toISOString(),
-            }))}
-          />
+          {!model.is_package && (
+            <PrintHistory
+              publicId={model.public_id}
+              canLog={canLogPrints}
+              files={files.rows
+                .filter((file) => !file.missing_at)
+                .map((file) => ({ id: file.id, filename: file.filename }))}
+              suggestions={suggestions}
+              stats={{
+                ...stats,
+                lastPrintedAt: stats.lastPrintedAt?.toISOString() ?? null,
+              }}
+              prints={prints.map((print) => ({
+                ...print,
+                startedAt: print.startedAt?.toISOString() ?? null,
+                finishedAt: print.finishedAt?.toISOString() ?? null,
+                createdAt: print.createdAt.toISOString(),
+              }))}
+            />
+          )}
         </div>
 
         <aside className="min-w-0 space-y-4">

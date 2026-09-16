@@ -46,6 +46,8 @@ export const models = pgTable(
 
     /** True when this model is a single loose file rather than a folder. */
     isFileModel: boolean('is_file_model').notNull().default(false),
+    /** A package owns shared files while preserving the models beneath its directory. */
+    isPackage: boolean('is_package').notNull().default(false),
 
     // Denormalized for sorting and grid badges without a join.
     fileCount: integer('file_count').notNull().default(0),

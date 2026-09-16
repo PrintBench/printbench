@@ -20,6 +20,7 @@ type ModelRow = {
   file_count: number
   total_size: string
   library_name: string
+  is_package: boolean
   preview_extension: string | null
   preview_image_file_id: string | null
   thumb_file_id: string | null
@@ -47,7 +48,7 @@ export default async function ModelsPage({
   const afterId = params.afterId
 
   const result = await db.execute<ModelRow>(sql`
-    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size,
+    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
            f.extension AS preview_extension,
            CASE WHEN f.category = 'image' THEN f.id END AS preview_image_file_id,
@@ -128,6 +129,7 @@ export default async function ModelsPage({
                 totalSize={Number(row.total_size)}
                 libraryName={row.library_name}
                 previewExtension={row.preview_extension}
+                isPackage={row.is_package}
                 previewImageFileId={row.preview_image_file_id}
                 thumbFileId={row.thumb_file_id}
                 dimensions={formatDimensions(

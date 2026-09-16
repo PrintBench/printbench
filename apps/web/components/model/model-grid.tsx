@@ -20,6 +20,7 @@ export function ModelGrid({ models }: { models: SearchHit[] }) {
           totalSize={model.totalSize}
           libraryName={model.libraryName}
           previewExtension={model.previewExtension}
+          isPackage={model.isPackage}
           previewImageFileId={model.previewImageFileId}
           thumbFileId={model.thumbFileId}
           dimensions={formatDimensions(model.bboxX ?? 0, model.bboxY ?? 0, model.bboxZ ?? 0)}

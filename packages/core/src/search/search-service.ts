@@ -55,6 +55,7 @@ export interface SearchHit {
   fileCount: number
   totalSize: number
   libraryName: string
+  isPackage: boolean
   previewImageFileId: string | null
   thumbFileId: string | null
   previewExtension: string | null
@@ -142,6 +143,7 @@ export async function searchModels(
     file_count: number
     total_size: string
     library_name: string
+    is_package: boolean
     preview_image_file_id: string | null
     thumb_file_id: string | null
     preview_extension: string | null
@@ -158,7 +160,7 @@ export async function searchModels(
     ), counted AS (
       SELECT count(*)::bigint AS total FROM matched
     )
-    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size,
+    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
            f.extension AS preview_extension,
            CASE WHEN f.category = 'image' THEN f.id END AS preview_image_file_id,
@@ -191,6 +193,7 @@ export async function searchModels(
       fileCount: row.file_count,
       totalSize: Number(row.total_size),
       libraryName: row.library_name,
+      isPackage: row.is_package,
       previewImageFileId: row.preview_image_file_id,
       thumbFileId: row.thumb_file_id,
       previewExtension: row.preview_extension,
@@ -283,14 +286,16 @@ function buildWhere(query: string, filters: SearchFilters): SQL {
   }
 
   if (filters.neverPrinted) {
-    clauses.push(sql`NOT EXISTS (SELECT 1 FROM print_runs p WHERE p.model_id = m.id)`)
+    clauses.push(
+      sql`NOT m.is_package AND NOT EXISTS (SELECT 1 FROM print_runs p WHERE p.model_id = m.id)`,
+    )
   }
 
   if (filters.missingPreview) {
-    clauses.push(sql`NOT EXISTS (
-      SELECT 1 FROM model_files f
-      WHERE f.model_id = m.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL
-    )`)
+    clauses.push(sql`NOT m.is_package AND NOT EXISTS (
+        SELECT 1 FROM model_files f
+        WHERE f.model_id = m.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL
+      )`)
   }
 
   if (filters.minSize != null) clauses.push(sql`m.total_size >= ${filters.minSize}`)

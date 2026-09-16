@@ -119,6 +119,7 @@ export interface LikedModel {
   fileCount: number
   totalSize: number
   libraryName: string
+  isPackage: boolean
   previewExtension: string | null
   previewImageFileId: string | null
   thumbFileId: string | null
@@ -140,12 +141,13 @@ export async function listLiked(
     file_count: number
     total_size: string
     library_name: string
+    is_package: boolean
     preview_extension: string | null
     preview_image_file_id: string | null
     thumb_file_id: string | null
     added_at: string
   }>(sql`
-    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size,
+    SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name, li.created_at AS added_at,
            selected.extension AS preview_extension,
            CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
@@ -170,6 +172,7 @@ export async function listLiked(
     fileCount: row.file_count,
     totalSize: Number(row.total_size),
     libraryName: row.library_name,
+    isPackage: row.is_package,
     previewExtension: row.preview_extension,
     previewImageFileId: row.preview_image_file_id,
     thumbFileId: row.thumb_file_id,

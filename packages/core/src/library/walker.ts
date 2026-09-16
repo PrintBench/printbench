@@ -24,7 +24,7 @@
  * weekly deep scan catches those.
  */
 
-import { isIgnoredName, isSidecarFilename, normalizePath } from './paths'
+import { isIgnoredName, isPrintBenchMetadataFilename, normalizePath } from './paths'
 import { isIndexable } from './media-types'
 import type { StorageAdapter } from '../storage/types'
 import type { WalkedDir, WalkedFile } from './grouping'
@@ -154,7 +154,7 @@ export async function walkLibrary(
        * from the counters because they are still not files we index, and
        * `filesSeen` is reported to the user as such.
        */
-      const sidecar = isSidecarFilename(name)
+      const sidecar = isPrintBenchMetadataFilename(name)
       if (!sidecar && !isIndexable(entry.path)) continue
       if (!sidecar) {
         stats.filesSeen++

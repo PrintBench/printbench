@@ -206,7 +206,11 @@ web shell is replaceable without touching the app.
 
 ## Browsing
 
-Beyond search there are four ways in, all reachable from the sidebar:
+Beyond search, the library can be explored in five ways:
+
+- **Packages** — add `.printbench-package.json` to a bundle directory to keep
+  its shared instructions, archives and images together while preserving the
+  independent child models below it. See [Model packages](docs/model-packages.md).
 
 - **Creators** — who made what, with everything of theirs you own.
 - **Tags** — with the management that keeps them usable: rename, recolour,

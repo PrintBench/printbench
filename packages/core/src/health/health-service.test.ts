@@ -194,6 +194,14 @@ describeDb('library health', () => {
       expect(await kindsFor('10')).not.toContain('nested_model')
     })
 
+    it('accepts child models inside an explicit package', async () => {
+      await db.execute(sql`
+        UPDATE models SET is_package = true WHERE id = ${id('05')}
+      `)
+      await detectProblems(db, { libraryId: LIB })
+      expect(await kindsFor('06')).not.toContain('nested_model')
+    })
+
     it('is idempotent', async () => {
       const first = await detectProblems(db, { libraryId: LIB })
       const second = await detectProblems(db, { libraryId: LIB })
