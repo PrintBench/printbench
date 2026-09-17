@@ -225,8 +225,6 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     .filter((f) => !f.missing_at && VIEWABLE.has(f.extension.toLowerCase()))
     .sort((a, b) => Number(b.size) - Number(a.size))[0]
 
-  const NUMBER = new Intl.NumberFormat('en-GB')
-
   /*
    * Built here rather than in the client component: only the server knows the
    * configured public address, and a link built from window.location would be

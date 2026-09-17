@@ -90,10 +90,7 @@ function FileRow({ file, depth }: { file: TreeFile; depth: number }) {
         {file.extension || '—'}
       </span>
 
-      <span
-        className="min-w-0 flex-1 basis-40 truncate text-sm"
-        title={file.filename}
-      >
+      <span className="min-w-0 flex-1 basis-40 truncate text-sm" title={file.filename}>
         {file.displayName ?? file.filename}
       </span>
 
@@ -112,13 +109,9 @@ function FileRow({ file, depth }: { file: TreeFile; depth: number }) {
 
       {!file.missing_at && (
         <>
-          {file.canOpenInSlicer && (
-            <OpenInSlicer fileId={file.id} filename={file.filename} />
-          )}
+          {file.canOpenInSlicer && <OpenInSlicer fileId={file.id} filename={file.filename} />}
 
-          {file.canSendToPrinter && (
-            <SendToPrinter fileId={file.id} filename={file.filename} />
-          )}
+          {file.canSendToPrinter && <SendToPrinter fileId={file.id} filename={file.filename} />}
 
           <FileDownloadLink fileId={file.id} filename={file.filename} />
         </>
@@ -127,13 +120,7 @@ function FileRow({ file, depth }: { file: TreeFile; depth: number }) {
   )
 }
 
-function FolderNode({
-  node,
-  depth,
-}: {
-  node: TreeNode
-  depth: number
-}) {
+function FolderNode({ node, depth }: { node: TreeNode; depth: number }) {
   /*
    * Top-level folders such as "3MF File - TitanPals Astro" and
    * "STL Files - TitanPals Astro" start expanded.
@@ -173,31 +160,19 @@ function FolderNode({
 
         <Folder className="size-4 shrink-0 text-[var(--color-ink-muted)]" />
 
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-          {node.name}
-        </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{node.name}</span>
 
-        <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-faint)]">
-          {total}
-        </span>
+        <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-faint)]">{total}</span>
       </button>
 
       {expanded && (
         <ul>
           {folders.map((folder) => (
-            <FolderNode
-              key={`${depth}-${folder.name}`}
-              node={folder}
-              depth={depth + 1}
-            />
+            <FolderNode key={`${depth}-${folder.name}`} node={folder} depth={depth + 1} />
           ))}
 
           {files.map((file) => (
-            <FileRow
-              key={file.id}
-              file={file}
-              depth={depth + 1}
-            />
+            <FileRow key={file.id} file={file} depth={depth + 1} />
           ))}
         </ul>
       )}
@@ -226,9 +201,7 @@ export function FileTree({ files }: { files: TreeFile[] }) {
   const extensionGroups = new Map<string, TreeNode>()
 
   for (const file of tree.files) {
-    const extension = file.extension
-      ? file.extension.replace(/^\./, '').toUpperCase()
-      : 'OTHER'
+    const extension = file.extension ? file.extension.replace(/^\./, '').toUpperCase() : 'OTHER'
 
     let group = extensionGroups.get(extension)
 
@@ -250,19 +223,11 @@ export function FileTree({ files }: { files: TreeFile[] }) {
   return (
     <ul>
       {folders.map((folder) => (
-        <FolderNode
-          key={`folder-${folder.name}`}
-          node={folder}
-          depth={0}
-        />
+        <FolderNode key={`folder-${folder.name}`} node={folder} depth={0} />
       ))}
 
       {rootGroups.map((group) => (
-        <FolderNode
-          key={`extension-${group.name}`}
-          node={group}
-          depth={0}
-        />
+        <FolderNode key={`extension-${group.name}`} node={group} depth={0} />
       ))}
     </ul>
   )
