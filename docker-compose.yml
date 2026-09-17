@@ -38,12 +38,11 @@ services:
       LIBRARY_ROOTS: /libraries:/data/libraries
       # Must match the internal locations in docker/nginx.conf.
       ACCEL_MOUNTS: /_protected/library/=/libraries,/_protected/managed/=/data/libraries
-    group_add:
-      - '973'
     volumes:
       - previews:/data
-      # Your existing collection. Writable so PrintBench can save metadata sidecars.
-      - ${LIBRARY_PATH:-./libraries}:/libraries
+      # Existing collections are read-only by default. Set LIBRARY_MODE=rw
+      # only when PrintBench should be allowed to save metadata sidecars.
+      - ${LIBRARY_PATH:-./libraries}:/libraries:${LIBRARY_MODE:-ro}
     healthcheck:
       # The standalone server binds the container interface, not loopback.
       # Double-dollar defers hostname expansion until the check runs in Docker.
@@ -64,11 +63,9 @@ services:
       APP_URL: ${APP_URL:-}
       DATA_DIR: /data
       LIBRARY_ROOTS: /libraries:/data/libraries
-    group_add:
-      - '973'
     volumes:
       - previews:/data
-      - ${LIBRARY_PATH:-./libraries}:/libraries
+      - ${LIBRARY_PATH:-./libraries}:/libraries:${LIBRARY_MODE:-ro}
 
   nginx:
     build: { context: ., dockerfile: docker/nginx.Dockerfile }
@@ -78,7 +75,7 @@ services:
       - '80'
     volumes:
       - previews:/data:ro
-      - ${LIBRARY_PATH:-./libraries}:/libraries
+      - ${LIBRARY_PATH:-./libraries}:/libraries:ro
 
 volumes:
   pgdata:

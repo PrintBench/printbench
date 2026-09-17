@@ -148,6 +148,7 @@ function FolderNode({ node, depth }: { node: TreeNode; depth: number }) {
     <li>
       <button
         type="button"
+        aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
         className="flex w-full items-center gap-2 border-t border-[var(--color-border)] px-4 py-2.5 text-left hover:bg-[var(--color-surface-2)]"
         style={{ paddingLeft: `${16 + depth * 20}px` }}
