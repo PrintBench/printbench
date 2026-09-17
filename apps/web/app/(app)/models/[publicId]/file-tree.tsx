@@ -215,8 +215,33 @@ export function FileTree({ files }: { files: TreeFile[] }) {
     }),
   )
 
-  const rootFiles = [...tree.files].sort((a, b) =>
-    (a.displayName ?? a.filename).localeCompare(b.displayName ?? b.filename, undefined, {
+  /*
+   * Files that live directly at the current model root have no real
+   * directory hierarchy to display. Group those files into virtual,
+   * collapsible folders by extension instead.
+   *
+   * This changes presentation only. No directories are created and the
+   * original relative filename is still passed to all file actions.
+   */
+  const extensionGroups = new Map<string, TreeNode>()
+
+  for (const file of tree.files) {
+    const extension = file.extension
+      ? file.extension.replace(/^\./, '').toUpperCase()
+      : 'OTHER'
+
+    let group = extensionGroups.get(extension)
+
+    if (!group) {
+      group = makeNode(extension)
+      extensionGroups.set(extension, group)
+    }
+
+    group.files.push(file)
+  }
+
+  const rootGroups = [...extensionGroups.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, {
       numeric: true,
       sensitivity: 'base',
     }),
@@ -226,16 +251,16 @@ export function FileTree({ files }: { files: TreeFile[] }) {
     <ul>
       {folders.map((folder) => (
         <FolderNode
-          key={folder.name}
+          key={`folder-${folder.name}`}
           node={folder}
           depth={0}
         />
       ))}
 
-      {rootFiles.map((file) => (
-        <FileRow
-          key={file.id}
-          file={file}
+      {rootGroups.map((group) => (
+        <FolderNode
+          key={`extension-${group.name}`}
+          node={group}
           depth={0}
         />
       ))}

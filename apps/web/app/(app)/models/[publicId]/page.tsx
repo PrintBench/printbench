@@ -26,10 +26,7 @@ import { formatBytes, formatDimensions } from '@/components/model/model-card'
 import { ModelViewer } from '@/components/viewer/model-viewer'
 import { DownloadModelButton } from './download-button'
 import { ModelEditor } from './model-editor'
-import { FileDownloadLink } from './file-download-link'
 import { FileTree } from './file-tree'
-import { OpenInSlicer } from './open-in-slicer'
-import { SendToPrinter } from './send-to-printer'
 import { PrintHistory } from './print-history'
 import { ShareButton } from './share-button'
 import { DeleteButton } from './delete-button'
@@ -442,65 +439,19 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               </h2>
 
               <Card className="overflow-hidden">
-                {category === 'model' ? (
-                  <FileTree
-                    files={byCategory.get(category)!.map((file) => ({
-                      id: file.id,
-                      filename: file.filename,
-                      extension: file.extension,
-                      size: file.size,
-                      presupported: file.presupported,
-                      missing_at: file.missing_at,
-                      triangle_count: file.triangle_count,
-                      canOpenInSlicer: slicersFor(file.extension).length > 0,
-                      canSendToPrinter: canSend && canSendToPrinter(file.extension),
-                    }))}
-                  />
-                ) : (
-                  <ul className="divide-y divide-[var(--color-border)]">
-                    {byCategory.get(category)!.map((file) => (
-                      <li
-                        key={file.id}
-                        className={
-                          file.missing_at
-                            ? 'flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 opacity-50'
-                            : 'flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5'
-                        }
-                      >
-                        <span className="w-10 shrink-0 rounded bg-[var(--color-surface-2)] px-1.5 py-0.5 text-center text-[10px] font-medium uppercase text-[var(--color-ink-faint)]">
-                          {file.extension || '—'}
-                        </span>
-                        <span
-                          className="min-w-0 flex-1 basis-40 truncate text-sm"
-                          title={file.filename}
-                        >
-                          {file.filename}
-                        </span>
-                        {file.presupported && <Badge tone="accent">supported</Badge>}
-                        {file.missing_at && <Badge tone="danger">missing</Badge>}
-                        {file.triangle_count != null && (
-                          <span className="hidden shrink-0 text-xs tabular-nums text-[var(--color-ink-faint)] sm:inline">
-                            {NUMBER.format(file.triangle_count)} tris
-                          </span>
-                        )}
-                        <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-muted)]">
-                          {formatBytes(Number(file.size))}
-                        </span>
-                        {!file.missing_at && (
-                          <>
-                            {slicersFor(file.extension).length > 0 && (
-                              <OpenInSlicer fileId={file.id} filename={file.filename} />
-                            )}
-                            {canSend && canSendToPrinter(file.extension) && (
-                              <SendToPrinter fileId={file.id} filename={file.filename} />
-                            )}
-                            <FileDownloadLink fileId={file.id} filename={file.filename} />
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <FileTree
+                  files={byCategory.get(category)!.map((file) => ({
+                    id: file.id,
+                    filename: file.filename,
+                    extension: file.extension,
+                    size: file.size,
+                    presupported: file.presupported,
+                    missing_at: file.missing_at,
+                    triangle_count: file.triangle_count,
+                    canOpenInSlicer: slicersFor(file.extension).length > 0,
+                    canSendToPrinter: canSend && canSendToPrinter(file.extension),
+                  }))}
+                />
               </Card>
             </section>
           ))}
