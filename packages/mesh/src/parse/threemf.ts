@@ -27,11 +27,9 @@ const decodeUtf8 = (bytes: Uint8Array): string => new TextDecoder('utf-8').decod
  * vertices are declared once and referenced by triangles — and it declares its
  * units, so dimensions are trustworthy.
  *
- * This is the one format where we do NOT stream: the geometry is inside a
- * deflate stream inside a zip, and the vertex table must be resolved before
- * any triangle can be read. In practice 3MF files are small (the format
- * compresses well and is used for finished parts rather than raw scans), so
- * a size ceiling is applied instead.
+ * Indexed geometry must remain available while component instances are drawn.
+ * Store it in typed arrays without retaining per-vertex XML objects. Bound both
+ * compressed input and expanded package data: small ZIPs can contain huge XML.
  *
  * **The production extension matters more than it sounds.** A project file
  * saved by Bambu Studio or Orca declares `requiredextensions="p"` and puts no
@@ -44,6 +42,8 @@ const decodeUtf8 = (bytes: Uint8Array): string => new TextDecoder('utf-8').decod
 
 /** Beyond this the file is refused rather than risking the worker's heap. */
 export const MAX_3MF_BYTES = 512 * 1024 * 1024
+/** Cap relevant ZIP entries before inflation allocates their output buffers. */
+export const MAX_3MF_EXPANDED_BYTES = 256 * 1024 * 1024
 
 const MODEL_PATHS = ['3D/3dmodel.model', '3d/3dmodel.model']
 
@@ -72,7 +72,25 @@ export function readThreeMf(buffer: Uint8Array, visit: TriangleVisitor): ThreeMf
 
   let entries: Record<string, Uint8Array>
   try {
-    entries = unzipSync(buffer)
+    let expandedBytes = 0
+    entries = unzipSync(buffer, {
+      filter: (entry) => {
+        // Slicer projects can carry very large G-code, settings and other data
+        // that neither mesh analysis nor thumbnails consume. Never inflate it.
+        const key = normalisePart(entry.name)
+        if (!key.endsWith('.model') && key !== '_rels/.rels' && !/\.(png|jpe?g)$/.test(key)) {
+          return false
+        }
+        expandedBytes += entry.originalSize
+        if (expandedBytes > MAX_3MF_EXPANDED_BYTES) {
+          throw new MeshParseError(
+            '3MF expanded geometry and images exceed the 256 MB memory budget',
+            '3mf',
+          )
+        }
+        return true
+      },
+    })
   } catch (error) {
     throw new MeshParseError(
       `Not a readable 3MF package: ${error instanceof Error ? error.message : String(error)}`,
@@ -340,12 +358,38 @@ function makeEmitter(stats: MeshStats, visit: TriangleVisitor): Emitter {
 
 /** Parses one `.model` part into its objects and build items. */
 function parsePart(xml: string): ParsedPart {
+  // Keep only the small document structure in the XML object tree. Dense mesh
+  // attributes used to exist both as millions of JS objects and typed arrays.
+  // updateTag runs as each element is read, before it is retained in that tree.
+  const geometry = new Map<
+    string,
+    { vertices: NumberBuffer<Float32Array>; triangles: NumberBuffer<Int32Array> }
+  >()
+  let current:
+    { vertices: NumberBuffer<Float32Array>; triangles: NumberBuffer<Int32Array> } | undefined
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@',
     // Objects with one child must still be arrays, or a single-mesh model and
     // a multi-mesh one take different code paths.
     isArray: (name) => ['object', 'vertex', 'triangle', 'item', 'component'].includes(name),
+    updateTag: (name, path, attrs) => {
+      const location = String(path).replace(/^Model\./, 'model.')
+      if (location === 'model.resources.object') {
+        current = {
+          vertices: new NumberBuffer(Float32Array),
+          triangles: new NumberBuffer(Int32Array),
+        }
+        geometry.set(String(attrs['@id'] ?? ''), current)
+      } else if (current && location === 'model.resources.object.mesh.vertices.vertex') {
+        current.vertices.push(Number(attrs['@x']), Number(attrs['@y']), Number(attrs['@z']))
+        return false
+      } else if (current && location === 'model.resources.object.mesh.triangles.triangle') {
+        current.triangles.push(toIndex(attrs['@v1']), toIndex(attrs['@v2']), toIndex(attrs['@v3']))
+        return false
+      }
+      return name
+    },
   })
 
   let doc: Record<string, unknown>
@@ -375,9 +419,13 @@ function parsePart(xml: string): ParsedPart {
 
     const componentNodes = ((node.components as Record<string, unknown>)?.component ??
       []) as Record<string, unknown>[]
+    const data = geometry.get(id)
 
     objects.set(id, {
-      mesh: readMesh(node.mesh as Record<string, unknown> | undefined),
+      mesh:
+        data?.vertices.length && data.triangles.length
+          ? { vertices: data.vertices.finish(), triangles: data.triangles.finish() }
+          : undefined,
       components: componentNodes.map((component) => ({
         objectId: String(component['@objectid'] ?? ''),
         // The namespace prefix is conventionally "p", but only conventionally.
@@ -420,38 +468,42 @@ function attr(node: Record<string, unknown>, name: string): string | undefined {
   return undefined
 }
 
-function readMesh(mesh: Record<string, unknown> | undefined): MeshData | undefined {
-  if (!mesh) return undefined
+/** Small initial chunks also keep packages with many tiny objects inexpensive. */
+class NumberBuffer<T extends Float32Array | Int32Array> {
+  private chunks: T[] = []
+  private used = 0
+  private result: T | undefined
+  length = 0
 
-  const vertexNodes = ((mesh.vertices as Record<string, unknown>)?.vertex ?? []) as Record<
-    string,
-    unknown
-  >[]
-  const triangleNodes = ((mesh.triangles as Record<string, unknown>)?.triangle ?? []) as Record<
-    string,
-    unknown
-  >[]
+  constructor(private readonly ArrayType: { new (length: number): T }) {}
 
-  if (vertexNodes.length === 0 || triangleNodes.length === 0) return undefined
-
-  // Flat typed arrays rather than objects: a dense mesh has millions of these.
-  const vertices = new Float32Array(vertexNodes.length * 3)
-  for (let i = 0; i < vertexNodes.length; i++) {
-    const node = vertexNodes[i]!
-    vertices[i * 3] = Number(node['@x'])
-    vertices[i * 3 + 1] = Number(node['@y'])
-    vertices[i * 3 + 2] = Number(node['@z'])
+  push(a: number, b: number, c: number): void {
+    let chunk = this.chunks[this.chunks.length - 1]
+    if (!chunk || this.used === chunk.length) {
+      chunk = new this.ArrayType(Math.min((chunk?.length ?? 48) * 2, 12_288))
+      this.chunks.push(chunk)
+      this.used = 0
+    }
+    chunk[this.used] = a
+    chunk[this.used + 1] = b
+    chunk[this.used + 2] = c
+    this.used += 3
+    this.length += 3
   }
 
-  const triangles = new Int32Array(triangleNodes.length * 3)
-  for (let i = 0; i < triangleNodes.length; i++) {
-    const node = triangleNodes[i]!
-    triangles[i * 3] = toIndex(node['@v1'])
-    triangles[i * 3 + 1] = toIndex(node['@v2'])
-    triangles[i * 3 + 2] = toIndex(node['@v3'])
+  finish(): T {
+    if (this.result) return this.result
+    const values = new this.ArrayType(this.length)
+    let offset = 0
+    for (const chunk of this.chunks) {
+      const count = Math.min(chunk.length, this.length - offset)
+      values.set(chunk.subarray(0, count), offset)
+      offset += count
+    }
+    this.chunks = []
+    this.result = values
+    return values
   }
-
-  return { vertices, triangles }
 }
 
 function toIndex(value: unknown): number {

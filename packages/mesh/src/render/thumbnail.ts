@@ -1,6 +1,7 @@
 import sharp from 'sharp'
 import { readStl } from '../parse/stl'
-import { readThreeMf } from '../parse/threemf'
+import { MAX_3MF_BYTES, readThreeMf } from '../parse/threemf'
+import { collectBounded } from '../parse/collect-bounded'
 import { readObj } from '../parse/obj'
 import { readPly } from '../parse/ply'
 import {
@@ -85,7 +86,7 @@ async function measure(
     case 'ply':
       return readPly(source, noop, options)
     case '3mf':
-      return readThreeMf(await collect(source), noop)
+      return readThreeMf(await collectBounded(source, MAX_3MF_BYTES, '3mf', options), noop)
   }
 }
 
@@ -104,7 +105,7 @@ export async function renderThumbnail(
    * triangle count are wanted regardless.
    */
   if (format === '3mf') {
-    const buffer = await collect(source)
+    const buffer = await collectBounded(source, MAX_3MF_BYTES, '3mf', options)
     const result = readThreeMf(buffer, noop)
     if (result.thumbnail && result.thumbnail.data.byteLength > 0) {
       try {
@@ -208,13 +209,6 @@ async function rasterise(
     embedded: false,
     rendererVersion: RENDERER_VERSION,
   }
-}
-
-async function collect(source: StreamSource): Promise<Buffer> {
-  const stream = await source()
-  const chunks: Buffer[] = []
-  for await (const chunk of stream) chunks.push(chunk as Buffer)
-  return Buffer.concat(chunks)
 }
 
 function noop(): void {}

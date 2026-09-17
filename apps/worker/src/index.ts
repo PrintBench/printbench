@@ -12,7 +12,8 @@ import { mkdirSync } from 'node:fs'
 import { sql } from 'drizzle-orm'
 import { loadRootEnv } from '@pb/core'
 import { createDb } from '@pb/db'
-import { JOB, getQueue } from '@pb/jobs'
+import { JOB, getQueue, type JobHandler, type JobName } from '@pb/jobs'
+import { withMemoryDiagnostics } from './memory-diagnostics'
 import { handleLibraryScan } from './jobs/scan'
 import { handleModelMove } from './jobs/move'
 import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs/analyze'
@@ -93,15 +94,17 @@ async function main(): Promise<void> {
   await queue.start()
   console.log('[worker] job queue ready')
 
-  await queue.work(JOB.libraryScan, handleLibraryScan)
-  await queue.work(JOB.modelMove, handleModelMove)
-  await queue.work(JOB.fileAnalyze, handleFileAnalyze)
-  await queue.work(JOB.fileThumbnail, handleFileThumbnail)
-  await queue.work(JOB.fileDigest, handleFileDigest)
-  await queue.work(JOB.healthDetect, handleHealthDetect)
-  await queue.work(JOB.maintReconcile, handleMaintReconcile)
-  await queue.work(JOB.maintArchive, handleMaintArchive)
-  await queue.work(JOB.scheduleSweep, handleScheduleSweep)
+  const work = <N extends JobName>(name: N, handler: JobHandler<N>) =>
+    queue.work(name, withMemoryDiagnostics(name, handler))
+  await work(JOB.libraryScan, handleLibraryScan)
+  await work(JOB.modelMove, handleModelMove)
+  await work(JOB.fileAnalyze, handleFileAnalyze)
+  await work(JOB.fileThumbnail, handleFileThumbnail)
+  await work(JOB.fileDigest, handleFileDigest)
+  await work(JOB.healthDetect, handleHealthDetect)
+  await work(JOB.maintReconcile, handleMaintReconcile)
+  await work(JOB.maintArchive, handleMaintArchive)
+  await work(JOB.scheduleSweep, handleScheduleSweep)
   console.log(
     '[worker] handlers: library.scan, model.move, file.analyze, file.thumbnail, file.digest, ' +
       'health.detect, library.schedule, maint.reconcile, maint.archive',
