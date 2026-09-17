@@ -1,8 +1,12 @@
-# Local-only port publishing. Coolify's Traefik reaches the `nginx` service
-# over Docker networking, so the production compose file intentionally avoids
-# binding a fixed host port.
+# Local-only settings for this PrintBench deployment.
+# Coolify's Traefik reaches the `nginx` service over Docker networking, so the
+# production compose file intentionally avoids binding a fixed host port.
 
 services:
   nginx:
     ports:
       - '${PORT:-8080}:80'
+
+  worker:
+    environment:
+      NODE_OPTIONS: --max-old-space-size=4096
