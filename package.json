@@ -1,7 +1,7 @@
 {
   "name": "printbench",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Self-hosted web app for managing and finding your 3D print files (STL, 3MF, OBJ, PLY). Postgres is the only dependency.",
   "keywords": [
     "3d-printing",
