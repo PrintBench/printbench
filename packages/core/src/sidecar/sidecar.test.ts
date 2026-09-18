@@ -83,8 +83,11 @@ describeDb('sidecar round trip', () => {
   let root: string
   let library: LibraryLocation
 
-  const scan = () =>
-    scanLibrary({ db, storage: new LocalAdapter(library), library }, { mode: 'deep' })
+  const scan = (options: { restoreSidecars?: boolean } = {}) =>
+    scanLibrary(
+      { db, storage: new LocalAdapter(library), library },
+      { mode: 'deep', ...options },
+    )
 
   beforeAll(async () => {
     ;({ pool, db } = createDb(url))
@@ -294,6 +297,105 @@ describeDb('sidecar round trip', () => {
 
     const after = await db.execute<{ name: string }>(sql`SELECT name FROM models WHERE id = ${id}`)
     expect(after.rows[0]!.name).toBe('Newer Name')
+  })
+
+  it('explicitly restores sidecar metadata over an existing model', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    // Give the existing database record metadata that should be replaced.
+    await updateModel(db, id, {
+      name: 'Database Name',
+      license: 'MIT',
+      creator: 'Database Creator',
+      tags: ['old-tag'],
+      notes: 'Database notes',
+    })
+
+    // Deliberately make the sidecar authoritative. Explicit nulls and an empty
+    // tag list mean those existing values should be cleared.
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'Sidecar Name',
+        notes: null,
+        license: null,
+        creator: null,
+        tags: [],
+      }),
+    )
+
+    const outcome = await scan({ restoreSidecars: true })
+    expect(outcome.status).toBe('succeeded')
+    expect(outcome.sidecarsRestored).toBeGreaterThan(0)
+
+    const after = await db.execute<{
+      name: string
+      notes: string | null
+      license: string | null
+      creator: string | null
+      tags: string[] | null
+    }>(sql`
+      SELECT m.name, m.notes, m.license, c.name AS creator,
+             (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
+                JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
+      FROM models m LEFT JOIN creators c ON c.id = m.creator_id
+      WHERE m.id = ${id}
+    `)
+
+    const row = after.rows[0]!
+    expect(row.name).toBe('Sidecar Name')
+    expect(row.notes).toBeNull()
+    expect(row.license).toBeNull()
+    expect(row.creator).toBeNull()
+    expect(row.tags).toBeNull()
+  })
+
+  it('leaves existing metadata unchanged when fields are absent from the sidecar', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await updateModel(db, id, {
+      name: 'Database Name',
+      license: 'CC-BY-4.0',
+      creator: 'Database Creator',
+      tags: ['keep-tag'],
+      notes: 'Keep these notes',
+    })
+
+    // Only name is present. The other database metadata must survive.
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'Sidecar Name',
+      }),
+    )
+
+    const outcome = await scan({ restoreSidecars: true })
+    expect(outcome.status).toBe('succeeded')
+
+    const after = await db.execute<{
+      name: string
+      notes: string | null
+      license: string | null
+      creator: string | null
+      tags: string[] | null
+    }>(sql`
+      SELECT m.name, m.notes, m.license, c.name AS creator,
+             (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
+                JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
+      FROM models m LEFT JOIN creators c ON c.id = m.creator_id
+      WHERE m.id = ${id}
+    `)
+
+    const row = after.rows[0]!
+    expect(row.name).toBe('Sidecar Name')
+    expect(row.notes).toBe('Keep these notes')
+    expect(row.license).toBe('CC-BY-4.0')
+    expect(row.creator).toBe('Database Creator')
+    expect(row.tags).toEqual(['keep-tag'])
   })
 
   it('ignores a corrupt sidecar rather than failing the scan', async () => {

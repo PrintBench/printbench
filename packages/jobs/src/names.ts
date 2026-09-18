@@ -30,6 +30,11 @@ export const payloads = {
     mode: z.enum(['fast', 'deep']).default('fast'),
     /** Set only when an admin has confirmed a genuine mass deletion. */
     force: z.boolean().default(false),
+    /**
+     * Explicitly restore metadata from on-disk sidecars for existing models.
+     * Omitted for ordinary scans so stale sidecars cannot overwrite newer DB edits.
+     */
+    restoreSidecars: z.boolean().optional(),
   }),
   [JOB.modelIndex]: z.object({ modelId: z.string().uuid() }),
   [JOB.modelMove]: z.object({

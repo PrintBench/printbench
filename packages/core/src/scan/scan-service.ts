@@ -45,6 +45,8 @@ export interface ScanOptions {
   mode?: 'fast' | 'deep'
   /** Set by an admin to confirm a genuine mass deletion. */
   force?: boolean
+  /** Explicitly make on-disk sidecar metadata authoritative for this scan. */
+  restoreSidecars?: boolean
   signal?: AbortSignal
   onProgress?: (progress: ScanProgress) => void
   /**
@@ -229,27 +231,28 @@ export async function scanLibrary(
       touchedModelIds.push(result.modelId)
       if (result.created) {
         outcome.modelsCreated++
-        /*
-         * Restore metadata from the sidecar, but only for a model being seen
-         * for the first time.
-         *
-         * This is what makes the database rebuildable: drop Postgres, rescan,
-         * and tags, creator, licence and notes come back. Applying it on every
-         * scan instead would let a stale file on disk overwrite an edit made in
-         * the app — the database is authoritative once a model is known.
-         */
-        if (!model.isFileModel) {
-          const restored = await restoreFromSidecar(
-            db,
-            storage,
-            result.modelId,
-            model.path,
-            model.isPackage,
-          )
-          if (restored) outcome.sidecarsRestored++
-        }
       } else {
         outcome.modelsUpdated++
+      }
+
+      /*
+       * New models always restore metadata from their sidecar so the database
+       * remains rebuildable.
+       *
+       * Existing models restore sidecars only when explicitly requested. Ordinary
+       * scans keep the database authoritative so a stale sidecar cannot overwrite
+       * a newer edit made in the app.
+       */
+      if ((result.created || options.restoreSidecars) && !model.isFileModel) {
+        const restored = await restoreFromSidecar(
+          db,
+          storage,
+          result.modelId,
+          model.path,
+          model.isPackage,
+          !result.created && options.restoreSidecars === true,
+        )
+        if (restored) outcome.sidecarsRestored++
       }
       outcome.filesCreated += result.filesCreated
     }
@@ -748,11 +751,11 @@ async function saveFingerprints(
 export { markMissing as __markMissingForTests, countModelsNotIn as __countModelsNotInForTests }
 
 /**
- * Applies a sidecar's metadata to a newly discovered model.
+ * Applies metadata from an on-disk sidecar.
  *
- * Only ever called for a model created by this scan. Creators and tags are
- * created as needed, so a library moved to a fresh instance rebuilds its whole
- * taxonomy from the folders themselves.
+ * New models use merge semantics so the database can be rebuilt from the
+ * library. When overwriteExisting is true, fields explicitly present in the
+ * sidecar are authoritative, including null values and empty tag lists.
  */
 async function restoreFromSidecar(
   db: Database,
@@ -760,6 +763,7 @@ async function restoreFromSidecar(
   modelId: string,
   modelPath: string,
   isPackage: boolean,
+  overwriteExisting = false,
 ): Promise<boolean> {
   const { data, error } = isPackage
     ? await readPackageSidecar(storage, modelPath)
@@ -775,14 +779,37 @@ async function restoreFromSidecar(
   if (data.notes !== undefined) updates.push('notes')
   if (data.license !== undefined) updates.push('license')
 
-  await db.execute(sql`
-    UPDATE models SET
-      name = coalesce(${data.name ?? null}, name),
-      slug = coalesce(${data.name ? slugify(data.name) : null}, slug),
-      notes = coalesce(${data.notes ?? null}, notes),
-      license = coalesce(${data.license ?? null}, license)
-    WHERE id = ${modelId}
-  `)
+  if (overwriteExisting) {
+    await db.execute(sql`
+      UPDATE models SET
+        name = CASE
+          WHEN ${data.name !== undefined} THEN ${data.name ?? null}
+          ELSE name
+        END,
+        slug = CASE
+          WHEN ${data.name !== undefined} THEN ${data.name ? slugify(data.name) : null}
+          ELSE slug
+        END,
+        notes = CASE
+          WHEN ${data.notes !== undefined} THEN ${data.notes ?? null}
+          ELSE notes
+        END,
+        license = CASE
+          WHEN ${data.license !== undefined} THEN ${data.license ?? null}
+          ELSE license
+        END
+      WHERE id = ${modelId}
+    `)
+  } else {
+    await db.execute(sql`
+      UPDATE models SET
+        name = coalesce(${data.name ?? null}, name),
+        slug = coalesce(${data.name ? slugify(data.name) : null}, slug),
+        notes = coalesce(${data.notes ?? null}, notes),
+        license = coalesce(${data.license ?? null}, license)
+      WHERE id = ${modelId}
+    `)
+  }
 
   if (data.creator) {
     const creator = await db.execute<{ id: string }>(sql`
@@ -795,9 +822,16 @@ async function restoreFromSidecar(
       UPDATE models SET creator_id = ${creator.rows[0]!.id} WHERE id = ${modelId}
     `)
     updates.push('creator')
+  } else if (overwriteExisting && data.creator === null) {
+    await db.execute(sql`UPDATE models SET creator_id = NULL WHERE id = ${modelId}`)
+    updates.push('creator')
   }
 
-  if (data.tags?.length) {
+  if (data.tags !== undefined) {
+    if (overwriteExisting) {
+      await db.execute(sql`DELETE FROM model_tags WHERE model_id = ${modelId}`)
+    }
+
     for (const name of data.tags) {
       const tag = await db.execute<{ id: string }>(sql`
         INSERT INTO tags (name, slug) VALUES (${name}, ${slugify(name) || 'tag'})
@@ -809,7 +843,12 @@ async function restoreFromSidecar(
         ON CONFLICT DO NOTHING
       `)
     }
-    updates.push(`${data.tags.length} tags`)
+
+    if (data.tags.length > 0) {
+      updates.push(`${data.tags.length} tags`)
+    } else if (overwriteExisting) {
+      updates.push('tags')
+    }
   }
 
   if (data.previewFile !== undefined) {

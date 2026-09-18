@@ -17,10 +17,18 @@ export function ScanButton({
   const [pending, startTransition] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [confirmingRestore, setConfirmingRestore] = useState(false)
 
-  function run(options: { mode?: 'fast' | 'deep'; force?: boolean } = {}) {
+  function run(
+    options: {
+      mode?: 'fast' | 'deep'
+      force?: boolean
+      restoreSidecars?: boolean
+    } = {},
+  ) {
     setMessage(null)
     setConfirming(false)
+    setConfirmingRestore(false)
     startTransition(async () => {
       const result = await triggerScan(libraryId, options)
       setMessage(result.ok ? 'Scan queued' : result.error)
@@ -75,26 +83,63 @@ export function ScanButton({
 
   return (
     <div className="flex flex-col items-end gap-1.5">
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={pending}
-          onClick={() => run({ mode: 'fast' })}
-        >
-          <RefreshCw className={pending ? 'animate-spin' : undefined} />
-          Scan
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={pending}
-          title="Re-examines every file. Slower, but catches edits to existing files."
-          onClick={() => run({ mode: 'deep' })}
-        >
-          Deep scan
-        </Button>
-      </div>
+      {confirmingRestore ? (
+        <div className="flex flex-col items-end gap-2 rounded-[var(--radius-control)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3">
+          <p className="max-w-sm text-right text-xs text-[var(--color-ink)]">
+            Restore metadata from .printbench.json files? Existing PrintBench metadata for models
+            with sidecars will be replaced by metadata stored in those files. Models without a
+            sidecar will not be changed.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => setConfirmingRestore(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              disabled={pending}
+              onClick={() => run({ mode: 'deep', restoreSidecars: true })}
+            >
+              Restore metadata
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => run({ mode: 'fast' })}
+          >
+            <RefreshCw className={pending ? 'animate-spin' : undefined} />
+            Scan
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            title="Re-examines every file. Slower, but catches edits to existing files."
+            onClick={() => run({ mode: 'deep' })}
+          >
+            Deep scan
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            title="Restore model metadata from on-disk .printbench.json sidecars."
+            onClick={() => setConfirmingRestore(true)}
+          >
+            Restore sidecars
+          </Button>
+        </div>
+      )}
       {message && <span className="text-xs text-[var(--color-ink-faint)]">{message}</span>}
     </div>
   )

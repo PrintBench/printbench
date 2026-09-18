@@ -358,7 +358,11 @@ export async function createLibrary(input: {
 
 export async function triggerScan(
   libraryId: string,
-  options: { mode?: 'fast' | 'deep'; force?: boolean } = {},
+  options: {
+    mode?: 'fast' | 'deep'
+    force?: boolean
+    restoreSidecars?: boolean
+  } = {},
 ): Promise<Result> {
   try {
     const user = await requireUser()
@@ -378,7 +382,12 @@ export async function triggerScan(
     const queue = await getStartedQueue()
     await queue.send(
       JOB.libraryScan,
-      { libraryId, mode: options.mode ?? 'fast', force: options.force ?? false },
+      {
+        libraryId,
+        mode: options.mode ?? 'fast',
+        force: options.force ?? false,
+        restoreSidecars: options.restoreSidecars ?? false,
+      },
       { singletonKey: `scan:${libraryId}` },
     )
 
