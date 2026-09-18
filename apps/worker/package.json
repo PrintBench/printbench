@@ -15,13 +15,13 @@
     "@pb/jobs": "*",
     "@pb/mesh": "*",
     "@tus/file-store": "^2.1.1",
-    "@tus/server": "^2.4.4",
+    "@tus/server": "^2.4.5",
     "archiver": "^8.0.0",
     "chokidar": "^5.0.0",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",
-    "tsx": "^4.20.6"
+    "tsx": "^4.23.13"
   }
 }

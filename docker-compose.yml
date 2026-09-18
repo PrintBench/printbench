@@ -40,8 +40,9 @@ services:
       ACCEL_MOUNTS: /_protected/library/=/libraries,/_protected/managed/=/data/libraries
     volumes:
       - previews:/data
-      # Your existing collection, mounted read-only. The app never writes here.
-      - ${LIBRARY_PATH:-./libraries}:/libraries:ro
+      # Existing collections are read-only by default. Set LIBRARY_MODE=rw
+      # only when PrintBench should be allowed to save metadata sidecars.
+      - ${LIBRARY_PATH:-./libraries}:/libraries:${LIBRARY_MODE:-ro}
     healthcheck:
       # The standalone server binds the container interface, not loopback.
       # Double-dollar defers hostname expansion until the check runs in Docker.
@@ -62,9 +63,10 @@ services:
       APP_URL: ${APP_URL:-}
       DATA_DIR: /data
       LIBRARY_ROOTS: /libraries:/data/libraries
+      WORKER_MEMORY_LOG: ${WORKER_MEMORY_LOG:-0}
     volumes:
       - previews:/data
-      - ${LIBRARY_PATH:-./libraries}:/libraries:ro
+      - ${LIBRARY_PATH:-./libraries}:/libraries:${LIBRARY_MODE:-ro}
 
   nginx:
     build: { context: ., dockerfile: docker/nginx.Dockerfile }

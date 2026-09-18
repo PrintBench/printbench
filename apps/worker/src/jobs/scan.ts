@@ -8,6 +8,7 @@ import {
 } from '@pb/core'
 import type { JobPayload } from '@pb/jobs'
 import { JOB, getQueue } from '@pb/jobs'
+import { reportMemory } from '../memory-diagnostics'
 
 /**
  * Runs a library scan.
@@ -55,6 +56,13 @@ export async function handleLibraryScan(
     {
       mode: payload.mode,
       force: payload.force,
+      onProgress: (progress) =>
+        reportMemory({
+          job: JOB.libraryScan,
+          libraryId: library.id,
+          event: 'phase',
+          ...progress,
+        }),
       /*
        * Fan out derived work in batches. A 50k-file library produces roughly a
        * hundred multi-row inserts rather than 150,000 individual ones.
