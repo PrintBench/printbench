@@ -851,6 +851,37 @@ async function restoreFromSidecar(
     }
   }
 
+  if (data.links !== undefined) {
+    if (overwriteExisting) {
+      await db.execute(sql`DELETE FROM model_links WHERE model_id = ${modelId}`)
+    }
+
+    for (const [position, link] of data.links.entries()) {
+      let host: string | null = null
+      try {
+        host = new URL(link.url).hostname
+      } catch {
+        // Sidecar validation intentionally permits non-URL strings. Preserve
+        // the link and simply omit the derived host when it cannot be parsed.
+      }
+
+      await db.execute(sql`
+        INSERT INTO model_links (model_id, url, title, host, position)
+        VALUES (${modelId}, ${link.url}, ${link.title ?? null}, ${host}, ${position})
+        ON CONFLICT (model_id, url) DO UPDATE SET
+          title = EXCLUDED.title,
+          host = EXCLUDED.host,
+          position = EXCLUDED.position
+      `)
+    }
+
+    if (data.links.length > 0) {
+      updates.push(`${data.links.length} links`)
+    } else if (overwriteExisting) {
+      updates.push('links')
+    }
+  }
+
   if (data.previewFile !== undefined) {
     if (data.previewFile === null) {
       await db.execute(sql`UPDATE models SET preview_file_id = NULL WHERE id = ${modelId}`)

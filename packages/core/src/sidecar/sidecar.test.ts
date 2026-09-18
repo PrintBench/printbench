@@ -84,10 +84,7 @@ describeDb('sidecar round trip', () => {
   let library: LibraryLocation
 
   const scan = (options: { restoreSidecars?: boolean } = {}) =>
-    scanLibrary(
-      { db, storage: new LocalAdapter(library), library },
-      { mode: 'deep', ...options },
-    )
+    scanLibrary({ db, storage: new LocalAdapter(library), library }, { mode: 'deep', ...options })
 
   beforeAll(async () => {
     ;({ pool, db } = createDb(url))
@@ -396,6 +393,131 @@ describeDb('sidecar round trip', () => {
     expect(row.license).toBe('CC-BY-4.0')
     expect(row.creator).toBe('Database Creator')
     expect(row.tags).toEqual(['keep-tag'])
+  })
+
+  it('explicitly replaces existing links from the sidecar', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES
+        (${id}, 'https://old.example.com/model', 'Old link', 'old.example.com', 0),
+        (${id}, 'https://remove.example.com/model', 'Remove me', 'remove.example.com', 1)
+    `)
+
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        links: [
+          {
+            url: 'https://example.com/red-dragon',
+            title: 'Red Dragon',
+          },
+          {
+            url: 'not-a-valid-url',
+            title: 'Custom link',
+          },
+        ],
+      }),
+    )
+
+    const outcome = await scan({ restoreSidecars: true })
+    expect(outcome.status).toBe('succeeded')
+
+    const after = await db.execute<{
+      url: string
+      title: string | null
+      host: string | null
+      position: number
+    }>(sql`
+      SELECT url, title, host, position
+      FROM model_links
+      WHERE model_id = ${id}
+      ORDER BY position
+    `)
+
+    expect(after.rows).toEqual([
+      {
+        url: 'https://example.com/red-dragon',
+        title: 'Red Dragon',
+        host: 'example.com',
+        position: 0,
+      },
+      {
+        url: 'not-a-valid-url',
+        title: 'Custom link',
+        host: null,
+        position: 1,
+      },
+    ])
+  })
+
+  it('explicitly clears existing links when the sidecar contains an empty link list', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES (${id}, 'https://old.example.com/model', 'Old link', 'old.example.com', 0)
+    `)
+
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        links: [],
+      }),
+    )
+
+    await scan({ restoreSidecars: true })
+
+    const after = await db.execute<{ count: number }>(sql`
+      SELECT count(*)::int AS count
+      FROM model_links
+      WHERE model_id = ${id}
+    `)
+
+    expect(after.rows[0]!.count).toBe(0)
+  })
+
+  it('leaves existing links unchanged when links are absent from the sidecar', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES (${id}, 'https://keep.example.com/model', 'Keep me', 'keep.example.com', 0)
+    `)
+
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'Sidecar Name',
+      }),
+    )
+
+    await scan({ restoreSidecars: true })
+
+    const after = await db.execute<{
+      url: string
+      title: string | null
+      host: string | null
+    }>(sql`
+      SELECT url, title, host
+      FROM model_links
+      WHERE model_id = ${id}
+    `)
+
+    expect(after.rows).toEqual([
+      {
+        url: 'https://keep.example.com/model',
+        title: 'Keep me',
+        host: 'keep.example.com',
+      },
+    ])
   })
 
   it('ignores a corrupt sidecar rather than failing the scan', async () => {

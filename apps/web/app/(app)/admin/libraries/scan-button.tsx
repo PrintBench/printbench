@@ -86,9 +86,9 @@ export function ScanButton({
       {confirmingRestore ? (
         <div className="flex flex-col items-end gap-2 rounded-[var(--radius-control)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3">
           <p className="max-w-sm text-right text-xs text-[var(--color-ink)]">
-            Restore metadata from .printbench.json files? Existing PrintBench metadata for models
-            with sidecars will be replaced by metadata stored in those files. Models without a
-            sidecar will not be changed.
+            Restore metadata from sidecar files? Existing PrintBench metadata for models and
+            packages with .printbench.json or .printbench-package.json files will be replaced by
+            metadata explicitly stored in those files. Models without a sidecar will not be changed.
           </p>
           <div className="flex gap-2">
             <Button
@@ -133,7 +133,7 @@ export function ScanButton({
             size="sm"
             variant="ghost"
             disabled={pending}
-            title="Restore model metadata from on-disk .printbench.json sidecars."
+            title="Restore model and package metadata from on-disk sidecar files."
             onClick={() => setConfirmingRestore(true)}
           >
             Restore sidecars

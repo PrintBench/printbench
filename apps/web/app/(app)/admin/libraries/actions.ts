@@ -380,7 +380,7 @@ export async function triggerScan(
      * queueing a scan each time.
      */
     const queue = await getStartedQueue()
-    await queue.send(
+    const jobId = await queue.send(
       JOB.libraryScan,
       {
         libraryId,
@@ -390,6 +390,14 @@ export async function triggerScan(
       },
       { singletonKey: `scan:${libraryId}` },
     )
+
+    if (options.restoreSidecars && !jobId) {
+      return {
+        ok: false,
+        error:
+          'A scan is already queued for this library. Wait for it to finish, then restore sidecars again.',
+      }
+    }
 
     revalidatePath('/admin/libraries')
     return { ok: true }
