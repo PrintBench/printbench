@@ -59,6 +59,26 @@ describe('sidecar serialisation', () => {
       expect(parseSidecar('{"version":1,"tags":"not-an-array"}').data).toBeNull()
     })
 
+    it('rejects empty or whitespace-only identity fields', () => {
+      expect(parseSidecar('{"version":1,"name":""}').data).toBeNull()
+      expect(parseSidecar('{"version":1,"name":"   "}').data).toBeNull()
+      expect(parseSidecar('{"version":1,"creator":""}').data).toBeNull()
+      expect(parseSidecar('{"version":1,"creator":"   "}').data).toBeNull()
+    })
+
+    it('trims identity fields while preserving an explicit null creator', () => {
+      expect(
+        parseSidecar('{"version":1,"name":"  My Model  ","creator":"  The Kit Kiln  "}').data,
+      ).toEqual({
+        name: 'My Model',
+        creator: 'The Kit Kiln',
+      })
+
+      expect(parseSidecar('{"version":1,"creator":null}').data).toEqual({
+        creator: null,
+      })
+    })
+
     it('refuses a sidecar from a newer version rather than guessing', () => {
       // Reading it could silently drop fields it does not know about.
       const { data, error } = parseSidecar('{"version":99,"name":"X"}')

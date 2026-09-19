@@ -17,7 +17,7 @@ import {
   type BrowseResult,
   type LibraryLocation,
 } from '@pb/core'
-import { assertCan, cronProblem, PolicyError } from '@pb/core'
+import { assertCan, assertCanTriggerScan, cronProblem, PolicyError } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
 import { getStartedQueue, JOB } from '@pb/jobs'
@@ -366,9 +366,9 @@ export async function triggerScan(
 ): Promise<Result> {
   try {
     const user = await requireUser()
-    assertCan(
+    assertCanTriggerScan(
       { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
-      'scan:trigger',
+      options,
     )
 
     /*

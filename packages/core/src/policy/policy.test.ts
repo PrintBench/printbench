@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { ACTION_MINIMUM_ROLE, PolicyError, ROLES, assertCan, can, roleAtLeast } from './policy'
+import {
+  ACTION_MINIMUM_ROLE,
+  PolicyError,
+  ROLES,
+  assertCan,
+  assertCanTriggerScan,
+  can,
+  roleAtLeast,
+} from './policy'
 import type { Action, PolicyUser } from './policy'
 
 const admin: PolicyUser = { id: 'u-admin', role: ROLES.admin }
@@ -94,5 +102,21 @@ describe('assertCan', () => {
 
   it('is silent when permitted', () => {
     expect(() => assertCan(admin, 'library:manage')).not.toThrow()
+  })
+})
+
+describe('scan trigger authorization', () => {
+  it('allows a member to trigger a normal scan', () => {
+    expect(() => assertCanTriggerScan(member)).not.toThrow()
+  })
+
+  it('requires library management permission to restore sidecars', () => {
+    expect(() => assertCanTriggerScan(member, { restoreSidecars: true })).toThrow(PolicyError)
+    expect(() => assertCanTriggerScan(admin, { restoreSidecars: true })).not.toThrow()
+  })
+
+  it('requires library management permission to force a scan', () => {
+    expect(() => assertCanTriggerScan(member, { force: true })).toThrow(PolicyError)
+    expect(() => assertCanTriggerScan(admin, { force: true })).not.toThrow()
   })
 })

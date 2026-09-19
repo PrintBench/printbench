@@ -25,10 +25,10 @@ const sidecarSchema = z.object({
   /** Written for humans opening the file; never read back. */
   generator: z.string().optional(),
   updatedAt: z.string().optional(),
-  name: z.string().max(500).optional(),
+  name: z.string().trim().min(1).max(500).optional(),
   notes: z.string().max(20_000).nullable().optional(),
   license: z.string().max(120).nullable().optional(),
-  creator: z.string().max(225).nullable().optional(),
+  creator: z.string().trim().min(1).max(225).nullable().optional(),
   tags: z.array(z.string().max(120)).max(200).optional(),
   links: z
     .array(z.object({ url: z.string().max(2000), title: z.string().max(300).optional() }))
