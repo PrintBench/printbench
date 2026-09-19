@@ -59,6 +59,26 @@ describe('sidecar serialisation', () => {
       expect(parseSidecar('{"version":1,"tags":"not-an-array"}').data).toBeNull()
     })
 
+    it('rejects empty or whitespace-only identity fields', () => {
+      expect(parseSidecar('{"version":1,"name":""}').data).toBeNull()
+      expect(parseSidecar('{"version":1,"name":"   "}').data).toBeNull()
+      expect(parseSidecar('{"version":1,"creator":""}').data).toBeNull()
+      expect(parseSidecar('{"version":1,"creator":"   "}').data).toBeNull()
+    })
+
+    it('trims identity fields while preserving an explicit null creator', () => {
+      expect(
+        parseSidecar('{"version":1,"name":"  My Model  ","creator":"  The Kit Kiln  "}').data,
+      ).toEqual({
+        name: 'My Model',
+        creator: 'The Kit Kiln',
+      })
+
+      expect(parseSidecar('{"version":1,"creator":null}').data).toEqual({
+        creator: null,
+      })
+    })
+
     it('refuses a sidecar from a newer version rather than guessing', () => {
       // Reading it could silently drop fields it does not know about.
       const { data, error } = parseSidecar('{"version":99,"name":"X"}')
@@ -83,8 +103,8 @@ describeDb('sidecar round trip', () => {
   let root: string
   let library: LibraryLocation
 
-  const scan = () =>
-    scanLibrary({ db, storage: new LocalAdapter(library), library }, { mode: 'deep' })
+  const scan = (options: { restoreSidecars?: boolean } = {}) =>
+    scanLibrary({ db, storage: new LocalAdapter(library), library }, { mode: 'deep', ...options })
 
   beforeAll(async () => {
     ;({ pool, db } = createDb(url))
@@ -294,6 +314,230 @@ describeDb('sidecar round trip', () => {
 
     const after = await db.execute<{ name: string }>(sql`SELECT name FROM models WHERE id = ${id}`)
     expect(after.rows[0]!.name).toBe('Newer Name')
+  })
+
+  it('explicitly restores sidecar metadata over an existing model', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    // Give the existing database record metadata that should be replaced.
+    await updateModel(db, id, {
+      name: 'Database Name',
+      license: 'MIT',
+      creator: 'Database Creator',
+      tags: ['old-tag'],
+      notes: 'Database notes',
+    })
+
+    // Deliberately make the sidecar authoritative. Explicit nulls and an empty
+    // tag list mean those existing values should be cleared.
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'Sidecar Name',
+        notes: null,
+        license: null,
+        creator: null,
+        tags: [],
+      }),
+    )
+
+    const outcome = await scan({ restoreSidecars: true })
+    expect(outcome.status).toBe('succeeded')
+    expect(outcome.sidecarsRestored).toBeGreaterThan(0)
+
+    const after = await db.execute<{
+      name: string
+      notes: string | null
+      license: string | null
+      creator: string | null
+      tags: string[] | null
+    }>(sql`
+      SELECT m.name, m.notes, m.license, c.name AS creator,
+             (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
+                JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
+      FROM models m LEFT JOIN creators c ON c.id = m.creator_id
+      WHERE m.id = ${id}
+    `)
+
+    const row = after.rows[0]!
+    expect(row.name).toBe('Sidecar Name')
+    expect(row.notes).toBeNull()
+    expect(row.license).toBeNull()
+    expect(row.creator).toBeNull()
+    expect(row.tags).toBeNull()
+  })
+
+  it('leaves existing metadata unchanged when fields are absent from the sidecar', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await updateModel(db, id, {
+      name: 'Database Name',
+      license: 'CC-BY-4.0',
+      creator: 'Database Creator',
+      tags: ['keep-tag'],
+      notes: 'Keep these notes',
+    })
+
+    // Only name is present. The other database metadata must survive.
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'Sidecar Name',
+      }),
+    )
+
+    const outcome = await scan({ restoreSidecars: true })
+    expect(outcome.status).toBe('succeeded')
+
+    const after = await db.execute<{
+      name: string
+      notes: string | null
+      license: string | null
+      creator: string | null
+      tags: string[] | null
+    }>(sql`
+      SELECT m.name, m.notes, m.license, c.name AS creator,
+             (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
+                JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
+      FROM models m LEFT JOIN creators c ON c.id = m.creator_id
+      WHERE m.id = ${id}
+    `)
+
+    const row = after.rows[0]!
+    expect(row.name).toBe('Sidecar Name')
+    expect(row.notes).toBe('Keep these notes')
+    expect(row.license).toBe('CC-BY-4.0')
+    expect(row.creator).toBe('Database Creator')
+    expect(row.tags).toEqual(['keep-tag'])
+  })
+
+  it('explicitly replaces existing links from the sidecar', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES
+        (${id}, 'https://old.example.com/model', 'Old link', 'old.example.com', 0),
+        (${id}, 'https://remove.example.com/model', 'Remove me', 'remove.example.com', 1)
+    `)
+
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        links: [
+          {
+            url: 'https://example.com/red-dragon',
+            title: 'Red Dragon',
+          },
+          {
+            url: 'not-a-valid-url',
+            title: 'Custom link',
+          },
+        ],
+      }),
+    )
+
+    const outcome = await scan({ restoreSidecars: true })
+    expect(outcome.status).toBe('succeeded')
+
+    const after = await db.execute<{
+      url: string
+      title: string | null
+      host: string | null
+      position: number
+    }>(sql`
+      SELECT url, title, host, position
+      FROM model_links
+      WHERE model_id = ${id}
+      ORDER BY position
+    `)
+
+    expect(after.rows).toEqual([
+      {
+        url: 'https://example.com/red-dragon',
+        title: 'Red Dragon',
+        host: 'example.com',
+        position: 0,
+      },
+      {
+        url: 'not-a-valid-url',
+        title: 'Custom link',
+        host: null,
+        position: 1,
+      },
+    ])
+  })
+
+  it('explicitly clears existing links when the sidecar contains an empty link list', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES (${id}, 'https://old.example.com/model', 'Old link', 'old.example.com', 0)
+    `)
+
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        links: [],
+      }),
+    )
+
+    await scan({ restoreSidecars: true })
+
+    const after = await db.execute<{ count: number }>(sql`
+      SELECT count(*)::int AS count
+      FROM model_links
+      WHERE model_id = ${id}
+    `)
+
+    expect(after.rows[0]!.count).toBe(0)
+  })
+
+  it('leaves existing links unchanged when links are absent from the sidecar', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES (${id}, 'https://keep.example.com/model', 'Keep me', 'keep.example.com', 0)
+    `)
+
+    await writeFile(
+      path.join(root, 'Red Dragon', '.printbench.json'),
+      JSON.stringify({
+        version: 1,
+        name: 'Sidecar Name',
+      }),
+    )
+
+    await scan({ restoreSidecars: true })
+
+    const after = await db.execute<{
+      url: string
+      title: string | null
+      host: string | null
+    }>(sql`
+      SELECT url, title, host
+      FROM model_links
+      WHERE model_id = ${id}
+    `)
+
+    expect(after.rows).toEqual([
+      {
+        url: 'https://keep.example.com/model',
+        title: 'Keep me',
+        host: 'keep.example.com',
+      },
+    ])
   })
 
   it('ignores a corrupt sidecar rather than failing the scan', async () => {
