@@ -31,6 +31,8 @@ export interface SearchFilters {
   extensions?: string[]
   /** Only models containing at least one pre-supported file. */
   presupported?: boolean
+  /** Filter packages from regular models when specified. */
+  isPackage?: boolean
   /** Only models with no print logged against them. */
   neverPrinted?: boolean
   /** Only models with no thumbnail — usually a sign of a parse failure. */
@@ -256,6 +258,9 @@ function buildWhere(query: string, filters: SearchFilters): SQL {
   }
   if (filters.creatorIds?.length) {
     clauses.push(sql`m.creator_id = ANY(${sql.param(filters.creatorIds)}::uuid[])`)
+  }
+  if (filters.isPackage !== undefined) {
+    clauses.push(sql`m.is_package = ${filters.isPackage}`)
   }
   if (filters.licenses?.length) {
     clauses.push(sql`m.license = ANY(${sql.param(filters.licenses)}::text[])`)

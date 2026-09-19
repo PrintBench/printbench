@@ -24,6 +24,7 @@ export interface CreatorSummary {
   publicId: string
   notes: string | null
   modelCount: number
+  packageCount: number
   /** A model with a rendered thumbnail, for the card. */
   previewFileId: string | null
 }
@@ -65,10 +66,12 @@ export async function listCreators(db: Database): Promise<CreatorSummary[]> {
     public_id: string
     notes: string | null
     model_count: number
+    package_count: number
     preview_file_id: string | null
   }>(sql`
     SELECT c.id, c.name, c.slug, c.public_id, c.notes,
-           count(m.id)::int AS model_count,
+           count(m.id) FILTER (WHERE NOT m.is_package)::int AS model_count,
+           count(m.id) FILTER (WHERE m.is_package)::int AS package_count,
            (SELECT f.id FROM model_files f
               JOIN models fm ON fm.id = f.model_id
              WHERE fm.creator_id = c.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL
@@ -76,7 +79,7 @@ export async function listCreators(db: Database): Promise<CreatorSummary[]> {
     FROM creators c
     LEFT JOIN models m ON m.creator_id = c.id AND m.missing_at IS NULL
     GROUP BY c.id
-    -- Busiest first: a creator with one model is rarely what you are after.
+    -- Busiest first: rank by all present items, whether models or packages.
     ORDER BY count(m.id) DESC, c.name ASC`)
 
   return rows.rows.map(toCreator)
@@ -90,11 +93,16 @@ export async function creatorBySlug(db: Database, slug: string): Promise<Creator
     public_id: string
     notes: string | null
     model_count: number
+    package_count: number
     preview_file_id: string | null
   }>(sql`
     SELECT c.id, c.name, c.slug, c.public_id, c.notes,
            (SELECT count(*)::int FROM models m
-             WHERE m.creator_id = c.id AND m.missing_at IS NULL) AS model_count,
+             WHERE m.creator_id = c.id AND m.missing_at IS NULL
+               AND NOT m.is_package) AS model_count,
+           (SELECT count(*)::int FROM models m
+             WHERE m.creator_id = c.id AND m.missing_at IS NULL
+               AND m.is_package) AS package_count,
            NULL::uuid AS preview_file_id
     FROM creators c WHERE c.slug = ${slug} LIMIT 1`)
 
@@ -109,6 +117,7 @@ function toCreator(row: {
   public_id: string
   notes: string | null
   model_count: number
+  package_count: number
   preview_file_id: string | null
 }): CreatorSummary {
   return {
@@ -118,6 +127,7 @@ function toCreator(row: {
     publicId: row.public_id,
     notes: row.notes,
     modelCount: row.model_count,
+    packageCount: row.package_count,
     previewFileId: row.preview_file_id,
   }
 }
