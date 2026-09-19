@@ -355,41 +355,6 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
       */}
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0 space-y-6">
-          {model.is_package && packageChildren.rows.length > 0 && (
-            <section>
-              <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                <Boxes className="size-4" />
-                Models in this package
-                <span className="font-normal text-[var(--color-ink-faint)]">
-                  {packageChildren.rows.length}
-                </span>
-              </h2>
-              <Card className="overflow-hidden">
-                <ul className="divide-y divide-[var(--color-border)]">
-                  {packageChildren.rows.map((child) => (
-                    <li key={child.public_id}>
-                      <Link
-                        href={`/models/${child.public_id}` as Route}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]"
-                      >
-                        <Box className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{child.name}</span>
-                          <span className="block truncate text-xs text-[var(--color-ink-faint)]">
-                            {child.path.slice(model.path.length + 1)}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">
-                          {child.file_count} files · {formatBytes(Number(child.total_size))}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </section>
-          )}
-
           {selectedImage ? (
             <Card className="overflow-hidden">
               <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
@@ -424,6 +389,41 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 </div>
               </Card>
             )
+          )}
+
+          {model.is_package && packageChildren.rows.length > 0 && (
+            <section>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                <Boxes className="size-4" />
+                Models in this package
+                <span className="font-normal text-[var(--color-ink-faint)]">
+                  {packageChildren.rows.length}
+                </span>
+              </h2>
+              <Card className="overflow-hidden">
+                <ul className="divide-y divide-[var(--color-border)]">
+                  {packageChildren.rows.map((child) => (
+                    <li key={child.public_id}>
+                      <Link
+                        href={`/models/${child.public_id}` as Route}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]"
+                      >
+                        <Box className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{child.name}</span>
+                          <span className="block truncate text-xs text-[var(--color-ink-faint)]">
+                            {child.path.slice(model.path.length + 1)}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">
+                          {child.file_count} files · {formatBytes(Number(child.total_size))}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
           )}
 
           {CATEGORY_ORDER.filter((category) => byCategory.has(category)).map((category) => (
