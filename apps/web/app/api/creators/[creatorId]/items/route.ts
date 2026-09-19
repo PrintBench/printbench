@@ -5,8 +5,7 @@ import { getDb } from '@pb/db'
 export const dynamic = 'force-dynamic'
 
 const MAX_LIMIT = 100
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /**
  * Paginated creator items for the creator detail page.
@@ -32,19 +31,14 @@ export async function GET(
 
   const type = searchParams.get('type')
   if (type !== 'model' && type !== 'package') {
-    return Response.json(
-      { error: 'type must be "model" or "package"' },
-      { status: 400 },
-    )
+    return Response.json({ error: 'type must be "model" or "package"' }, { status: 400 })
   }
 
   const rawOffset = Number.parseInt(searchParams.get('offset') ?? '0', 10)
   const rawLimit = Number.parseInt(searchParams.get('limit') ?? '48', 10)
 
   const offset = Number.isFinite(rawOffset) ? Math.max(rawOffset, 0) : 0
-  const limit = Number.isFinite(rawLimit)
-    ? Math.min(Math.max(rawLimit, 1), MAX_LIMIT)
-    : 48
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), MAX_LIMIT) : 48
 
   const result = await searchModels(getDb(), {
     creatorIds: [creatorId],

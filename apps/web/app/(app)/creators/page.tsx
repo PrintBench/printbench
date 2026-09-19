@@ -20,12 +20,8 @@ export default async function CreatorsPage() {
   }
 
   const creators = await listCreators(getDb())
-  const withItems = creators.filter(
-    (creator) => creator.modelCount > 0 || creator.packageCount > 0,
-  )
-  const empty = creators.filter(
-    (creator) => creator.modelCount === 0 && creator.packageCount === 0,
-  )
+  const withItems = creators.filter((creator) => creator.modelCount > 0 || creator.packageCount > 0)
+  const empty = creators.filter((creator) => creator.modelCount === 0 && creator.packageCount === 0)
 
   return (
     <>

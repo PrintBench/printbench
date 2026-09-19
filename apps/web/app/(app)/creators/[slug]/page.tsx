@@ -75,8 +75,7 @@ export default async function CreatorPage({ params }: { params: Promise<{ slug: 
         <>
           <p className="mb-6 text-sm text-[var(--color-ink-muted)]">
             {creator.modelCount.toLocaleString()} Model
-            {creator.modelCount === 1 ? '' : 's'} ·{' '}
-            {creator.packageCount.toLocaleString()} Package
+            {creator.modelCount === 1 ? '' : 's'} · {creator.packageCount.toLocaleString()} Package
             {creator.packageCount === 1 ? '' : 's'}
           </p>
 
