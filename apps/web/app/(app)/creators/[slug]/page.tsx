@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
-import { ModelGrid } from '@/components/model/model-grid'
+import { CreatorItemSection } from '@/components/creator/creator-item-section'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,9 +30,21 @@ export default async function CreatorPage({ params }: { params: Promise<{ slug: 
   const creator = await creatorBySlug(db, slug)
   if (!creator) notFound()
 
-  // Reuses search rather than a second query: the filters, sorting and hit
-  // shape are already there, and one of them drifting is one bug too many.
-  const result = await searchModels(db, { creatorIds: [creator.id], limit: 96 })
+  // Reuse search for both item types so filtering, sorting and the hit shape
+  // stay consistent with the rest of the application. Keep the initial
+  // batches deliberately small: some creators may have thousands of items.
+  const [packages, models] = await Promise.all([
+    searchModels(db, {
+      creatorIds: [creator.id],
+      isPackage: true,
+      limit: 24,
+    }),
+    searchModels(db, {
+      creatorIds: [creator.id],
+      isPackage: false,
+      limit: 48,
+    }),
+  ])
 
   return (
     <>
@@ -54,27 +66,41 @@ export default async function CreatorPage({ params }: { params: Promise<{ slug: 
         }
       />
 
-      {result.hits.length === 0 ? (
+      {packages.total === 0 && models.total === 0 ? (
         <EmptyState
           title="Nothing here yet"
-          description="No models are attributed to this creator, or the ones that were are missing from disk."
+          description="No models or packages are attributed to this creator, or the ones that were are missing from disk."
         />
       ) : (
         <>
-          <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
-            {creator.modelCount} model{creator.modelCount === 1 ? '' : 's'}
+          <p className="mb-6 text-sm text-[var(--color-ink-muted)]">
+            {creator.modelCount.toLocaleString()} Model
+            {creator.modelCount === 1 ? '' : 's'} ·{' '}
+            {creator.packageCount.toLocaleString()} Package
+            {creator.packageCount === 1 ? '' : 's'}
           </p>
-          <ModelGrid models={result.hits} />
-          {result.total > result.hits.length && (
-            <p className="mt-4 text-sm text-[var(--color-ink-muted)]">
-              Showing {result.hits.length} of {result.total}.{' '}
-              <Link
-                href={`/search?creator=${creator.id}` as Route}
-                className="text-[var(--color-accent)] hover:underline"
-              >
-                See them all in search
-              </Link>
-            </p>
+
+          {packages.total > 0 && (
+            <CreatorItemSection
+              creatorId={creator.id}
+              type="package"
+              title="Packages"
+              initialItems={packages.hits}
+              total={packages.total}
+              batchSize={24}
+              className="mb-8"
+            />
+          )}
+
+          {models.total > 0 && (
+            <CreatorItemSection
+              creatorId={creator.id}
+              type="model"
+              title="Models"
+              initialItems={models.hits}
+              total={models.total}
+              batchSize={48}
+            />
           )}
         </>
       )}
