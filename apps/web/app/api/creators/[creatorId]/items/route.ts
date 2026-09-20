@@ -45,6 +45,7 @@ export async function GET(
     isPackage: type === 'package',
     offset,
     limit,
+    includeFacets: false,
   })
 
   return Response.json(

@@ -47,6 +47,8 @@ export interface SearchOptions extends SearchFilters {
   sort?: SortOrder
   limit?: number
   offset?: number
+  /** Skip facet queries when the caller only needs hits and a total. */
+  includeFacets?: boolean
 }
 
 export interface SearchHit {
@@ -184,7 +186,10 @@ export async function searchModels(
     LIMIT ${limit} OFFSET ${offset}
   `)
 
-  const facets = await loadFacets(db, query, options)
+  const facets =
+    options.includeFacets === false
+      ? { libraries: [], creators: [], tags: [], licenses: [], extensions: [] }
+      : await loadFacets(db, query, options)
 
   return {
     hits: rows.rows.map((row) => ({

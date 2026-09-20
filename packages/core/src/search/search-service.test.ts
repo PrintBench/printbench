@@ -410,6 +410,22 @@ describeDb('searchModels', () => {
     })
   })
 
+  describe('facet loading', () => {
+    it('can skip facet queries when the caller does not need them', async () => {
+      const result = await search({ includeFacets: false, limit: 3 })
+
+      expect(result.hits).toHaveLength(3)
+      expect(result.total).toBe(10)
+      expect(result.facets).toEqual({
+        libraries: [],
+        creators: [],
+        tags: [],
+        licenses: [],
+        extensions: [],
+      })
+    })
+  })
+
   describe('sorting and paging', () => {
     it('sorts by name, size and age', async () => {
       expect((await names({ sort: 'name' }))[0]).toBe('Beast Mount')

@@ -44,6 +44,7 @@ export default async function SearchPage({
     neverPrinted: params.neverPrinted,
     missingPreview: params.missingPreview,
     minSize: params.minSize,
+    isPackage: params.type === 'package' ? true : params.type === 'model' ? false : undefined,
     sort: params.sort as SortOrder,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,

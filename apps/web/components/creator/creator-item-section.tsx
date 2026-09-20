@@ -108,7 +108,7 @@ export function CreatorItemSection({
               </Button>
 
               <Link
-                href={`/search?creator=${creatorId}` as Route}
+                href={`/search?creator=${encodeURIComponent(creatorId)}&type=${type}` as Route}
                 className="text-sm text-[var(--color-accent)] hover:underline"
               >
                 See all in search

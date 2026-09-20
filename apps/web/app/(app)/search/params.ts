@@ -21,6 +21,7 @@ export interface ParsedSearchParams {
   neverPrinted: boolean
   missingPreview: boolean
   minSize?: number
+  type?: 'model' | 'package'
   sort: string
   page: number
 }
@@ -45,6 +46,7 @@ export function parseSearchParams(raw: RawParams): ParsedSearchParams {
   const sortValue = Array.isArray(raw.sort) ? raw.sort[0] : raw.sort
   const pageValue = Number(Array.isArray(raw.page) ? raw.page[0] : raw.page)
   const minSize = Number(Array.isArray(raw.minSize) ? raw.minSize[0] : raw.minSize)
+  const typeValue = Array.isArray(raw.type) ? raw.type[0] : raw.type
 
   return {
     q: (Array.isArray(raw.q) ? (raw.q[0] ?? '') : (raw.q ?? '')).slice(0, 200),
@@ -57,6 +59,7 @@ export function parseSearchParams(raw: RawParams): ParsedSearchParams {
     neverPrinted: flag(raw.neverPrinted),
     missingPreview: flag(raw.missingPreview),
     minSize: Number.isFinite(minSize) && minSize > 0 ? minSize : undefined,
+    type: typeValue === 'model' || typeValue === 'package' ? typeValue : undefined,
     sort: sortValue && SORTS.has(sortValue) ? sortValue : 'relevance',
     page: Number.isFinite(pageValue) && pageValue > 0 ? Math.floor(pageValue) : 1,
   }
