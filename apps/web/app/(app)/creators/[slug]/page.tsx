@@ -37,11 +37,13 @@ export default async function CreatorPage({ params }: { params: Promise<{ slug: 
     searchModels(db, {
       creatorIds: [creator.id],
       isPackage: true,
+      includeFacets: false,
       limit: 24,
     }),
     searchModels(db, {
       creatorIds: [creator.id],
       isPackage: false,
+      includeFacets: false,
       limit: 48,
     }),
   ])

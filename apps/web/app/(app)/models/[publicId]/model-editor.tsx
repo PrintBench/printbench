@@ -11,10 +11,10 @@ import { cn } from '@/lib/cn'
 import { loadSuggestions, saveModel } from './edit-actions'
 
 /**
- * Inline metadata editing.
+ * Model metadata editor.
  *
- * Opens in place rather than on a separate page: editing a model is something
- * you do while looking at it, and a round trip to a form loses that context.
+ * Opens in a modal dialog over the model detail page so the user can edit
+ * metadata without navigating away from the model they are viewing.
  *
  * Common licences are offered as a list, because typing "CC-BY-NC-4.0" by hand
  * produces a facet full of near-miss variants that never group.

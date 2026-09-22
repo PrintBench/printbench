@@ -58,7 +58,9 @@ export function FacetPanel({
   ]
 
   const anyActive =
-    groups.some((group) => group.selected.length > 0) || toggles.some((toggle) => toggle.active)
+    params.type !== undefined ||
+    groups.some((group) => group.selected.length > 0) ||
+    toggles.some((toggle) => toggle.active)
 
   return (
     // min-w-0: as a grid item this is sized to its min-content, and a long tag
@@ -77,6 +79,42 @@ export function FacetPanel({
             Clear
           </Link>
         )}
+      </div>
+
+      <div>
+        <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
+          Type
+        </h3>
+        <div className="space-y-0.5">
+          {[
+            { value: 'model', label: 'Models' },
+            { value: 'package', label: 'Packages' },
+          ].map((option) => {
+            const active = params.type === option.value
+            return (
+              <Link
+                key={option.value}
+                href={buildHref(raw, { type: active ? null : option.value })}
+                className={cn(
+                  'flex items-center gap-2 rounded-[var(--radius-control)] px-2 py-1 text-sm transition-colors',
+                  active
+                    ? 'bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent)]'
+                    : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex size-3.5 shrink-0 items-center justify-center rounded-full border',
+                    active ? 'border-[var(--color-accent)]' : 'border-[var(--color-border-strong)]',
+                  )}
+                >
+                  {active && <span className="size-2 rounded-full bg-[var(--color-accent)]" />}
+                </span>
+                {option.label}
+              </Link>
+            )
+          })}
+        </div>
       </div>
 
       <div className="space-y-1">
