@@ -63,6 +63,7 @@ export async function handleLibraryScan(
           event: 'phase',
           ...progress,
         }),
+      restoreSidecars: payload.restoreSidecars ?? false,
       /*
        * Fan out derived work in batches. A 50k-file library produces roughly a
        * hundred multi-row inserts rather than 150,000 individual ones.
@@ -96,6 +97,7 @@ export async function handleLibraryScan(
     `[scan] finished "${library.name}" in ${seconds}s — ` +
       `${outcome.modelsCreated} new, ${outcome.modelsUpdated} updated, ` +
       `${outcome.modelsRenamed} renamed, ${outcome.modelsMissing} missing, ` +
+      `${outcome.sidecarsRestored} sidecars restored, ` +
       `${outcome.filesSeen} files seen, ${outcome.filesQueued} queued for rendering`,
   )
 

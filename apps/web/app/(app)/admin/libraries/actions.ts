@@ -17,7 +17,7 @@ import {
   type BrowseResult,
   type LibraryLocation,
 } from '@pb/core'
-import { assertCan, cronProblem, PolicyError } from '@pb/core'
+import { assertCan, assertCanTriggerScan, cronProblem, PolicyError } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
 import { getStartedQueue, JOB } from '@pb/jobs'
@@ -358,13 +358,17 @@ export async function createLibrary(input: {
 
 export async function triggerScan(
   libraryId: string,
-  options: { mode?: 'fast' | 'deep'; force?: boolean } = {},
+  options: {
+    mode?: 'fast' | 'deep'
+    force?: boolean
+    restoreSidecars?: boolean
+  } = {},
 ): Promise<Result> {
   try {
     const user = await requireUser()
-    assertCan(
+    assertCanTriggerScan(
       { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
-      'scan:trigger',
+      options,
     )
 
     /*
@@ -376,11 +380,24 @@ export async function triggerScan(
      * queueing a scan each time.
      */
     const queue = await getStartedQueue()
-    await queue.send(
+    const jobId = await queue.send(
       JOB.libraryScan,
-      { libraryId, mode: options.mode ?? 'fast', force: options.force ?? false },
+      {
+        libraryId,
+        mode: options.mode ?? 'fast',
+        force: options.force ?? false,
+        restoreSidecars: options.restoreSidecars ?? false,
+      },
       { singletonKey: `scan:${libraryId}` },
     )
+
+    if (options.restoreSidecars && !jobId) {
+      return {
+        ok: false,
+        error:
+          'A scan is already queued for this library. Wait for it to finish, then restore sidecars again.',
+      }
+    }
 
     revalidatePath('/admin/libraries')
     return { ok: true }

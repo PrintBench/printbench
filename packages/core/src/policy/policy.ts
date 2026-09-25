@@ -124,6 +124,17 @@ export function assertCan(
   }
 }
 
+/**
+ * Triggering a normal scan is an operational task available to members.
+ * Scan options that can rewrite library metadata require library management.
+ */
+export function assertCanTriggerScan(
+  user: PolicyUser | null | undefined,
+  options: { force?: boolean; restoreSidecars?: boolean } = {},
+): void {
+  assertCan(user, options.force || options.restoreSidecars ? 'library:manage' : 'scan:trigger')
+}
+
 export class PolicyError extends Error {
   readonly action: Action
   constructor(action: Action) {
