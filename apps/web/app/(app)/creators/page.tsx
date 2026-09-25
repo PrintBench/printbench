@@ -20,8 +20,8 @@ export default async function CreatorsPage() {
   }
 
   const creators = await listCreators(getDb())
-  const withModels = creators.filter((creator) => creator.modelCount > 0)
-  const empty = creators.filter((creator) => creator.modelCount === 0)
+  const withItems = creators.filter((creator) => creator.modelCount > 0 || creator.packageCount > 0)
+  const empty = creators.filter((creator) => creator.modelCount === 0 && creator.packageCount === 0)
 
   return (
     <>
@@ -30,7 +30,7 @@ export default async function CreatorsPage() {
         description={
           creators.length === 0
             ? 'Whoever made your models appears here once you record them.'
-            : `${withModels.length} with models in your library`
+            : `${withItems.length} creator${withItems.length === 1 ? '' : 's'} with items in your library`
         }
       />
 
@@ -48,7 +48,7 @@ export default async function CreatorsPage() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {withModels.map((creator) => (
+            {withItems.map((creator) => (
               <Link
                 key={creator.id}
                 href={`/creators/${creator.slug}` as Route}
@@ -73,7 +73,10 @@ export default async function CreatorsPage() {
                   <div className="min-w-0">
                     <p className="truncate font-medium">{creator.name}</p>
                     <p className="text-xs text-[var(--color-ink-muted)]">
-                      {creator.modelCount} model{creator.modelCount === 1 ? '' : 's'}
+                      {creator.modelCount.toLocaleString()} model
+                      {creator.modelCount === 1 ? '' : 's'} ·{' '}
+                      {creator.packageCount.toLocaleString()} package
+                      {creator.packageCount === 1 ? '' : 's'}
                     </p>
                   </div>
                 </div>
@@ -82,15 +85,15 @@ export default async function CreatorsPage() {
           </div>
 
           {/*
-           * Creators with nothing attributed to them still exist — a tag was
-           * removed, or a model was deleted. Worth showing quietly so they can
-           * be noticed rather than silently orphaned.
+           * Creators with no models or packages attributed to them still
+           * exist — an item may have been removed. Worth showing quietly so
+           * they can be noticed rather than silently orphaned.
            */}
           {empty.length > 0 && (
             <Card className="mt-6">
               <CardContent className="p-4">
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
-                  No models attributed
+                  No items attributed
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {empty.map((creator) => (

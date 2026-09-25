@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Loader2, Pencil, Plus, X } from 'lucide-react'
+import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
@@ -10,10 +11,10 @@ import { cn } from '@/lib/cn'
 import { loadSuggestions, saveModel } from './edit-actions'
 
 /**
- * Inline metadata editing.
+ * Model metadata editor.
  *
- * Opens in place rather than on a separate page: editing a model is something
- * you do while looking at it, and a round trip to a form loses that context.
+ * Opens in a modal dialog over the model detail page so the user can edit
+ * metadata without navigating away from the model they are viewing.
  *
  * Common licences are offered as a list, because typing "CC-BY-NC-4.0" by hand
  * produces a facet full of near-miss variants that never group.
@@ -71,15 +72,6 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
 
   if (!canEdit) return null
 
-  if (!open) {
-    return (
-      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
-        <Pencil />
-        Edit
-      </Button>
-    )
-  }
-
   function addTag(value: string) {
     const cleaned = value.trim()
     if (!cleaned) return
@@ -126,125 +118,163 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
     .slice(0, 10)
 
   return (
-    <div className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-      <Field label="Name" htmlFor="model-name">
-        <Input value={name} onChange={(event) => setName(event.target.value)} />
-      </Field>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && saving) return
+        setOpen(nextOpen)
+      }}
+    >
+      <Dialog.Trigger asChild>
+        <Button variant="secondary" size="sm">
+          <Pencil />
+          Edit
+        </Button>
+      </Dialog.Trigger>
 
-      <Field label="Notes" htmlFor="model-notes">
-        <textarea
-          id="model-notes"
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-          rows={4}
-          className="w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm focus:border-[var(--color-accent)]"
-        />
-      </Field>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Creator" htmlFor="model-creator" hint="Created if it does not exist yet.">
-          <Input
-            value={creator}
-            list="creator-suggestions"
-            onChange={(event) => setCreator(event.target.value)}
-          />
-        </Field>
-        <datalist id="creator-suggestions">
-          {suggestions.creators.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
-
-        <Field
-          label="Licence"
-          htmlFor="model-license"
-          hint="Pick a standard identifier so licences group together."
-        >
-          <Input
-            value={license}
-            list="license-suggestions"
-            onChange={(event) => setLicense(event.target.value)}
-          />
-        </Field>
-        <datalist id="license-suggestions">
-          {LICENCES.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
-      </div>
-
-      <div className="space-y-1.5">
-        <span className="block text-sm font-medium">Tags</span>
-
-        <div className="flex flex-wrap gap-1.5">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] py-0.5 pl-2.5 pr-1 text-xs font-medium text-[var(--color-accent)]"
-            >
-              {tag}
-              <button
-                type="button"
-                aria-label={`Remove tag ${tag}`}
-                onClick={() => setTags((current) => current.filter((item) => item !== tag))}
-                className="rounded-full p-0.5 hover:bg-[var(--color-accent)]/15"
-              >
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-
-        <Input
-          value={tagDraft}
-          placeholder="Add a tag and press Enter"
-          onChange={(event) => setTagDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ',') {
-              event.preventDefault()
-              addTag(tagDraft)
-            } else if (event.key === 'Backspace' && tagDraft === '') {
-              setTags((current) => current.slice(0, -1))
-            }
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl"
+          onEscapeKeyDown={(event) => {
+            if (saving) event.preventDefault()
           }}
-        />
+          onPointerDownOutside={(event) => {
+            if (saving) event.preventDefault()
+          }}
+        >
+          <Dialog.Title className="sr-only">Edit model</Dialog.Title>
+          <Dialog.Description className="sr-only">Edit this model's metadata.</Dialog.Description>
 
-        {unusedTagSuggestions.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-1">
-            {unusedTagSuggestions.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => addTag(tag)}
-                className={cn(
-                  'inline-flex items-center gap-0.5 rounded-full border border-[var(--color-border)] px-2 py-0.5',
-                  'text-xs text-[var(--color-ink-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]',
-                )}
+          <div className="space-y-4">
+            <Field label="Name" htmlFor="model-name">
+              <Input value={name} onChange={(event) => setName(event.target.value)} />
+            </Field>
+
+            <Field label="Notes" htmlFor="model-notes">
+              <textarea
+                id="model-notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={4}
+                className="w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm focus:border-[var(--color-accent)]"
+              />
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Creator"
+                htmlFor="model-creator"
+                hint="Created if it does not exist yet."
               >
-                <Plus className="size-2.5" />
-                {tag}
-              </button>
-            ))}
+                <Input
+                  value={creator}
+                  list="creator-suggestions"
+                  onChange={(event) => setCreator(event.target.value)}
+                />
+              </Field>
+              <datalist id="creator-suggestions">
+                {suggestions.creators.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+
+              <Field
+                label="Licence"
+                htmlFor="model-license"
+                hint="Pick a standard identifier so licences group together."
+              >
+                <Input
+                  value={license}
+                  list="license-suggestions"
+                  onChange={(event) => setLicense(event.target.value)}
+                />
+              </Field>
+              <datalist id="license-suggestions">
+                {LICENCES.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="block text-sm font-medium">Tags</span>
+
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] py-0.5 pl-2.5 pr-1 text-xs font-medium text-[var(--color-accent)]"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      aria-label={`Remove tag ${tag}`}
+                      onClick={() => setTags((current) => current.filter((item) => item !== tag))}
+                      className="rounded-full p-0.5 hover:bg-[var(--color-accent)]/15"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              <Input
+                value={tagDraft}
+                placeholder="Add a tag and press Enter"
+                onChange={(event) => setTagDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ',') {
+                    event.preventDefault()
+                    addTag(tagDraft)
+                  } else if (event.key === 'Backspace' && tagDraft === '') {
+                    setTags((current) => current.slice(0, -1))
+                  }
+                }}
+              />
+
+              {unusedTagSuggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {unusedTagSuggestions.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => addTag(tag)}
+                      className={cn(
+                        'inline-flex items-center gap-0.5 rounded-full border border-[var(--color-border)] px-2 py-0.5',
+                        'text-xs text-[var(--color-ink-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]',
+                      )}
+                    >
+                      <Plus className="size-2.5" />
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <p role="alert" className="text-sm text-[var(--color-danger)]">
+                {error}
+              </p>
+            )}
+            {note && <p className="text-sm text-[var(--color-ink-muted)]">{note}</p>}
+
+            <div className="flex justify-end gap-2">
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="sm" disabled={saving}>
+                  Cancel
+                </Button>
+              </Dialog.Close>
+              <Button size="sm" onClick={() => void save()} disabled={saving || name.trim() === ''}>
+                {saving ? <Loader2 className="animate-spin" /> : <Check />}
+                Save
+              </Button>
+            </div>
           </div>
-        )}
-      </div>
-
-      {error && (
-        <p role="alert" className="text-sm text-[var(--color-danger)]">
-          {error}
-        </p>
-      )}
-      {note && <p className="text-sm text-[var(--color-ink-muted)]">{note}</p>}
-
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={saving}>
-          Cancel
-        </Button>
-        <Button size="sm" onClick={() => void save()} disabled={saving || name.trim() === ''}>
-          {saving ? <Loader2 className="animate-spin" /> : <Check />}
-          Save
-        </Button>
-      </div>
-    </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }

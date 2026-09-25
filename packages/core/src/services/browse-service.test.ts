@@ -80,22 +80,25 @@ describeDb('browse', () => {
         (${TAG_X}, 'BrowseDragon', 'browsedragon-bx'),
         (${TAG_Y}, 'BrowseTerrain', 'browseterrain-bx')`)
 
-    // suffix, creator, missing
-    const models: [string, string | null, boolean][] = [
-      ['01', CREATOR_A, false],
-      ['02', CREATOR_A, false],
+    // suffix, creator, missing, package
+    const models: [string, string | null, boolean, boolean][] = [
+      ['01', CREATOR_A, false, false],
+      ['02', CREATOR_A, false, false],
       // On an unplugged drive: counted nowhere.
-      ['03', CREATOR_A, true],
-      ['04', null, false],
+      ['03', CREATOR_A, true, false],
+      ['04', null, false, false],
+      ['05', CREATOR_A, false, true],
+      // Missing packages are excluded just like missing models.
+      ['06', CREATOR_A, true, true],
     ]
 
-    for (const [suffix, creator, missing] of models) {
+    for (const [suffix, creator, missing, isPackage] of models) {
       await db.execute(sql`
         INSERT INTO models (id, library_id, path, name, slug, public_id, creator_id,
-                            file_count, total_size, missing_at)
+                            file_count, total_size, missing_at, is_package)
         VALUES (${id(suffix)}, ${LIB}, ${'bx/' + suffix}, ${'Browse Model ' + suffix},
                 ${'bx-' + suffix}, ${'mdbx0000000' + suffix}, ${creator}, 1, 1000,
-                ${missing ? sql`now()` : null})`)
+                ${missing ? sql`now()` : null}, ${isPackage})`)
     }
 
     await db.execute(sql`
@@ -107,16 +110,19 @@ describeDb('browse', () => {
   }
 
   describe('creators', () => {
-    it('counts only models that are present', async () => {
+    it('counts present models and packages separately', async () => {
       const creators = await listCreators(db)
       const browse = creators.find((c) => c.id === CREATOR_A)
-      // Three models, one of them missing from disk.
+      // Three regular models and two packages exist, but one of each is missing.
       expect(browse?.modelCount).toBe(2)
+      expect(browse?.packageCount).toBe(1)
     })
 
     it('includes a creator with nothing attributed to them', async () => {
       const creators = await listCreators(db)
-      expect(creators.find((c) => c.id === CREATOR_B)?.modelCount).toBe(0)
+      const quiet = creators.find((c) => c.id === CREATOR_B)
+      expect(quiet?.modelCount).toBe(0)
+      expect(quiet?.packageCount).toBe(0)
     })
 
     it('puts the busiest first', async () => {
@@ -130,6 +136,7 @@ describeDb('browse', () => {
       const creator = await creatorBySlug(db, 'browse-studios-bx')
       expect(creator?.name).toBe('Browse Studios')
       expect(creator?.modelCount).toBe(2)
+      expect(creator?.packageCount).toBe(1)
     })
 
     it('returns null for an unknown slug', async () => {
@@ -226,7 +233,7 @@ describeDb('browse', () => {
       const models = await db.execute<{ n: number }>(
         sql`SELECT count(*)::int AS n FROM models WHERE library_id = ${LIB}`,
       )
-      expect(models.rows[0]!.n).toBe(4)
+      expect(models.rows[0]!.n).toBe(6)
       expect(await tagBySlug(db, 'browsedragon-bx')).toBeNull()
     })
   })

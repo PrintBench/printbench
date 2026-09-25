@@ -112,12 +112,14 @@ export function ModelCard({
           {libraryName ? `${libraryName} · ` : ''}
           {path}
         </p>
-        <p className="mt-auto flex items-center gap-1.5 pt-1 text-xs text-[var(--color-ink-muted)]">
-          <FileStack className="size-3" />
-          {fileCount} file{fileCount === 1 ? '' : 's'}
-          <span aria-hidden>·</span>
-          {formatBytes(totalSize)}
-        </p>
+        {(fileCount > 0 || totalSize > 0) && (
+          <p className="mt-auto flex items-center gap-1.5 pt-1 text-xs text-[var(--color-ink-muted)]">
+            <FileStack className="size-3" />
+            {fileCount} file{fileCount === 1 ? '' : 's'}
+            <span aria-hidden>·</span>
+            {formatBytes(totalSize)}
+          </p>
+        )}
         {dimensions && (
           <p className="truncate text-xs tabular-nums text-[var(--color-ink-faint)]">
             {dimensions}

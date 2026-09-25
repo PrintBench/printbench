@@ -20,10 +20,10 @@ TitanPals Cosmic Duo/
     └── rocket.stl
 ```
 
-The package page shows only files owned directly by the package (including
-files in conventional image folders), followed by links to the child models.
-Files inside `Astro` and `Rocket` remain attached to those models and are not
-duplicated into the package.
+The package page shows the package preview first, followed by links to the
+child models, then files owned directly by the package (including files in
+conventional image folders). Files inside child model directories remain
+attached to their respective models and are not duplicated into the package.
 
 The package sidecar uses the same versioned JSON fields as `.printbench.json`:
 

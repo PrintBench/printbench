@@ -44,6 +44,7 @@ export default async function SearchPage({
     neverPrinted: params.neverPrinted,
     missingPreview: params.missingPreview,
     minSize: params.minSize,
+    isPackage: params.type === 'package' ? true : params.type === 'model' ? false : undefined,
     sort: params.sort as SortOrder,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
@@ -59,7 +60,28 @@ export default async function SearchPage({
     params.presupported ||
     params.neverPrinted ||
     params.missingPreview ||
-    params.minSize !== undefined
+    params.minSize !== undefined ||
+    params.type !== undefined
+
+  const resultLabel =
+    params.type === 'package'
+      ? result.total === 1
+        ? 'package'
+        : 'packages'
+      : params.type === 'model'
+        ? result.total === 1
+          ? 'model'
+          : 'models'
+        : result.total === 1
+          ? 'item'
+          : 'items'
+
+  const emptyFilterTitle =
+    params.type === 'package'
+      ? 'No packages match these filters'
+      : params.type === 'model'
+        ? 'No models match these filters'
+        : 'No items match these filters'
 
   return (
     <>
@@ -67,7 +89,7 @@ export default async function SearchPage({
         title="Search"
         description={
           params.q || hasFilters
-            ? `${NUMBER.format(result.total)} ${result.total === 1 ? 'model' : 'models'}`
+            ? `${NUMBER.format(result.total)} ${resultLabel}`
             : 'Find anything in your library.'
         }
       />
@@ -81,7 +103,7 @@ export default async function SearchPage({
           {result.hits.length === 0 ? (
             <EmptyState
               icon={params.q ? <SearchIcon /> : <SlidersHorizontal />}
-              title={params.q ? `Nothing matches "${params.q}"` : 'No models match these filters'}
+              title={params.q ? `Nothing matches "${params.q}"` : emptyFilterTitle}
               description={
                 params.q
                   ? 'Try fewer words, or check the spelling. Search tolerates small typos, and you can exclude a term with a minus, like: dragon -blue'

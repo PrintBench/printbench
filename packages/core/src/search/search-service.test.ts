@@ -67,6 +67,7 @@ describeDb('searchModels', () => {
       // Named for a word that appears only in other models' notes, so the
       // weighting between name (A) and notes (C) can be tested directly.
       ['09', LIB_A, 'Beast Mount', CREATOR_LOOT, 'CC-BY-4.0', 15_000_000],
+      ['10', LIB_A, 'Package Collection', CREATOR_LOOT, 'CC-BY-4.0', 1_000_000],
     ]
 
     for (const [suffix, library, name, creator, license, size] of models) {
@@ -79,6 +80,10 @@ describeDb('searchModels', () => {
                 ${name.includes('Dragon') ? 'A fearsome winged beast for tabletop games' : null})
       `)
     }
+
+    await db.execute(sql`
+      UPDATE models SET is_package = true WHERE id = ${modelId('10')}
+    `)
 
     await db.execute(sql`
       INSERT INTO model_tags (model_id, tag_id) VALUES
@@ -312,8 +317,18 @@ describeDb('searchModels', () => {
       expect(result.sort()).toEqual(['Cable Clip', 'Hinged Storage Box'])
     })
 
+    it('filters to packages', async () => {
+      expect(await names({ isPackage: true })).toEqual(['Package Collection'])
+    })
+
+    it('filters to regular models', async () => {
+      const result = await names({ isPackage: false })
+      expect(result).not.toContain('Package Collection')
+      expect(result).toHaveLength(9)
+    })
+
     it('filters by library', async () => {
-      expect((await names({ libraryIds: [LIB_A] })).length).toBe(6)
+      expect((await names({ libraryIds: [LIB_A] })).length).toBe(7)
     })
 
     it('filters by licence', async () => {
@@ -369,8 +384,8 @@ describeDb('searchModels', () => {
   describe('facets', () => {
     it('counts every dimension', async () => {
       const { facets } = await search()
-      expect(facets.libraries.find((f) => f.label === 'Miniatures')?.count).toBe(6)
-      expect(facets.creators.find((f) => f.label === 'Loot Studios')?.count).toBe(5)
+      expect(facets.libraries.find((f) => f.label === 'Miniatures')?.count).toBe(7)
+      expect(facets.creators.find((f) => f.label === 'Loot Studios')?.count).toBe(6)
       expect(facets.tags.find((f) => f.label === 'dragon')?.count).toBe(2)
       expect(facets.licenses.find((f) => f.label === 'MIT')?.count).toBe(2)
       expect(facets.extensions.find((f) => f.label === 'stl')?.count).toBe(7)
@@ -383,7 +398,7 @@ describeDb('searchModels', () => {
      */
     it('excludes a facet from its own filter', async () => {
       const { facets } = await search({ creatorIds: [CREATOR_FUNC] })
-      expect(facets.creators.find((f) => f.label === 'Loot Studios')?.count).toBe(5)
+      expect(facets.creators.find((f) => f.label === 'Loot Studios')?.count).toBe(6)
       // Other facets DO respect the creator filter.
       expect(facets.licenses.find((f) => f.label === 'CC-BY-4.0')).toBeUndefined()
     })
@@ -395,17 +410,33 @@ describeDb('searchModels', () => {
     })
   })
 
+  describe('facet loading', () => {
+    it('can skip facet queries when the caller does not need them', async () => {
+      const result = await search({ includeFacets: false, limit: 3 })
+
+      expect(result.hits).toHaveLength(3)
+      expect(result.total).toBe(10)
+      expect(result.facets).toEqual({
+        libraries: [],
+        creators: [],
+        tags: [],
+        licenses: [],
+        extensions: [],
+      })
+    })
+  })
+
   describe('sorting and paging', () => {
     it('sorts by name, size and age', async () => {
       expect((await names({ sort: 'name' }))[0]).toBe('Beast Mount')
       expect((await names({ sort: 'largest' }))[0]).toBe('Red Dragon Miniature')
-      expect((await names({ sort: 'oldest' })).length).toBe(9)
+      expect((await names({ sort: 'oldest' })).length).toBe(10)
     })
 
     it('reports a total independent of the page size', async () => {
       const page = await search({ limit: 3 })
       expect(page.hits).toHaveLength(3)
-      expect(page.total).toBe(9)
+      expect(page.total).toBe(10)
     })
 
     it('pages without repeating or skipping', async () => {
