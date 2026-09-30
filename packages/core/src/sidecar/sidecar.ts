@@ -20,6 +20,22 @@ import type { StorageAdapter } from '../storage/types'
 
 export const SIDECAR_VERSION = 1
 
+export function isValidIsoDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
 const sidecarSchema = z.object({
   version: z.number().int().positive(),
   /** Written for humans opening the file; never read back. */
@@ -28,6 +44,10 @@ const sidecarSchema = z.object({
   name: z.string().trim().min(1).max(500).optional(),
   notes: z.string().max(20_000).nullable().optional(),
   license: z.string().max(120).nullable().optional(),
+  licenseUrl: z.string().max(2000).nullable().optional(),
+  licenseExpiresAt: z.string().refine(isValidIsoDate, 'Invalid licence expiry date').nullable().optional(),
+  commercialUse: z.boolean().nullable().optional(),
+  licenseNotes: z.string().max(20_000).nullable().optional(),
   creator: z.string().trim().min(1).max(225).nullable().optional(),
   tags: z.array(z.string().max(120)).max(200).optional(),
   links: z
@@ -44,6 +64,10 @@ export interface SidecarContent {
   name?: string
   notes?: string | null
   license?: string | null
+  licenseUrl?: string | null
+  licenseExpiresAt?: string | null
+  commercialUse?: boolean | null
+  licenseNotes?: string | null
   creator?: string | null
   tags?: string[]
   links?: { url: string; title?: string }[]
@@ -185,6 +209,10 @@ export function sidecarUnchanged(existing: SidecarContent | null, next: SidecarC
       name: content.name ?? null,
       notes: content.notes ?? null,
       license: content.license ?? null,
+      licenseUrl: content.licenseUrl ?? null,
+      licenseExpiresAt: content.licenseExpiresAt ?? null,
+      commercialUse: content.commercialUse ?? null,
+      licenseNotes: content.licenseNotes ?? null,
       creator: content.creator ?? null,
       tags: [...(content.tags ?? [])].sort((a, b) => a.localeCompare(b)),
       links: [...(content.links ?? [])]

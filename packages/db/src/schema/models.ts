@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
   numeric,
@@ -37,8 +38,16 @@ export const models = pgTable(
     publicId: text('public_id').notNull(),
 
     notes: text('notes'),
-    /** SPDX identifier, e.g. 'CC-BY-4.0'. Null means unknown, not unlicensed. */
+    /** Licence name or identifier. Null means unknown, not unlicensed. */
     license: text('license'),
+    /** Link to the licence terms or commercial subscription page. */
+    licenseUrl: text('license_url'),
+    /** Optional expiry date for time-limited commercial licences. */
+    licenseExpiresAt: date('license_expires_at'),
+    /** Explicit commercial-use permission: true, false, or null when not recorded. */
+    commercialUse: boolean('commercial_use'),
+    /** Free-form details for restrictions, attribution requirements, and other terms. */
+    licenseNotes: text('license_notes'),
 
     creatorId: uuid('creator_id').references(() => creators.id, { onDelete: 'set null' }),
     /** FK to model_files, added by migration once both tables exist (circular). */

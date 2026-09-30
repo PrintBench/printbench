@@ -778,6 +778,10 @@ async function restoreFromSidecar(
   if (data.name) updates.push('name')
   if (data.notes !== undefined) updates.push('notes')
   if (data.license !== undefined) updates.push('license')
+  if (data.licenseUrl !== undefined) updates.push('licenseUrl')
+  if (data.licenseExpiresAt !== undefined) updates.push('licenseExpiresAt')
+  if (data.commercialUse !== undefined) updates.push('commercialUse')
+  if (data.licenseNotes !== undefined) updates.push('licenseNotes')
 
   if (overwriteExisting) {
     await db.execute(sql`
@@ -797,6 +801,22 @@ async function restoreFromSidecar(
         license = CASE
           WHEN ${data.license !== undefined} THEN ${data.license ?? null}
           ELSE license
+        END,
+        license_url = CASE
+          WHEN ${data.licenseUrl !== undefined} THEN ${data.licenseUrl ?? null}
+          ELSE license_url
+        END,
+        license_expires_at = CASE
+          WHEN ${data.licenseExpiresAt !== undefined} THEN ${data.licenseExpiresAt ?? null}::date
+          ELSE license_expires_at
+        END,
+        commercial_use = CASE
+          WHEN ${data.commercialUse !== undefined} THEN ${data.commercialUse ?? null}
+          ELSE commercial_use
+        END,
+        license_notes = CASE
+          WHEN ${data.licenseNotes !== undefined} THEN ${data.licenseNotes ?? null}
+          ELSE license_notes
         END
       WHERE id = ${modelId}
     `)
@@ -806,7 +826,11 @@ async function restoreFromSidecar(
         name = coalesce(${data.name ?? null}, name),
         slug = coalesce(${data.name ? slugify(data.name) : null}, slug),
         notes = coalesce(${data.notes ?? null}, notes),
-        license = coalesce(${data.license ?? null}, license)
+        license = coalesce(${data.license ?? null}, license),
+        license_url = coalesce(${data.licenseUrl ?? null}, license_url),
+        license_expires_at = coalesce(${data.licenseExpiresAt ?? null}::date, license_expires_at),
+        commercial_use = coalesce(${data.commercialUse ?? null}, commercial_use),
+        license_notes = coalesce(${data.licenseNotes ?? null}, license_notes)
       WHERE id = ${modelId}
     `)
   }

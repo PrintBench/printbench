@@ -15,7 +15,11 @@ describe('sidecar serialisation', () => {
     const content = {
       name: 'Red Dragon',
       notes: 'A big one',
-      license: 'CC-BY-4.0',
+      license: 'Lord Phobos Commercial Seller Licence',
+      licenseUrl: 'https://example.com/licence',
+      licenseExpiresAt: '2026-10-31',
+      commercialUse: true,
+      licenseNotes: 'Attribution required. Scaling permitted.',
       creator: 'Loot Studios',
       tags: ['dragon', 'miniature'],
       previewFile: 'images/preview.png',
@@ -57,6 +61,14 @@ describe('sidecar serialisation', () => {
 
     it('rejects an unexpected shape', () => {
       expect(parseSidecar('{"version":1,"tags":"not-an-array"}').data).toBeNull()
+    })
+
+    it('rejects an impossible licence expiry date', () => {
+      const { data, error } = parseSidecar(
+        '{"version":1,"licenseExpiresAt":"2026-02-31"}',
+      )
+      expect(data).toBeNull()
+      expect(error).toMatch(/expiry date/i)
     })
 
     it('rejects empty or whitespace-only identity fields', () => {
@@ -147,6 +159,17 @@ describeDb('sidecar round trip', () => {
     await scan()
     const id = await modelId('Red Dragon')
 
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES (
+        ${id},
+        'https://example.com/original-model',
+        'Original model page',
+        'example.com',
+        0
+      )
+    `)
+
     const result = await updateModel(db, id, {
       name: 'Red Dragon Miniature',
       license: 'CC-BY-4.0',
@@ -166,6 +189,32 @@ describeDb('sidecar round trip', () => {
       creator: 'Loot Studios',
       tags: ['dragon', 'miniature'],
     })
+    expect(data?.links).toEqual([
+      {
+        url: 'https://example.com/original-model',
+        title: 'Original model page',
+      },
+    ])
+  })
+
+  it('rejects an impossible licence expiry date when editing metadata', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    const result = await updateModel(db, id, {
+      licenseExpiresAt: '2026-02-31',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/valid date/i)
+    expect(result.sidecarWritten).toBe(false)
+
+    const row = await db.execute<{ license_expires_at: string | null }>(sql`
+      SELECT license_expires_at
+      FROM models
+      WHERE id = ${id}
+    `)
+    expect(row.rows[0]!.license_expires_at).toBeNull()
   })
 
   it('never writes a sidecar into a library that opted out', async () => {
@@ -259,7 +308,11 @@ describeDb('sidecar round trip', () => {
     await scan()
     await updateModel(db, await modelId('Red Dragon'), {
       name: 'Red Dragon Miniature',
-      license: 'CC-BY-4.0',
+      license: 'Lord Phobos Commercial Seller Licence',
+      licenseUrl: 'https://example.com/licence',
+      licenseExpiresAt: '2026-10-31',
+      commercialUse: true,
+      licenseNotes: 'Attribution required. Scaling permitted.',
       creator: 'Loot Studios',
       tags: ['dragon', 'miniature'],
       notes: 'A fearsome beast',
@@ -279,11 +332,16 @@ describeDb('sidecar round trip', () => {
     const restored = await db.execute<{
       name: string
       license: string
+      license_url: string
+      license_expires_at: string
+      commercial_use: boolean
+      license_notes: string
       notes: string
       creator: string
       tags: string[]
     }>(sql`
-      SELECT m.name, m.license, m.notes, c.name AS creator,
+      SELECT m.name, m.license, m.license_url, m.license_expires_at,
+             m.commercial_use, m.license_notes, m.notes, c.name AS creator,
              (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
                 JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
       FROM models m LEFT JOIN creators c ON c.id = m.creator_id
@@ -292,7 +350,11 @@ describeDb('sidecar round trip', () => {
 
     const row = restored.rows[0]!
     expect(row.name).toBe('Red Dragon Miniature')
-    expect(row.license).toBe('CC-BY-4.0')
+    expect(row.license).toBe('Lord Phobos Commercial Seller Licence')
+    expect(row.license_url).toBe('https://example.com/licence')
+    expect(row.license_expires_at).toBe('2026-10-31')
+    expect(row.commercial_use).toBe(true)
+    expect(row.license_notes).toBe('Attribution required. Scaling permitted.')
     expect(row.notes).toBe('A fearsome beast')
     expect(row.creator).toBe('Loot Studios')
     expect(row.tags.sort()).toEqual(['dragon', 'miniature'])
@@ -324,6 +386,10 @@ describeDb('sidecar round trip', () => {
     await updateModel(db, id, {
       name: 'Database Name',
       license: 'MIT',
+      licenseUrl: 'https://example.com/old-licence',
+      licenseExpiresAt: '2027-12-31',
+      commercialUse: true,
+      licenseNotes: 'Old commercial terms',
       creator: 'Database Creator',
       tags: ['old-tag'],
       notes: 'Database notes',
@@ -338,6 +404,10 @@ describeDb('sidecar round trip', () => {
         name: 'Sidecar Name',
         notes: null,
         license: null,
+        licenseUrl: null,
+        licenseExpiresAt: null,
+        commercialUse: null,
+        licenseNotes: null,
         creator: null,
         tags: [],
       }),
@@ -351,10 +421,15 @@ describeDb('sidecar round trip', () => {
       name: string
       notes: string | null
       license: string | null
+      license_url: string | null
+      license_expires_at: string | null
+      commercial_use: boolean | null
+      license_notes: string | null
       creator: string | null
       tags: string[] | null
     }>(sql`
-      SELECT m.name, m.notes, m.license, c.name AS creator,
+      SELECT m.name, m.notes, m.license, m.license_url, m.license_expires_at,
+             m.commercial_use, m.license_notes, c.name AS creator,
              (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
                 JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
       FROM models m LEFT JOIN creators c ON c.id = m.creator_id
@@ -365,6 +440,10 @@ describeDb('sidecar round trip', () => {
     expect(row.name).toBe('Sidecar Name')
     expect(row.notes).toBeNull()
     expect(row.license).toBeNull()
+    expect(row.license_url).toBeNull()
+    expect(row.license_expires_at).toBeNull()
+    expect(row.commercial_use).toBeNull()
+    expect(row.license_notes).toBeNull()
     expect(row.creator).toBeNull()
     expect(row.tags).toBeNull()
   })
@@ -376,6 +455,10 @@ describeDb('sidecar round trip', () => {
     await updateModel(db, id, {
       name: 'Database Name',
       license: 'CC-BY-4.0',
+      licenseUrl: 'https://example.com/keep-licence',
+      licenseExpiresAt: '2027-06-30',
+      commercialUse: false,
+      licenseNotes: 'Keep these licence terms',
       creator: 'Database Creator',
       tags: ['keep-tag'],
       notes: 'Keep these notes',
@@ -397,10 +480,15 @@ describeDb('sidecar round trip', () => {
       name: string
       notes: string | null
       license: string | null
+      license_url: string | null
+      license_expires_at: string | null
+      commercial_use: boolean | null
+      license_notes: string | null
       creator: string | null
       tags: string[] | null
     }>(sql`
-      SELECT m.name, m.notes, m.license, c.name AS creator,
+      SELECT m.name, m.notes, m.license, m.license_url, m.license_expires_at,
+             m.commercial_use, m.license_notes, c.name AS creator,
              (SELECT array_agg(t.name ORDER BY t.name) FROM model_tags mt
                 JOIN tags t ON t.id = mt.tag_id WHERE mt.model_id = m.id) AS tags
       FROM models m LEFT JOIN creators c ON c.id = m.creator_id
@@ -411,6 +499,10 @@ describeDb('sidecar round trip', () => {
     expect(row.name).toBe('Sidecar Name')
     expect(row.notes).toBe('Keep these notes')
     expect(row.license).toBe('CC-BY-4.0')
+    expect(row.license_url).toBe('https://example.com/keep-licence')
+    expect(row.license_expires_at).toBe('2027-06-30')
+    expect(row.commercial_use).toBe(false)
+    expect(row.license_notes).toBe('Keep these licence terms')
     expect(row.creator).toBe('Database Creator')
     expect(row.tags).toEqual(['keep-tag'])
   })

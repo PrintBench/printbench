@@ -5,6 +5,7 @@ import { schema } from '@pb/db'
 import { slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
 import {
+  isValidIsoDate,
   readSidecar,
   readPackageSidecar,
   sidecarUnchanged,
@@ -26,6 +27,10 @@ export interface ModelPatch {
   name?: string
   notes?: string | null
   license?: string | null
+  licenseUrl?: string | null
+  licenseExpiresAt?: string | null
+  commercialUse?: boolean | null
+  licenseNotes?: string | null
   /** Creator name; created if it does not exist. Empty string clears it. */
   creator?: string | null
   /** Full replacement set of tag names. Created as needed. */
@@ -83,6 +88,32 @@ export async function updateModel(
     // Empty is stored as null: "unknown licence" and "no licence" are the same
     // thing here, and null keeps the facet clean.
     updates.license = license.length > 0 ? license : null
+  }
+
+  if (patch.licenseUrl !== undefined) {
+    const value = patch.licenseUrl?.trim() ?? ''
+    updates.licenseUrl = value.length > 0 ? value.slice(0, 2000) : null
+  }
+
+  if (patch.licenseExpiresAt !== undefined) {
+    const value = patch.licenseExpiresAt?.trim() ?? ''
+    if (value.length > 0 && !isValidIsoDate(value)) {
+      return {
+        ok: false,
+        error: 'Licence expiry must be a valid date in YYYY-MM-DD format.',
+        sidecarWritten: false,
+      }
+    }
+    updates.licenseExpiresAt = value.length > 0 ? value : null
+  }
+
+  if (patch.commercialUse !== undefined) {
+    updates.commercialUse = patch.commercialUse
+  }
+
+  if (patch.licenseNotes !== undefined) {
+    updates.licenseNotes =
+      patch.licenseNotes === null ? null : patch.licenseNotes.slice(0, MAX_NOTES)
   }
 
   if (patch.creator !== undefined) {
@@ -292,11 +323,16 @@ export async function buildSidecarContent(db: Database, modelId: string): Promis
     name: string
     notes: string | null
     license: string | null
+    license_url: string | null
+    license_expires_at: string | null
+    commercial_use: boolean | null
+    license_notes: string | null
     creator: string | null
     tags: string[] | null
     preview_file: string | null
   }>(sql`
     SELECT m.name, m.notes, m.license,
+           m.license_url, m.license_expires_at, m.commercial_use, m.license_notes,
            c.name AS creator,
            (SELECT array_agg(t.name ORDER BY t.name)
               FROM model_tags mt JOIN tags t ON t.id = mt.tag_id
@@ -311,12 +347,27 @@ export async function buildSidecarContent(db: Database, modelId: string): Promis
   const row = result.rows[0]
   if (!row) return {}
 
+  const links = await db.execute<{ url: string; title: string | null }>(sql`
+    SELECT url, title
+    FROM model_links
+    WHERE model_id = ${modelId}
+    ORDER BY position, id
+  `)
+
   return {
     name: row.name,
     notes: row.notes,
     license: row.license,
+    licenseUrl: row.license_url,
+    licenseExpiresAt: row.license_expires_at,
+    commercialUse: row.commercial_use,
+    licenseNotes: row.license_notes,
     creator: row.creator,
     tags: row.tags ?? [],
+    links: links.rows.map((link) => ({
+      url: link.url,
+      ...(link.title ? { title: link.title } : {}),
+    })),
     previewFile: row.preview_file,
   }
 }

@@ -6,6 +6,7 @@ import { Check, Loader2, Pencil, Plus, X } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { cn } from '@/lib/cn'
 import { loadSuggestions, saveModel } from './edit-actions'
@@ -38,6 +39,10 @@ export interface ModelEditorProps {
     name: string
     notes: string | null
     license: string | null
+    licenseUrl: string | null
+    licenseExpiresAt: string | null
+    commercialUse: boolean | null
+    licenseNotes: string | null
     creator: string | null
     tags: string[]
   }
@@ -54,6 +59,12 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
   const [name, setName] = useState(initial.name)
   const [notes, setNotes] = useState(initial.notes ?? '')
   const [license, setLicense] = useState(initial.license ?? '')
+  const [licenseUrl, setLicenseUrl] = useState(initial.licenseUrl ?? '')
+  const [licenseExpiresAt, setLicenseExpiresAt] = useState(initial.licenseExpiresAt ?? '')
+  const [commercialUse, setCommercialUse] = useState<'unknown' | 'yes' | 'no'>(
+    initial.commercialUse === true ? 'yes' : initial.commercialUse === false ? 'no' : 'unknown',
+  )
+  const [licenseNotes, setLicenseNotes] = useState(initial.licenseNotes ?? '')
   const [creator, setCreator] = useState(initial.creator ?? '')
   const [tags, setTags] = useState<string[]>(initial.tags)
   const [tagDraft, setTagDraft] = useState('')
@@ -94,6 +105,10 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
         name,
         notes: notes.trim() === '' ? null : notes,
         license: license.trim() === '' ? null : license,
+        licenseUrl: licenseUrl.trim() === '' ? null : licenseUrl,
+        licenseExpiresAt: licenseExpiresAt.trim() === '' ? null : licenseExpiresAt,
+        commercialUse: commercialUse === 'yes' ? true : commercialUse === 'no' ? false : null,
+        licenseNotes: licenseNotes.trim() === '' ? null : licenseNotes,
         creator: creator.trim() === '' ? null : creator,
         tags,
       })
@@ -197,6 +212,63 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
                 ))}
               </datalist>
             </div>
+
+            <Field
+              label="Licence URL"
+              htmlFor="model-license-url"
+              hint="Link to the licence terms or commercial subscription page."
+            >
+              <Input
+                id="model-license-url"
+                type="url"
+                value={licenseUrl}
+                placeholder="https://..."
+                onChange={(event) => setLicenseUrl(event.target.value)}
+              />
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Commercial use" htmlFor="model-commercial-use">
+                <Select
+                  id="model-commercial-use"
+                  value={commercialUse}
+                  onChange={(event) =>
+                    setCommercialUse(event.target.value as 'unknown' | 'yes' | 'no')
+                  }
+                >
+                  <option value="unknown">Not recorded</option>
+                  <option value="yes">Licensed for commercial use</option>
+                  <option value="no">Commercial use not permitted</option>
+                </Select>
+              </Field>
+
+              <Field
+                label="Licence expiry"
+                htmlFor="model-license-expiry"
+                hint="Leave blank if the licence does not expire."
+              >
+                <Input
+                  id="model-license-expiry"
+                  type="date"
+                  value={licenseExpiresAt}
+                  onChange={(event) => setLicenseExpiresAt(event.target.value)}
+                />
+              </Field>
+            </div>
+
+            <Field
+              label="Licence notes"
+              htmlFor="model-license-notes"
+              hint="Attribution, modification restrictions, or other important terms."
+            >
+              <textarea
+                id="model-license-notes"
+                value={licenseNotes}
+                onChange={(event) => setLicenseNotes(event.target.value)}
+                rows={3}
+                className="w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm focus:border-[var(--color-accent)]"
+              />
+            </Field>
 
             <div className="space-y-1.5">
               <span className="block text-sm font-medium">Tags</span>
