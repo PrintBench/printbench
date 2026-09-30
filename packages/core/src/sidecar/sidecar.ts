@@ -30,9 +30,7 @@ export function isValidIsoDate(value: string): boolean {
   const date = new Date(Date.UTC(year, month - 1, day))
 
   return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
   )
 }
 
@@ -45,7 +43,11 @@ const sidecarSchema = z.object({
   notes: z.string().max(20_000).nullable().optional(),
   license: z.string().max(120).nullable().optional(),
   licenseUrl: z.string().max(2000).nullable().optional(),
-  licenseExpiresAt: z.string().refine(isValidIsoDate, 'Invalid licence expiry date').nullable().optional(),
+  licenseExpiresAt: z
+    .string()
+    .refine(isValidIsoDate, 'Invalid licence expiry date')
+    .nullable()
+    .optional(),
   commercialUse: z.boolean().nullable().optional(),
   licenseNotes: z.string().max(20_000).nullable().optional(),
   creator: z.string().trim().min(1).max(225).nullable().optional(),

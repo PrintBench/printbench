@@ -64,9 +64,7 @@ describe('sidecar serialisation', () => {
     })
 
     it('rejects an impossible licence expiry date', () => {
-      const { data, error } = parseSidecar(
-        '{"version":1,"licenseExpiresAt":"2026-02-31"}',
-      )
+      const { data, error } = parseSidecar('{"version":1,"licenseExpiresAt":"2026-02-31"}')
       expect(data).toBeNull()
       expect(error).toMatch(/expiry date/i)
     })
