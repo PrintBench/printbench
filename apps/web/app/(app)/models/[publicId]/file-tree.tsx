@@ -197,13 +197,17 @@ export function FileTree({ files }: { files: TreeFile[] }) {
     group.files.push(file)
   }
 
-  const topLevelNodes = orderTopLevel([...extensionGroups.values()], [...tree.folders.values()])
+  const rootGroups = [...extensionGroups.values()]
+  const folders = [...tree.folders.values()]
+  const topLevelNodes = orderTopLevel(rootGroups, folders)
 
   return (
     <ul>
-      {topLevelNodes.map((node) => (
-        <FolderNode key={node.name} node={node} depth={0} />
-      ))}
+      {topLevelNodes.map((node) => {
+        const prefix = rootGroups.includes(node) ? 'extension' : 'folder'
+
+        return <FolderNode key={`${prefix}-${node.name}`} node={node} depth={0} />
+      })}
     </ul>
   )
 }
