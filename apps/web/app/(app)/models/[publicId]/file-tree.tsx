@@ -7,6 +7,7 @@ import { formatBytes } from '@/components/model/model-card'
 import { FileDownloadLink } from './file-download-link'
 import { OpenInSlicer } from './open-in-slicer'
 import { SendToPrinter } from './send-to-printer'
+import { compareFiles, compareFolders, orderTopLevel } from './file-tree-order'
 
 export type TreeFile = {
   id: string
@@ -130,19 +131,8 @@ function FolderNode({ node, depth }: { node: TreeNode; depth: number }) {
   const [expanded, setExpanded] = useState(depth === 0)
   const total = countFiles(node)
 
-  const folders = [...node.folders.values()].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, {
-      numeric: true,
-      sensitivity: 'base',
-    }),
-  )
-
-  const files = [...node.files].sort((a, b) =>
-    (a.displayName ?? a.filename).localeCompare(b.displayName ?? b.filename, undefined, {
-      numeric: true,
-      sensitivity: 'base',
-    }),
-  )
+  const folders = [...node.folders.values()].sort(compareFolders)
+  const files = [...node.files].sort(compareFiles)
 
   return (
     <li>
@@ -184,13 +174,6 @@ function FolderNode({ node, depth }: { node: TreeNode; depth: number }) {
 export function FileTree({ files }: { files: TreeFile[] }) {
   const tree = buildTree(files)
 
-  const folders = [...tree.folders.values()].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, {
-      numeric: true,
-      sensitivity: 'base',
-    }),
-  )
-
   /*
    * Files that live directly at the current model root have no real
    * directory hierarchy to display. Group those files into virtual,
@@ -214,21 +197,12 @@ export function FileTree({ files }: { files: TreeFile[] }) {
     group.files.push(file)
   }
 
-  const rootGroups = [...extensionGroups.values()].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, {
-      numeric: true,
-      sensitivity: 'base',
-    }),
-  )
+  const topLevelNodes = orderTopLevel([...extensionGroups.values()], [...tree.folders.values()])
 
   return (
     <ul>
-      {folders.map((folder) => (
-        <FolderNode key={`folder-${folder.name}`} node={folder} depth={0} />
-      ))}
-
-      {rootGroups.map((group) => (
-        <FolderNode key={`extension-${group.name}`} node={group} depth={0} />
+      {topLevelNodes.map((node) => (
+        <FolderNode key={node.name} node={node} depth={0} />
       ))}
     </ul>
   )
