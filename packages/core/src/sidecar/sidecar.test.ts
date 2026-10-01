@@ -195,6 +195,93 @@ describeDb('sidecar round trip', () => {
     ])
   })
 
+  it('replaces model links and writes them to the sidecar', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES (
+        ${id},
+        'https://example.com/old-link',
+        'Old link',
+        'example.com',
+        0
+      )
+    `)
+
+    const result = await updateModel(db, id, {
+      links: [
+        {
+          title: 'Original model page',
+          url: 'https://example.com/model',
+        },
+        {
+          title: 'Assembly video',
+          url: 'https://youtube.com/watch?v=test',
+        },
+        {
+          title: 'Custom link',
+          url: 'https://example.com/custom',
+        },
+      ],
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.sidecarWritten).toBe(true)
+
+    const links = await db.execute<{
+      url: string
+      title: string | null
+      host: string | null
+      position: number
+    }>(sql`
+      SELECT url, title, host, position
+      FROM model_links
+      WHERE model_id = ${id}
+      ORDER BY position, id
+    `)
+
+    expect(links.rows).toEqual([
+      {
+        url: 'https://example.com/model',
+        title: 'Original model page',
+        host: 'example.com',
+        position: 0,
+      },
+      {
+        url: 'https://youtube.com/watch?v=test',
+        title: 'Assembly video',
+        host: 'youtube.com',
+        position: 1,
+      },
+      {
+        url: 'https://example.com/custom',
+        title: 'Custom link',
+        host: 'example.com',
+        position: 2,
+      },
+    ])
+
+    const written = await readFile(path.join(root, 'Red Dragon', '.printbench.json'), 'utf8')
+    const { data } = parseSidecar(written)
+
+    expect(data?.links).toEqual([
+      {
+        url: 'https://example.com/model',
+        title: 'Original model page',
+      },
+      {
+        url: 'https://youtube.com/watch?v=test',
+        title: 'Assembly video',
+      },
+      {
+        url: 'https://example.com/custom',
+        title: 'Custom link',
+      },
+    ])
+  })
+
   it('rejects an impossible licence expiry date when editing metadata', async () => {
     await scan()
     const id = await modelId('Red Dragon')

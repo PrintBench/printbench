@@ -35,6 +35,8 @@ export interface ModelPatch {
   creator?: string | null
   /** Full replacement set of tag names. Created as needed. */
   tags?: string[]
+  /** Full replacement set of external links, preserved in display order. */
+  links?: { title?: string | null; url: string }[]
   previewFileId?: string | null
 }
 
@@ -151,6 +153,32 @@ export async function updateModel(
 
   if (patch.tags !== undefined) {
     await setModelTags(db, modelId, patch.tags)
+  }
+
+  if (patch.links !== undefined) {
+    await db.execute(sql`DELETE FROM model_links WHERE model_id = ${modelId}`)
+
+    for (const [position, link] of patch.links.entries()) {
+      const url = link.url.trim()
+      if (!url) continue
+
+      const title = link.title?.trim() || null
+      let host: string | null = null
+      try {
+        host = new URL(url).hostname
+      } catch {
+        // Preserve non-standard URLs just as the sidecar scanner does.
+      }
+
+      await db.execute(sql`
+        INSERT INTO model_links (model_id, url, title, host, position)
+        VALUES (${modelId}, ${url}, ${title}, ${host}, ${position})
+        ON CONFLICT (model_id, url) DO UPDATE SET
+          title = EXCLUDED.title,
+          host = EXCLUDED.host,
+          position = EXCLUDED.position
+      `)
+    }
   }
 
   // Rebuilt in the same operation: a renamed model that is not findable by its

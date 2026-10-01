@@ -27,6 +27,7 @@ export async function saveModel(
     licenseNotes?: string | null
     creator?: string | null
     tags?: string[]
+    links?: { title?: string | null; url: string }[]
     previewFileId?: string | null
   },
 ): Promise<Result> {

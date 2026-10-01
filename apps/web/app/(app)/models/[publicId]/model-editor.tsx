@@ -33,6 +33,18 @@ const LICENCES = [
   'Proprietary',
 ]
 
+const LINK_TYPES = [
+  'Original model page',
+  'Assembly video',
+  'Printing instructions',
+  'Designer page',
+] as const
+
+type ModelLink = {
+  title: string
+  url: string
+}
+
 export interface ModelEditorProps {
   publicId: string
   initial: {
@@ -45,6 +57,7 @@ export interface ModelEditorProps {
     licenseNotes: string | null
     creator: string | null
     tags: string[]
+    links: { title: string | null; url: string }[]
   }
   canEdit: boolean
 }
@@ -68,6 +81,12 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
   const [creator, setCreator] = useState(initial.creator ?? '')
   const [tags, setTags] = useState<string[]>(initial.tags)
   const [tagDraft, setTagDraft] = useState('')
+  const [links, setLinks] = useState<ModelLink[]>(
+    initial.links.map((link) => ({
+      title: link.title ?? '',
+      url: link.url,
+    })),
+  )
 
   const [suggestions, setSuggestions] = useState<{ tags: string[]; creators: string[] }>({
     tags: [],
@@ -111,6 +130,12 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
         licenseNotes: licenseNotes.trim() === '' ? null : licenseNotes,
         creator: creator.trim() === '' ? null : creator,
         tags,
+        links: links
+          .map((link) => ({
+            title: link.title.trim() === '' ? null : link.title.trim(),
+            url: link.url.trim(),
+          }))
+          .filter((link) => link.url !== ''),
       })
       if (!result.ok) {
         setError(result.error)
@@ -151,7 +176,7 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
 
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl"
+          className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl"
           onEscapeKeyDown={(event) => {
             if (saving) event.preventDefault()
           }}
@@ -269,6 +294,118 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
                 className="w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm focus:border-[var(--color-accent)]"
               />
             </Field>
+
+            <div className="space-y-2 border-y-2 border-[var(--color-border)] py-4">
+              <div>
+                <span className="block text-sm font-medium">Links</span>
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  Add source pages, videos, instructions, designer pages, or other useful links.
+                </span>
+              </div>
+
+              <div className="divide-y divide-[var(--color-border)]">
+                {links.map((link, index) => {
+                  const knownType = LINK_TYPES.includes(link.title as (typeof LINK_TYPES)[number])
+                  const selectedType = knownType ? link.title : 'Other'
+
+                  return (
+                    <div key={index} className="py-2 first:pt-0">
+                      <div
+                        className={cn(
+                          'grid gap-2',
+                          knownType
+                            ? 'sm:grid-cols-[190px_1fr_auto]'
+                            : 'sm:grid-cols-[190px_200px_1fr_auto]',
+                        )}
+                      >
+                        <Select
+                          id={`model-link-type-${index}`}
+                          aria-label={`Link ${index + 1} type`}
+                          value={selectedType}
+                          onChange={(event) => {
+                            const value = event.target.value
+                            setLinks((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      title: value === 'Other' ? '' : value,
+                                    }
+                                  : item,
+                              ),
+                            )
+                          }}
+                        >
+                          {LINK_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                          <option value="Other">Other</option>
+                        </Select>
+
+                        {!knownType && (
+                          <Input
+                            id={`model-link-title-${index}`}
+                            aria-label={`Link ${index + 1} title`}
+                            value={link.title}
+                            placeholder="Link title"
+                            onChange={(event) => {
+                              const value = event.target.value
+                              setLinks((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index ? { ...item, title: value } : item,
+                                ),
+                              )
+                            }}
+                          />
+                        )}
+
+                        <Input
+                          id={`model-link-url-${index}`}
+                          type="url"
+                          aria-label={`Link ${index + 1} URL`}
+                          value={link.url}
+                          placeholder="https://..."
+                          onChange={(event) => {
+                            const value = event.target.value
+                            setLinks((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, url: value } : item,
+                              ),
+                            )
+                          }}
+                        />
+
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          aria-label="Remove link"
+                          onClick={() =>
+                            setLinks((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index),
+                            )
+                          }
+                        >
+                          <X />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setLinks((current) => [...current, { title: '', url: '' }])}
+              >
+                <Plus />
+                Add link
+              </Button>
+            </div>
 
             <div className="space-y-1.5">
               <span className="block text-sm font-medium">Tags</span>

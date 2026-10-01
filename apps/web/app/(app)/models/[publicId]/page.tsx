@@ -373,6 +373,10 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   licenseNotes: model.license_notes,
                   creator,
                   tags,
+                  links: modelLinks.rows.map((link) => ({
+                    title: link.title,
+                    url: link.url,
+                  })),
                 }}
               />
               <DownloadModelButton publicId={model.public_id} />
@@ -647,9 +651,6 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               </p>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
-                  Licence
-                </p>
                 {model.license_url ? (
                   <a
                     href={model.license_url}
