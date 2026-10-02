@@ -4,7 +4,7 @@ import { schema } from '@pb/db'
 import { basename, humanizeName } from '../library/paths'
 import { readPackageSidecar, readSidecar } from '../sidecar/sidecar'
 import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
-import { updateModel, type ModelPatch } from './model-service'
+import { syncSidecar, updateModel, type ModelPatch } from './model-service'
 
 /** Structural contract: core does not depend on the mesh/image decoder package. */
 export interface EmbeddedModelMetadata {
@@ -30,7 +30,7 @@ export async function applyEmbeddedModelMetadata(
   fileId: string,
   metadata: EmbeddedModelMetadata,
 ): Promise<{ applied: boolean; reason?: string }> {
-  return db.transaction(async (transaction) => {
+  const result = await db.transaction(async (transaction) => {
     // Drizzle transactions implement the query interface used by updateModel.
     const tx = transaction as unknown as Database
     const locked = await tx.execute<{ id: string; embedded_metadata_state: string }>(sql`
@@ -83,11 +83,14 @@ export async function applyEmbeddedModelMetadata(
         .where(eq(schema.models.id, modelId))
       return { applied: false, reason: 'The project contains no missing descriptive fields.' }
     }
-    // Reuse creator resolution, search maintenance and sidecar synchronization.
-    const result = await updateModel(tx, modelId, patch)
+    // Disk writes wait until commit; a database rollback cannot leave metadata
+    // in a sidecar that was never saved to the model.
+    const result = await updateModel(tx, modelId, patch, { deferSidecar: true })
     if (!result.ok) throw new Error(result.error ?? 'Could not apply embedded metadata')
     return { applied: true }
   })
+  if (result.applied) await syncSidecar(db, modelId)
+  return result
 }
 
 function embeddedNotes(metadata: EmbeddedModelMetadata): string {

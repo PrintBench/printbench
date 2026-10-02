@@ -177,6 +177,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const creator = meta.rows[0]?.creator ?? null
   const creatorId = meta.rows[0]?.creator_id ?? null
   const tags = meta.rows[0]?.tags ?? []
+  const sources = await db.execute<{ url: string; title: string | null }>(sql`
+    SELECT url, title FROM model_links WHERE model_id = ${model.id} ORDER BY position, url
+  `)
+  const safeSources = sources.rows.filter((source) => {
+    try {
+      return ['https:', 'http:'].includes(new URL(source.url).protocol)
+    } catch {
+      return false
+    }
+  })
 
   const user = await getSessionUser()
   const policyUser = { id: user?.id ?? '', role: user?.role ?? null }
@@ -487,6 +497,24 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
         </div>
 
         <aside className="min-w-0 space-y-4">
+          {safeSources.length > 0 && (
+            <Card>
+              <CardContent className="space-y-2 p-4 text-sm">
+                <h2 className="font-semibold">Source links</h2>
+                {safeSources.map((source) => (
+                  <a
+                    key={source.url}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block break-words text-[var(--color-accent)] hover:underline"
+                  >
+                    {source.title || new URL(source.url).hostname}
+                  </a>
+                ))}
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardContent className="space-y-3 p-4 text-sm">
               <div>

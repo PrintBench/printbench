@@ -52,6 +52,7 @@ export async function updateModel(
   db: Database,
   modelId: string,
   patch: ModelPatch,
+  options: { deferSidecar?: boolean } = {},
 ): Promise<UpdateResult> {
   const rows = await db
     .select({ model: schema.models, library: schema.libraries })
@@ -129,7 +130,8 @@ export async function updateModel(
   // new name until some later sweep is worse than a slightly slower save.
   await refreshModelSearchVectors(db, [modelId])
 
-  const sidecarWritten = await syncSidecar(db, modelId)
+  // A surrounding transaction must commit before an external filesystem write.
+  const sidecarWritten = options.deferSidecar ? false : await syncSidecar(db, modelId)
   return { ok: true, sidecarWritten }
 }
 
@@ -291,6 +293,12 @@ async function hasNestedModel(
 }
 
 export async function buildSidecarContent(db: Database, modelId: string): Promise<SidecarContent> {
+  const links = await db
+    .select({ url: schema.modelLinks.url, title: schema.modelLinks.title })
+    .from(schema.modelLinks)
+    .where(eq(schema.modelLinks.modelId, modelId))
+    .orderBy(schema.modelLinks.position, schema.modelLinks.url)
+    .limit(50)
   const result = await db.execute<{
     name: string
     notes: string | null
@@ -321,6 +329,14 @@ export async function buildSidecarContent(db: Database, modelId: string): Promis
     creator: row.creator,
     tags: row.tags ?? [],
     previewFile: row.preview_file,
+    ...(links.length
+      ? {
+          links: links.map((link) => ({
+            url: link.url,
+            ...(link.title ? { title: link.title } : {}),
+          })),
+        }
+      : {}),
   }
 }
 

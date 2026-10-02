@@ -10,6 +10,7 @@ import { z } from 'zod'
 
 export const JOB = {
   libraryScan: 'library.scan',
+  makerWorldImport: 'model.import-makerworld',
   modelIndex: 'model.index',
   modelMove: 'model.move',
   fileDigest: 'file.digest',
@@ -25,6 +26,7 @@ export const JOB = {
 export type JobName = (typeof JOB)[keyof typeof JOB]
 
 export const payloads = {
+  [JOB.makerWorldImport]: z.object({ importId: z.string().uuid() }),
   [JOB.libraryScan]: z.object({
     libraryId: z.string().uuid(),
     mode: z.enum(['fast', 'deep']).default('fast'),
@@ -87,6 +89,7 @@ export const JOB_OPTIONS: Record<
   JobName,
   { concurrency: number; priority?: number; policy: QueuePolicy }
 > = {
+  [JOB.makerWorldImport]: { concurrency: 1, priority: 9, policy: 'stately' },
   [JOB.libraryScan]: { concurrency: 1, priority: 10, policy: 'stately' },
   [JOB.modelIndex]: { concurrency: 4, priority: 8, policy: 'standard' },
   /*

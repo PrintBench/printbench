@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
-import { renderEmbeddedThumbnail, MAX_3MF_EMBEDDED_IMAGE_PIXELS } from './embedded-thumbnail'
+import {
+  renderEmbeddedThumbnail,
+  renderRemoteThumbnail,
+  MAX_3MF_EMBEDDED_IMAGE_PIXELS,
+} from './embedded-thumbnail'
 import { MAX_3MF_EMBEDDED_IMAGE_BYTES } from './threemf-metadata'
 
 describe('safe embedded cover decoding', () => {
@@ -56,5 +60,41 @@ describe('safe embedded cover decoding', () => {
     expect(
       await renderEmbeddedThumbnail([{ path: 'huge.png', data: image, contentType: 'image/png' }]),
     ).toBeNull()
+    expect(await renderRemoteThumbnail(image)).toBeNull()
+  })
+})
+
+describe('safe remote artwork decoding', () => {
+  it.each(['png', 'jpeg', 'webp'] as const)('converts %s artwork with bounded dimensions', async (format) => {
+    const input = await sharp({
+      create: { width: 30, height: 20, channels: 3, background: '#336699' },
+    })
+      .toFormat(format)
+      .toBuffer()
+    const result = await renderRemoteThumbnail(input, { size: 15 })
+    expect(result).toMatchObject({ contentType: 'image/webp', width: 15, height: 10 })
+    expect((await sharp(result!.data).metadata()).format).toBe('webp')
+    if (format === 'webp') {
+      expect(
+        await renderEmbeddedThumbnail([{ path: 'cover.png', data: input, contentType: 'image/png' }]),
+      ).toBeNull()
+    }
+  })
+
+  it('rejects oversized, corrupt, vector and animated artwork', async () => {
+    expect(await renderRemoteThumbnail(new Uint8Array(MAX_3MF_EMBEDDED_IMAGE_BYTES + 1))).toBeNull()
+    expect(await renderRemoteThumbnail(Buffer.from('RIFF0000WEBP'))).toBeNull()
+    expect(
+      await renderRemoteThumbnail(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')),
+    ).toBeNull()
+    const pixels = Buffer.alloc(10 * 20 * 3, 0)
+    pixels.fill(255, 10 * 10 * 3)
+    const animated = await sharp(pixels, {
+      raw: { width: 10, height: 20, pageHeight: 10, channels: 3 },
+    })
+      .webp({ loop: 0, delay: [100, 100] })
+      .toBuffer()
+    expect((await sharp(animated).metadata()).pages).toBe(2)
+    expect(await renderRemoteThumbnail(animated)).toBeNull()
   })
 })

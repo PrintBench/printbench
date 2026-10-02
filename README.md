@@ -120,6 +120,13 @@ web shell is replaceable without touching the app.
   is preserved, because that structure is what groups files into models. A
   `.zip` is extracted server-side rather than stored whole, with a zip-slip
   guard on every entry, so a downloaded pack can be dropped in as one file.
+- **New 3MF files supply embedded metadata.** Titles, designers, descriptions,
+  licenses, source-file dates and covers are read by the worker, with existing
+  edits and sidecars taking precedence.
+- **MakerWorld links import files and details.** Save your own account cookie
+  on Upload, paste a model URL, and the worker imports its selected print profile
+  with metadata and a source link. See [Model imports](docs/model-imports.md) for
+  session requirements, limits and the unofficial API caveat.
 - **S3 is a full backend, not just a source.** A library can live on local
   disk, a NAS mount or an S3-compatible bucket, and read _and_ write the same
   either way — uploads, zip extraction, sidecars and deletion all go through

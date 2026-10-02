@@ -16,6 +16,7 @@ import { JOB, getQueue, type JobHandler, type JobName } from '@pb/jobs'
 import { withMemoryDiagnostics } from './memory-diagnostics'
 import { handleLibraryScan } from './jobs/scan'
 import { handleModelMove } from './jobs/move'
+import { handleMakerWorldImport } from './jobs/import'
 import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs/analyze'
 import { handleHealthDetect } from './jobs/health'
 import { handleMaintArchive, handleMaintReconcile } from './jobs/maintenance'
@@ -97,6 +98,7 @@ async function main(): Promise<void> {
   const work = <N extends JobName>(name: N, handler: JobHandler<N>) =>
     queue.work(name, withMemoryDiagnostics(name, handler))
   await work(JOB.libraryScan, handleLibraryScan)
+  await work(JOB.makerWorldImport, handleMakerWorldImport)
   await work(JOB.modelMove, handleModelMove)
   await work(JOB.fileAnalyze, handleFileAnalyze)
   await work(JOB.fileThumbnail, handleFileThumbnail)
