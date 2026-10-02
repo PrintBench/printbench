@@ -157,10 +157,10 @@ describeDb('searchModels', () => {
   }
 
   describe('relevance', () => {
-    it('returns a selected creator image separately from generated thumbnails', async () => {
+    it('keeps selected creator artwork while reporting the printable model format', async () => {
       const result = await search({ query: 'red dragon' })
       expect(result.hits[0]?.previewImageFileId).toBe(PREVIEW_IMAGE)
-      expect(result.hits[0]?.previewExtension).toBe('webp')
+      expect(result.hits[0]?.previewExtension).toBe('stl')
     })
 
     /*

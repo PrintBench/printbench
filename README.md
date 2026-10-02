@@ -122,7 +122,10 @@ web shell is replaceable without touching the app.
   guard on every entry, so a downloaded pack can be dropped in as one file.
 - **New 3MF files supply embedded metadata.** Titles, designers, descriptions,
   licenses, source-file dates and covers are read by the worker, with existing
-  edits and sidecars taking precedence.
+  edits and sidecars taking precedence. Recognized MakerWorld project IDs also
+  resolve public tags and details automatically, with no cookie required.
+  Model cards show the printable format independently of artwork, and the detail
+  preview switches between the thumbnail and interactive 3D model.
 - **MakerWorld links import files and details.** Save your own account cookie
   in Account settings → MakerWorld, then paste a model URL on Upload. The worker
   imports its selected print profile with metadata and a source link. See [Model imports](docs/model-imports.md) for

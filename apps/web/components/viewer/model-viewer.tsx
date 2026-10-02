@@ -37,6 +37,8 @@ export interface ModelViewerProps {
   thumbnailFileId?: string | null
   /** From settings. Falls back to the built-in limit when not supplied. */
   maxBytes?: number
+  /** Pause rendering while another preview (such as artwork) is displayed. */
+  active?: boolean
   /**
    * Where to fetch bytes and thumbnails from.
    *
@@ -56,6 +58,7 @@ export function ModelViewer({
   filename,
   thumbnailFileId,
   maxBytes = AUTO_LOAD_LIMIT,
+  active = true,
   urlFor = defaultUrlFor,
   className,
 }: ModelViewerProps) {
@@ -63,6 +66,18 @@ export function ModelViewer({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   const resetViewRef = useRef<(() => void) | null>(null)
+  const activeRef = useRef(active)
+  const resumeRef = useRef<(() => void) | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    activeRef.current = active
+    if (active) resumeRef.current?.()
+    else if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+  }, [active])
 
   const [phase, setPhase] = useState<Phase>('idle')
   const [progress, setProgress] = useState(0)
@@ -266,15 +281,22 @@ export function ModelViewer({
 
     let running = true
     const tick = () => {
-      if (!running) return
+      animationFrameRef.current = null
+      if (!running || !activeRef.current) return
       controls.update()
       renderer.render(scene, camera)
-      requestAnimationFrame(tick)
+      animationFrameRef.current = requestAnimationFrame(tick)
+    }
+    resumeRef.current = () => {
+      if (animationFrameRef.current === null) tick()
     }
     tick()
 
     cleanupRef.current = () => {
       running = false
+      resumeRef.current = null
+      if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
       observer.disconnect()
       controls.dispose()
       geometry.dispose()
@@ -296,8 +318,8 @@ export function ModelViewer({
 
   // Auto-start once visible, unless the file is large enough to need a decision.
   useEffect(() => {
-    if (visible && phase === 'idle' && !tooLarge) void start()
-  }, [visible, phase, tooLarge, start])
+    if (active && visible && phase === 'idle' && !tooLarge) void start()
+  }, [active, visible, phase, tooLarge, start])
 
   useEffect(() => () => cleanupRef.current?.(), [])
 

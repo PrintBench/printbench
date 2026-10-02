@@ -25,8 +25,20 @@ the metadata reader.
 
 A 3MF is not guaranteed to contain tags, a public model URL, or all the metadata
 on its download page. Internal Bambu identifiers are retained by the parser but
-are not guessed into public MakerWorld URLs. Local uploads do not contact
-MakerWorld automatically.
+are not guessed into public MakerWorld URLs. For a newly indexed project with a
+MakerWorld `DesignModelId`, the worker makes bounded public metadata requests:
+it resolves the internal identifier through Bambu Cloud's model mapping endpoint,
+then checks that the public design has the same internal identifier before
+adding its tags, description, creator, license and source link. No cookie or
+remote model download is needed for this enrichment. Its embedded cover remains
+preferred. If the source is unavailable, private, changed, or rate limited, the
+local package's metadata is still imported and geometry processing continues.
+Projects without this recognized identifier remain entirely local.
+
+Model cards describe the printable file format, even when the selected artwork is
+a WEBP or another image. The detail page offers **Thumbnail** and **3D model**
+controls when both previews exist. Switching retains the loaded model and camera
+while pausing rendering when the thumbnail is displayed.
 
 ## Importing a MakerWorld link
 

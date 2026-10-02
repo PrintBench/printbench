@@ -23,7 +23,7 @@ import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatBytes, formatDimensions } from '@/components/model/model-card'
-import { ModelViewer } from '@/components/viewer/model-viewer'
+import { ModelPreview } from '@/components/viewer/model-preview'
 import { DownloadModelButton } from './download-button'
 import { ModelEditor } from './model-editor'
 import { FileTree } from './file-tree'
@@ -364,40 +364,31 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
       */}
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0 space-y-6">
-          {selectedImage ? (
-            <Card className="overflow-hidden">
-              <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/files/${selectedImage.id}/raw?inline=1`}
-                  alt={`Preview of ${model.name}`}
-                  className="size-full object-contain"
-                />
-              </div>
-            </Card>
-          ) : viewable ? (
-            <ModelViewer
-              fileId={viewable.id}
-              format={viewable.extension.toLowerCase() as 'stl' | '3mf' | 'obj' | 'ply'}
-              fileSize={Number(viewable.size)}
-              filename={viewable.filename.split('/').pop() ?? viewable.filename}
-              thumbnailFileId={hero?.id ?? null}
-              maxBytes={settings.viewerMaxBytes}
-              className="aspect-[16/10]"
+          {(viewable || selectedImage || hero) && (
+            <ModelPreview
+              key={model.public_id}
+              name={model.name}
+              imageUrl={
+                selectedImage
+                  ? `/api/files/${selectedImage.id}/raw?inline=1`
+                  : hero
+                    ? `/api/files/${hero.id}/thumb`
+                    : null
+              }
+              preferImage={Boolean(selectedImage)}
+              model={
+                viewable
+                  ? {
+                      fileId: viewable.id,
+                      format: viewable.extension.toLowerCase() as 'stl' | '3mf' | 'obj' | 'ply',
+                      fileSize: Number(viewable.size),
+                      filename: viewable.filename.split('/').pop() ?? viewable.filename,
+                      thumbnailFileId: hero?.id ?? null,
+                      maxBytes: settings.viewerMaxBytes,
+                    }
+                  : null
+              }
             />
-          ) : (
-            hero && (
-              <Card className="overflow-hidden">
-                <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/files/${hero.id}/thumb`}
-                    alt={`Render of ${model.name}`}
-                    className="size-full object-contain p-4"
-                  />
-                </div>
-              </Card>
-            )
           )}
 
           {model.notes && (
@@ -619,8 +610,6 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               </div>
             </CardContent>
           </Card>
-
-          <p className="text-xs text-[var(--color-ink-faint)]">Drag to rotate, scroll to zoom.</p>
         </aside>
       </div>
     </>

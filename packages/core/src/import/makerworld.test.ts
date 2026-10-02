@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchMakerWorldModel, normalizeMakerWorldCookie, parseMakerWorldUrl } from './makerworld'
+import {
+  fetchMakerWorldModel,
+  fetchMakerWorldProjectMetadata,
+  normalizeMakerWorldCookie,
+  parseMakerWorldUrl,
+} from './makerworld'
 import { isPublicAddress, validateMakerWorldRemoteUrl } from './makerworld-network'
 
 // Small synthetic fixture matching the publicly observed Bambu API field shape.
@@ -24,6 +29,60 @@ const response = (body: unknown, status = 200) => ({
 })
 
 describe('MakerWorld provider', () => {
+  it('resolves embedded internal identity to public metadata without authentication or downloads', async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(response({ id: 123 }))
+      .mockResolvedValueOnce(response(design))
+    const model = await fetchMakerWorldProjectMetadata('USexample', { request })
+    expect(model).toMatchObject({
+      sourceUrl: 'https://makerworld.com/en/models/123',
+      tags: ['tools', 'test'],
+      files: [],
+    })
+    expect(request.mock.calls.map(([url]) => url)).toEqual([
+      'https://api.bambulab.com/v1/design-service/model/USexample',
+      'https://api.bambulab.com/v1/design-service/design/123',
+    ])
+    expect(
+      request.mock.calls.every(([, options]) => Object.keys(options.headers).length === 0),
+    ).toBe(true)
+  })
+
+  it('rejects a mapping to a different internal design rather than tagging the wrong project', async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(response({ id: 123 }))
+      .mockResolvedValueOnce(response({ ...design, modelId: 'USdifferent' }))
+    await expect(fetchMakerWorldProjectMetadata('USexample', { request })).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+    })
+  })
+
+  it.each(['../../123', 'https://attacker.example', 'USexample?token=value'])(
+    'rejects unsafe embedded identity %s before network access',
+    async (id) => {
+      const request = vi.fn()
+      await expect(fetchMakerWorldProjectMetadata(id, { request })).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE',
+      })
+      expect(request).not.toHaveBeenCalled()
+    },
+  )
+
+  it('declines an invalid mapping and stops after an access refusal', async () => {
+    const request = vi.fn().mockResolvedValue(response({ id: 'USnotpublic' }))
+    await expect(fetchMakerWorldProjectMetadata('USexample', { request })).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+    })
+    expect(request).toHaveBeenCalledTimes(1)
+    request.mockReset().mockResolvedValue(response({}, 403))
+    await expect(fetchMakerWorldProjectMetadata('USexample', { request })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+    expect(request).toHaveBeenCalledTimes(1)
+  })
+
   it('reads public metadata without sending credentials or resolving downloads', async () => {
     const request = vi.fn().mockResolvedValue(response(design))
     const model = await fetchMakerWorldModel(

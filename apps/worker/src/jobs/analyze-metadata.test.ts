@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   storage: { createReadStream: vi.fn() },
   store: { has: vi.fn(), write: vi.fn() },
   apply: vi.fn(),
+  canonical: vi.fn(),
+  fetchProject: vi.fn(),
   readMetadata: vi.fn(),
   cover: vi.fn(),
   analyze: vi.fn(),
@@ -42,6 +44,8 @@ vi.mock('@pb/core', async (importOriginal) => {
     createStorageAdapter: () => mocks.storage,
     getPreviewStore: () => mocks.store,
     applyEmbeddedModelMetadata: mocks.apply,
+    isEmbeddedMetadataSource: mocks.canonical,
+    fetchMakerWorldProjectMetadata: mocks.fetchProject,
     previewKey: mocks.key,
   }
 })
@@ -97,6 +101,7 @@ describe('worker embedded metadata and covers', () => {
     mocks.store.has.mockResolvedValue(false)
     mocks.store.write.mockResolvedValue(undefined)
     mocks.key.mockReturnValue('ab/cd/preview.webp')
+    mocks.canonical.mockResolvedValue(true)
     mocks.apply.mockResolvedValue({ applied: true })
     mocks.readMetadata.mockResolvedValue({
       title: 'Designer title',
@@ -114,6 +119,68 @@ describe('worker embedded metadata and covers', () => {
       unit: 'mm',
     })
     mocks.render.mockResolvedValue({ data: Buffer.from('rasterized') })
+  })
+
+  it('enriches recognized MakerWorld projects with public tags and provenance before one metadata save', async () => {
+    mocks.readMetadata.mockResolvedValue({
+      title: 'Embedded title',
+      description: 'Package description',
+      creationDate: '2026-07-02',
+      sourceIdentifiers: { 'MakerWorld internal design ID': 'USexample' },
+      thumbnails: [],
+    })
+    const source = {
+      title: 'Public title',
+      description: 'Full source description',
+      license: 'BY',
+      creator: { name: 'Source maker' },
+      sourceUrl: 'https://makerworld.com/en/models/123',
+      tags: ['bread'],
+      files: [],
+    }
+    mocks.fetchProject.mockResolvedValue(source)
+    await handleFileAnalyze({ fileId: 'file-1' })
+    expect(mocks.fetchProject).toHaveBeenCalledWith('USexample')
+    expect(mocks.apply).toHaveBeenCalledWith(
+      expect.anything(),
+      'model-1',
+      'file-1',
+      expect.objectContaining({
+        title: 'Public title',
+        designer: 'Source maker',
+        description: 'Full source description',
+        creationDate: '2026-07-02',
+      }),
+      source,
+    )
+    expect(mocks.analyze).toHaveBeenCalled()
+  })
+
+  it('does not read metadata or request remote details for a noncanonical variant file', async () => {
+    mocks.canonical.mockResolvedValue(false)
+    await handleFileAnalyze({ fileId: 'file-1' })
+    expect(mocks.readMetadata).not.toHaveBeenCalled()
+    expect(mocks.fetchProject).not.toHaveBeenCalled()
+    expect(mocks.apply).not.toHaveBeenCalled()
+    expect(mocks.analyze).toHaveBeenCalled()
+  })
+
+  it('falls back to embedded fields when public MakerWorld enrichment fails', async () => {
+    const metadata = {
+      title: 'Offline title',
+      sourceIdentifiers: { 'MakerWorld internal design ID': 'USexample' },
+      thumbnails: [],
+    }
+    mocks.readMetadata.mockResolvedValue(metadata)
+    mocks.fetchProject.mockRejectedValue(new Error('Provider refused request'))
+    await handleFileAnalyze({ fileId: 'file-1' })
+    expect(mocks.apply).toHaveBeenCalledWith(expect.anything(), 'model-1', 'file-1', metadata)
+    expect(mocks.analyze).toHaveBeenCalled()
+  })
+
+  it('does not contact a provider for projects without recognized source identity', async () => {
+    await handleFileAnalyze({ fileId: 'file-1' })
+    expect(mocks.fetchProject).not.toHaveBeenCalled()
   })
 
   it('saves descriptive metadata independently of an unsupported or corrupt geometry result', async () => {

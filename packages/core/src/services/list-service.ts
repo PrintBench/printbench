@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import type { Database } from '@pb/db'
 import { slugify } from '../library/paths'
+import { modelFormatSql } from './model-format'
 
 /**
  * Lists, and the "liked" list in particular.
@@ -120,6 +121,7 @@ export interface LikedModel {
   totalSize: number
   libraryName: string
   isPackage: boolean
+  /** Representative live model format, independent of the thumbnail file. */
   previewExtension: string | null
   previewImageFileId: string | null
   thumbFileId: string | null
@@ -149,7 +151,7 @@ export async function listLiked(
   }>(sql`
     SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name, li.created_at AS added_at,
-           selected.extension AS preview_extension,
+           ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
            (SELECT f.id FROM model_files f
              WHERE f.model_id = m.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL

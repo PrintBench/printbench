@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Boxes, ChevronLeft, ChevronRight, HardDrive } from 'lucide-react'
 import { sql } from 'drizzle-orm'
 import { getDb } from '@pb/db'
+import { modelFormatSql } from '@pb/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
@@ -50,7 +51,7 @@ export default async function ModelsPage({
   const result = await db.execute<ModelRow>(sql`
     SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
-           f.extension AS preview_extension,
+           ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN f.category = 'image' THEN f.id END AS preview_image_file_id,
            -- The preview file if it has a rendered thumbnail; otherwise any
            -- mesh in the model that does. A model whose chosen preview is an

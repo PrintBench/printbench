@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { sql } from 'drizzle-orm'
 import { Boxes, ClipboardList, HardDrive, History, Printer, Wrench } from 'lucide-react'
-import { can, listRequests, printStats } from '@pb/core'
+import { can, listRequests, modelFormatSql, printStats } from '@pb/core'
 import { getSessionUser } from '@pb/auth'
 import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
@@ -50,7 +50,7 @@ async function recentModels(): Promise<RecentModel[]> {
   const result = await getDb().execute<RecentModel>(sql`
     SELECT m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
-           selected.extension AS preview_extension,
+           ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
            f.id AS thumb_file_id, f.bbox_x, f.bbox_y, f.bbox_z
     FROM models m

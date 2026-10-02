@@ -1,5 +1,6 @@
 import { sql, type SQL } from 'drizzle-orm'
 import type { Database } from '@pb/db'
+import { modelFormatSql } from '../services/model-format'
 
 /**
  * Model search.
@@ -62,6 +63,7 @@ export interface SearchHit {
   isPackage: boolean
   previewImageFileId: string | null
   thumbFileId: string | null
+  /** Representative live model format, independent of the thumbnail file. */
   previewExtension: string | null
   bboxX: number | null
   bboxY: number | null
@@ -166,7 +168,7 @@ export async function searchModels(
     )
     SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
-           f.extension AS preview_extension,
+           ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN f.category = 'image' THEN f.id END AS preview_image_file_id,
            coalesce(
              CASE WHEN f.thumb_state = 'ok' THEN f.id END,

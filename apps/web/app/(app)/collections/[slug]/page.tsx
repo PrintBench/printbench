@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { Route } from 'next'
 import { notFound } from 'next/navigation'
 import { sql } from 'drizzle-orm'
-import { can, collectionBySlug, listCollections } from '@pb/core'
+import { can, collectionBySlug, listCollections, modelFormatSql } from '@pb/core'
 import { getSessionUser } from '@pb/auth'
 import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
@@ -54,7 +54,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
   const models = await db.execute<Row>(sql`
     SELECT m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
-           selected.extension AS preview_extension,
+           ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
            f.id AS thumb_file_id, f.bbox_x, f.bbox_y, f.bbox_z
     FROM collection_models cm

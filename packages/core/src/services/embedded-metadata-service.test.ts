@@ -6,7 +6,7 @@ import { eq, sql } from 'drizzle-orm'
 import { createDb, schema } from '@pb/db'
 import { LocalAdapter } from '../storage/local-adapter'
 import { scanLibrary } from '../scan/scan-service'
-import { applyEmbeddedModelMetadata } from './embedded-metadata-service'
+import { applyEmbeddedModelMetadata, isEmbeddedMetadataSource } from './embedded-metadata-service'
 import { updateModel } from './model-service'
 
 const describeDb = process.env.DATABASE_URL ? describe : describe.skip
@@ -107,6 +107,56 @@ describeDb('embedded metadata persistence', () => {
     })
   })
 
+  it('persists verified public tags and source link with metadata and sidecar', async () => {
+    const { model, files } = await scanned()
+    const source = {
+      sourceUrl: 'https://makerworld.com/en/models/123',
+      tags: ['miniatures', 'bread'],
+    }
+    await applyEmbeddedModelMetadata(db, model.id, files[0]!.id, metadata, source)
+    const tags = await db.execute<{ name: string }>(
+      sql`SELECT tags.name FROM tags JOIN model_tags ON model_tags.tag_id = tags.id WHERE model_tags.model_id = ${model.id} ORDER BY tags.name`,
+    )
+    expect(tags.rows.map((t) => t.name)).toEqual(['bread', 'miniatures'])
+    const links = await db
+      .select()
+      .from(schema.modelLinks)
+      .where(eq(schema.modelLinks.modelId, model.id))
+    expect(links).toHaveLength(1)
+    expect(links[0]?.url).toBe(source.sourceUrl)
+    const sidecar = JSON.parse(await readFile(path.join(root, '104', '.printbench.json'), 'utf8'))
+    expect(sidecar.tags).toEqual(expect.arrayContaining(['bread', 'miniatures']))
+    expect(sidecar.links).toEqual(
+      expect.arrayContaining([expect.objectContaining({ url: source.sourceUrl })]),
+    )
+    await updateModel(db, model.id, { tags: [], notes: 'My own notes' })
+    expect(
+      (await applyEmbeddedModelMetadata(db, model.id, files[0]!.id, metadata, source)).applied,
+    ).toBe(false)
+    expect((await stored(model.id)).notes).toBe('My own notes')
+    expect(
+      await db.select().from(schema.modelTags).where(eq(schema.modelTags.modelId, model.id)),
+    ).toHaveLength(0)
+  })
+
+  it('preserves pending model tags supplied by another authoritative source', async () => {
+    const { model, files } = await scanned()
+    await updateModel(db, model.id, { tags: ['existing-tag'] })
+    await db
+      .update(schema.models)
+      .set({ embeddedMetadataState: 'pending' })
+      .where(eq(schema.models.id, model.id))
+    await rm(path.join(root, '104', '.printbench.json'))
+    await applyEmbeddedModelMetadata(db, model.id, files[0]!.id, metadata, {
+      sourceUrl: 'https://makerworld.com/en/models/123',
+      tags: ['remote-tag'],
+    })
+    const tags = await db.execute<{ name: string }>(
+      sql`SELECT tags.name FROM tags JOIN model_tags ON model_tags.tag_id = tags.id WHERE model_tags.model_id = ${model.id}`,
+    )
+    expect(tags.rows.map((t) => t.name)).toEqual(['existing-tag'])
+  })
+
   it('never refills fields deliberately cleared by an edit or replays a title', async () => {
     const { model, files } = await scanned()
     await applyEmbeddedModelMetadata(db, model.id, files[0]!.id, metadata)
@@ -168,6 +218,8 @@ describeDb('embedded metadata persistence', () => {
     const { model, files } = await scanned()
     const first = files.find((f) => f.filename === 'a.3mf')!
     const variant = files.find((f) => f.filename === 'z-variant.3mf')!
+    expect(await isEmbeddedMetadataSource(db, model.id, first.id)).toBe(true)
+    expect(await isEmbeddedMetadataSource(db, model.id, variant.id)).toBe(false)
     expect(
       (
         await applyEmbeddedModelMetadata(db, model.id, variant.id, {

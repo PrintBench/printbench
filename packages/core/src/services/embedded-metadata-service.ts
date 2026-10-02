@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 import type { Database } from '@pb/db'
 import { schema } from '@pb/db'
+import { parseMakerWorldUrl, type MakerWorldModel } from '../import/makerworld'
 import { basename, humanizeName } from '../library/paths'
 import { readPackageSidecar, readSidecar } from '../sidecar/sidecar'
 import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
@@ -18,6 +19,21 @@ export interface EmbeddedModelMetadata {
   sourceIdentifiers?: Record<string, string>
 }
 
+/** Cheap preflight so variant files do not make duplicate public requests. */
+export async function isEmbeddedMetadataSource(
+  db: Database,
+  modelId: string,
+  fileId: string,
+): Promise<boolean> {
+  const result = await db.execute<{ id: string }>(sql`
+    SELECT model_files.id FROM model_files JOIN models ON models.id = model_files.model_id
+    WHERE models.id = ${modelId} AND models.embedded_metadata_state = 'pending'
+      AND lower(model_files.extension) = '3mf' AND model_files.missing_at IS NULL
+    ORDER BY model_files.filename COLLATE "C", model_files.id LIMIT 1
+  `)
+  return result.rows[0]?.id === fileId
+}
+
 /**
  * A new model gets one automatic import. Existing records, sidecars, explicit
  * edits and URL imports are authoritative, even when they intentionally clear a
@@ -29,6 +45,7 @@ export async function applyEmbeddedModelMetadata(
   modelId: string,
   fileId: string,
   metadata: EmbeddedModelMetadata,
+  source?: Pick<MakerWorldModel, 'sourceUrl' | 'tags'>,
 ): Promise<{ applied: boolean; reason?: string }> {
   const result = await db.transaction(async (transaction) => {
     // Drizzle transactions implement the query interface used by updateModel.
@@ -69,6 +86,26 @@ export async function applyEmbeddedModelMetadata(
     }
 
     const patch: ModelPatch = {}
+    if (source) {
+      // Only an exact provider mapping can supply this provenance, never the
+      // opaque ids retained in the package or arbitrary embedded HTTP URLs.
+      const url = parseMakerWorldUrl(source.sourceUrl).sourceUrl
+      await tx
+        .insert(schema.modelLinks)
+        .values({
+          modelId,
+          url,
+          host: 'makerworld.com',
+          title: 'MakerWorld',
+        })
+        .onConflictDoNothing()
+      const existingTags = await tx
+        .select({ id: schema.modelTags.tagId })
+        .from(schema.modelTags)
+        .where(eq(schema.modelTags.modelId, modelId))
+        .limit(1)
+      if (!existingTags.length && source.tags.length) patch.tags = source.tags
+    }
     if (metadata.title && row.model.name === humanizeName(basename(row.model.path)))
       patch.name = metadata.title
     if (metadata.designer && !row.model.creatorId) patch.creator = metadata.designer
@@ -76,7 +113,7 @@ export async function applyEmbeddedModelMetadata(
     const notes = embeddedNotes(metadata)
     if (notes && !row.model.notes?.trim()) patch.notes = notes
 
-    if (!Object.keys(patch).length) {
+    if (!Object.keys(patch).length && !source) {
       await tx
         .update(schema.models)
         .set({ embeddedMetadataState: 'done' })

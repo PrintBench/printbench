@@ -80,6 +80,23 @@ describeDb('lists and likes', () => {
   }
 
   describe('the liked list', () => {
+    it('keeps artwork independent of the printable model format', async () => {
+      await db.execute(sql`
+        INSERT INTO model_files (model_id, filename, extension, category, size, media_type)
+        VALUES (${id('01')}, 'model.3mf', '3mf', 'model', 1000, 'model/3mf')`)
+      const cover = await db.execute<{ id: string }>(sql`
+        INSERT INTO model_files (model_id, filename, extension, category, size, media_type)
+        VALUES (${id('01')}, 'cover.webp', 'webp', 'image', 2000, 'image/webp')
+        RETURNING id`)
+      await db.execute(sql`UPDATE models SET preview_file_id = ${cover.rows[0]!.id}
+        WHERE id = ${id('01')}`)
+      await toggleLike(db, USER, id('01'))
+
+      const [liked] = await listLiked(db, USER)
+      expect(liked?.previewExtension).toBe('3mf')
+      expect(liked?.previewImageFileId).toBe(cover.rows[0]!.id)
+    })
+
     it('is created on first use, not at sign-up', async () => {
       const before = await db.execute<{ n: number }>(
         sql`SELECT count(*)::int AS n FROM lists WHERE user_id = ${USER}`,

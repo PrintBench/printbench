@@ -23,6 +23,7 @@ export interface ModelCardProps {
   fileCount: number
   totalSize: number
   libraryName?: string
+  /** Printable model format, independent of the file used as its artwork. */
   previewExtension?: string | null
   isPackage?: boolean
   /** Selected creator-supplied image, served directly instead of as a generated mesh thumbnail. */

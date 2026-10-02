@@ -44,6 +44,8 @@ export interface MakerWorldDependencies {
   request?: (url: string, options: MakerWorldRequest) => Promise<MakerWorldResponse>
   /** Omitted: URL-selected profile, otherwise the first published profile. */
   profileIds?: string[]
+  /** Internal identity expected when resolving a downloaded project. */
+  expectedModelId?: string
 }
 
 export function parseMakerWorldUrl(value: string): {
@@ -192,53 +194,14 @@ export async function fetchMakerWorldModel(
   const parsedUrl = parseMakerWorldUrl(value)
   const token = cookie ? normalizeMakerWorldCookie(cookie) : null
   const request = deps.request ?? requestMakerWorldJson
-  async function getJson(path: string, authenticated = false): Promise<unknown> {
-    let response: MakerWorldResponse
-    try {
-      response = await request(`https://api.bambulab.com${path}`, {
-        maxBytes: 4 * 1024 * 1024,
-        timeoutMs: 20_000,
-        headers: authenticated && token ? { Authorization: `Bearer ${token}` } : {},
-      })
-    } catch {
-      throw new ImportProviderError('UNAVAILABLE', 'MakerWorld could not be reached')
-    }
-    if (response.status === 400)
-      throw new ImportProviderError(
-        'INVALID_RESPONSE',
-        'MakerWorld rejected the model or print profile',
-      )
-    if (response.status === 401)
-      throw new ImportProviderError(
-        'AUTH_REQUIRED',
-        'MakerWorld sign-in is required or has expired',
-      )
-    if (response.status === 403)
-      throw new ImportProviderError(
-        'FORBIDDEN',
-        'MakerWorld refused this request; check access in MakerWorld',
-      )
-    if (response.status === 404)
-      throw new ImportProviderError('NOT_FOUND', 'MakerWorld model or profile was not found')
-    if (response.status === 429)
-      throw new ImportProviderError(
-        'RATE_LIMITED',
-        'MakerWorld is rate limiting requests; try again later',
-      )
-    if (response.status !== 200)
-      throw new ImportProviderError('UNAVAILABLE', 'MakerWorld returned an unexpected response')
-    if (response.body.length > 4 * 1024 * 1024)
-      throw new ImportProviderError('INVALID_RESPONSE', 'MakerWorld metadata exceeds the limit')
-    try {
-      return JSON.parse(response.body.toString('utf8'))
-    } catch {
-      throw new ImportProviderError('INVALID_RESPONSE', 'MakerWorld returned invalid metadata')
-    }
-  }
   const validated = designSchema.safeParse(
-    await getJson(`/v1/design-service/design/${parsedUrl.externalId}`),
+    await getMakerWorldJson(`/v1/design-service/design/${parsedUrl.externalId}`, request),
   )
-  if (!validated.success || String(validated.data.id) !== parsedUrl.externalId) {
+  if (
+    !validated.success ||
+    String(validated.data.id) !== parsedUrl.externalId ||
+    (deps.expectedModelId && validated.data.modelId !== deps.expectedModelId)
+  ) {
     throw new ImportProviderError(
       'INVALID_RESPONSE',
       'MakerWorld returned an unsupported model response',
@@ -302,9 +265,10 @@ export async function fetchMakerWorldModel(
         'INVALID_RESPONSE',
         'MakerWorld did not provide a download profile ID',
       )
-    const response = await getJson(
+    const response = await getMakerWorldJson(
       `/v1/iot-service/api/user/profile/${internalId}?model_id=${encodeURIComponent(design.modelId)}`,
-      true,
+      request,
+      token,
     )
     const download = z
       .object({ url: z.string().max(16_384), name: z.string().max(4096).optional() })
@@ -330,4 +294,77 @@ export async function fetchMakerWorldModel(
     })
   }
   return model
+}
+
+async function getMakerWorldJson(
+  path: string,
+  request: NonNullable<MakerWorldDependencies['request']>,
+  token: string | null = null,
+): Promise<unknown> {
+  let response: MakerWorldResponse
+  try {
+    response = await request(`https://api.bambulab.com${path}`, {
+      maxBytes: 4 * 1024 * 1024,
+      timeoutMs: 20_000,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+  } catch {
+    throw new ImportProviderError('UNAVAILABLE', 'MakerWorld could not be reached')
+  }
+  if (response.status === 400)
+    throw new ImportProviderError(
+      'INVALID_RESPONSE',
+      'MakerWorld rejected the model or print profile',
+    )
+  if (response.status === 401)
+    throw new ImportProviderError('AUTH_REQUIRED', 'MakerWorld sign-in is required or has expired')
+  if (response.status === 403)
+    throw new ImportProviderError(
+      'FORBIDDEN',
+      'MakerWorld refused this request; check access in MakerWorld',
+    )
+  if (response.status === 404)
+    throw new ImportProviderError('NOT_FOUND', 'MakerWorld model or profile was not found')
+  if (response.status === 429)
+    throw new ImportProviderError(
+      'RATE_LIMITED',
+      'MakerWorld is rate limiting requests; try again later',
+    )
+  if (response.status !== 200)
+    throw new ImportProviderError('UNAVAILABLE', 'MakerWorld returned an unexpected response')
+  if (response.body.length > 4 * 1024 * 1024)
+    throw new ImportProviderError('INVALID_RESPONSE', 'MakerWorld metadata exceeds the limit')
+  try {
+    return JSON.parse(response.body.toString('utf8'))
+  } catch {
+    throw new ImportProviderError('INVALID_RESPONSE', 'MakerWorld returned invalid metadata')
+  }
+}
+
+/**
+ * Bambu Studio resolves its embedded DesignModelId with this mapping endpoint.
+ * Check the returned design's modelId too: neither numeric profile ids nor titles
+ * are safe substitutes for an exact source identity. This never resolves files.
+ */
+export async function fetchMakerWorldProjectMetadata(
+  internalModelId: string,
+  deps: Pick<MakerWorldDependencies, 'request'> = {},
+): Promise<MakerWorldModel> {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(internalModelId))
+    throw new ImportProviderError('INVALID_RESPONSE', 'Invalid MakerWorld project identifier')
+  const request = deps.request ?? requestMakerWorldJson
+  const mapping = z
+    .object({ id: numericId })
+    .safeParse(
+      await getMakerWorldJson(
+        `/v1/design-service/model/${encodeURIComponent(internalModelId)}`,
+        request,
+      ),
+    )
+  if (!mapping.success)
+    throw new ImportProviderError('INVALID_RESPONSE', 'MakerWorld could not identify this project')
+  return fetchMakerWorldModel(`https://makerworld.com/en/models/${mapping.data.id}`, undefined, {
+    request,
+    expectedModelId: internalModelId,
+  })
 }

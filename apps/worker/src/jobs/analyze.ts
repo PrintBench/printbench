@@ -7,7 +7,10 @@ import {
   libraryLocationFromRow,
   previewKey,
   applyEmbeddedModelMetadata,
+  isEmbeddedMetadataSource,
+  fetchMakerWorldProjectMetadata,
   type StorageAdapter,
+  type EmbeddedModelMetadata,
 } from '@pb/core'
 import {
   MeshParseError,
@@ -86,11 +89,15 @@ export async function handleFileAnalyze(
   const { file, storage, relativePath } = context
   const format = supportedFormat(file.extension)
 
-  if (format === '3mf' && context.model.embeddedMetadataState === 'pending') {
+  if (
+    format === '3mf' &&
+    context.model.embeddedMetadataState === 'pending' &&
+    (await isEmbeddedMetadataSource(db, file.modelId, file.id))
+  ) {
     // Descriptive metadata does not depend on geometry succeeding. A designer's
     // title and cover remain useful even when this parser cannot read the mesh.
     try {
-      let metadata = {}
+      let metadata: EmbeddedModelMetadata = {}
       try {
         metadata = await readThreeMfMetadataFromSource(
           () => storage.createReadStream(relativePath),
@@ -101,7 +108,27 @@ export async function handleFileAnalyze(
       } catch (error) {
         console.warn(`[metadata] ${file.filename}: ${message(error)}`)
       }
-      await applyEmbeddedModelMetadata(db, file.modelId, file.id, metadata)
+      const internalId = metadata.sourceIdentifiers?.['MakerWorld internal design ID']
+      let source: Awaited<ReturnType<typeof fetchMakerWorldProjectMetadata>> | undefined
+      if (internalId) {
+        try {
+          source = await fetchMakerWorldProjectMetadata(internalId)
+          metadata = {
+            ...metadata,
+            title: source.title,
+            designer: source.creator?.name ?? metadata.designer,
+            description: source.description ?? metadata.description,
+            license: source.license ?? metadata.license,
+          }
+        } catch {
+          // Public source enrichment is optional. No credentials, remote files,
+          // arbitrary embedded URLs or repeated retries are involved, and an
+          // offline library keeps the descriptive fields from its own package.
+          console.warn(`[metadata] MakerWorld details unavailable for ${file.filename}`)
+        }
+      }
+      if (source) await applyEmbeddedModelMetadata(db, file.modelId, file.id, metadata, source)
+      else await applyEmbeddedModelMetadata(db, file.modelId, file.id, metadata)
     } catch (error) {
       // Metadata failures never block or repeatedly retry geometry analysis.
       console.warn(`[metadata] could not save for ${file.filename}: ${message(error)}`)
