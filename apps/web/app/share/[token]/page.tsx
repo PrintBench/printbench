@@ -26,6 +26,7 @@ type FileRow = {
   category: string
   size: string
   thumb_state: string
+  thumb_key: string | null
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
@@ -59,7 +60,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   if (!model) notFound()
 
   const files = await db.execute<FileRow>(sql`
-    SELECT id, filename, extension, category, size, thumb_state
+    SELECT id, filename, extension, category, size, thumb_state, thumb_key
     FROM model_files
     WHERE model_id = ${model.id} AND missing_at IS NULL
     ORDER BY category, filename`)
@@ -67,7 +68,11 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   const totalSize = files.rows.reduce((sum, file) => sum + Number(file.size), 0)
   const hero = files.rows
     .filter((file) => file.thumb_state === 'ok')
-    .sort((a, b) => Number(b.size) - Number(a.size))[0]
+    .sort(
+      (a, b) =>
+        Number(b.category === 'image') - Number(a.category === 'image') ||
+        Number(b.size) - Number(a.size),
+    )[0]
 
   const VIEWABLE = new Set(['stl', '3mf', 'obj', 'ply'])
   const viewable = files.rows
@@ -103,6 +108,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
         fileSize={Number(viewable?.size ?? 0)}
         filename={viewable?.filename ?? ''}
         thumbnailFileId={hero?.id ?? null}
+        thumbnailKey={hero?.thumb_key ?? null}
       />
 
       <section className="mt-6">

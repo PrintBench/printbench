@@ -10,12 +10,11 @@ export interface ModelPreviewProps {
   name: string
   imageUrl: string | null
   model: Omit<ModelViewerProps, 'active' | 'className'> | null
-  preferImage?: boolean
 }
 
 /** Keep the loaded viewer and camera while switching back to the artwork. */
-export function ModelPreview({ name, imageUrl, model, preferImage = false }: ModelPreviewProps) {
-  const initialView = imageUrl && (preferImage || !model) ? 'image' : 'model'
+export function ModelPreview({ name, imageUrl, model }: ModelPreviewProps) {
+  const initialView = imageUrl ? 'image' : 'model'
   const [view, setView] = useState<'image' | 'model'>(initialView)
   const [modelVisited, setModelVisited] = useState(initialView === 'model')
 

@@ -6,7 +6,7 @@ import {
   PolicyError,
   MakerWorldImportError,
   markMakerWorldImportQueueFailed,
-  createMakerWorldImport,
+  createModelSourceImport,
   getMakerWorldImportStatus,
 } from '@pb/core'
 import { getDb } from '@pb/db'
@@ -38,13 +38,13 @@ function failure(error: unknown, message: string): Failure {
   }
 }
 
-export async function startMakerWorldImport(input: {
+export async function startModelSourceImport(input: {
   libraryId: string
   url: string
 }): Promise<{ ok: true; id: string } | Failure> {
   try {
     const user = await authorize()
-    const created = await createMakerWorldImport(getDb(), {
+    const created = await createModelSourceImport(getDb(), {
       userId: user.id,
       libraryId: input.libraryId,
       url: input.url,

@@ -165,9 +165,11 @@ try {
   const page = await get('/upload')
   const uploadHtml = await page.text()
   check(
-    'upload page includes local and MakerWorld imports',
+    'upload page includes local and three-provider imports',
     page.status === 200 &&
-      uploadHtml.includes('Import from MakerWorld') &&
+      uploadHtml.includes('Import from model sites') &&
+      uploadHtml.includes('Printables') &&
+      uploadHtml.includes('Thingiverse') &&
       uploadHtml.includes('Drop files or folders here'),
   )
 

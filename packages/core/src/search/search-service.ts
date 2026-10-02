@@ -1,6 +1,6 @@
 import { sql, type SQL } from 'drizzle-orm'
 import type { Database } from '@pb/db'
-import { modelFormatSql } from '../services/model-format'
+import { modelFormatSql, modelGeometrySql, modelThumbnailSql } from '../services/model-format'
 
 /**
  * Model search.
@@ -63,6 +63,7 @@ export interface SearchHit {
   isPackage: boolean
   previewImageFileId: string | null
   thumbFileId: string | null
+  thumbKey: string | null
   /** Representative live model format, independent of the thumbnail file. */
   previewExtension: string | null
   bboxX: number | null
@@ -152,6 +153,7 @@ export async function searchModels(
     is_package: boolean
     preview_image_file_id: string | null
     thumb_file_id: string | null
+    thumb_key: string | null
     preview_extension: string | null
     bbox_x: string | null
     bbox_y: string | null
@@ -170,19 +172,16 @@ export async function searchModels(
            l.name AS library_name,
            ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN f.category = 'image' THEN f.id END AS preview_image_file_id,
-           coalesce(
-             CASE WHEN f.thumb_state = 'ok' THEN f.id END,
-             (SELECT f2.id FROM model_files f2
-               WHERE f2.model_id = m.id AND f2.thumb_state = 'ok' AND f2.missing_at IS NULL
-               ORDER BY f2.size DESC LIMIT 1)
-           ) AS thumb_file_id,
-           f.bbox_x, f.bbox_y, f.bbox_z,
+           thumb.id AS thumb_file_id, thumb.thumb_key,
+           geometry.bbox_x, geometry.bbox_y, geometry.bbox_z,
            matched.rank,
            counted.total
     FROM matched
     JOIN models m ON m.id = matched.id
     JOIN libraries l ON l.id = m.library_id
     LEFT JOIN model_files f ON f.id = m.preview_file_id
+    LEFT JOIN LATERAL (${modelGeometrySql(sql`m.id`, sql`m.preview_file_id`)}) geometry ON true
+    LEFT JOIN LATERAL (${modelThumbnailSql(sql`m.id`, sql`m.preview_file_id`)}) thumb ON true
     CROSS JOIN counted
     ${order}
     LIMIT ${limit} OFFSET ${offset}
@@ -205,6 +204,7 @@ export async function searchModels(
       isPackage: row.is_package,
       previewImageFileId: row.preview_image_file_id,
       thumbFileId: row.thumb_file_id,
+      thumbKey: row.thumb_key,
       previewExtension: row.preview_extension,
       bboxX: row.bbox_x === null ? null : Number(row.bbox_x),
       bboxY: row.bbox_y === null ? null : Number(row.bbox_y),

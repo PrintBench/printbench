@@ -8,16 +8,18 @@ import { Input } from '@/components/ui/input'
 import type { UploadTarget } from './actions'
 import {
   pollMakerWorldImport,
-  startMakerWorldImport,
+  startModelSourceImport,
   type MakerWorldImportStatus,
-} from './makerworld-actions'
+} from './source-actions'
 import { readMakerWorldCookieStatus } from '../settings/makerworld-actions'
+import { readThingiverseTokenStatus } from '../settings/thingiverse-actions'
 
-export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
+export function ModelSourceImportForm({ targets }: { targets: UploadTarget[] }) {
   const router = useRouter()
   const [libraryId, setLibraryId] = useState(targets[0]?.id ?? '')
   const [url, setUrl] = useState('')
   const [saved, setSaved] = useState<boolean | null>(null)
+  const [thingiverseSaved, setThingiverseSaved] = useState<boolean | null>(null)
   const [cookieMessage, setCookieMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
@@ -37,6 +39,14 @@ export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
       })
       .catch(() => {
         if (!cancelled) setCookieMessage('Could not check your MakerWorld connection.')
+      })
+    void readThingiverseTokenStatus()
+      .then((result) => {
+        if (cancelled) return
+        if (result.ok) setThingiverseSaved(result.saved)
+      })
+      .catch(() => {
+        // A connection check does not prevent importing from another source.
       })
     return () => {
       cancelled = true
@@ -72,16 +82,16 @@ export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
 
   return (
     <section
-      aria-labelledby="makerworld-heading"
+      aria-labelledby="model-sources-heading"
       className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
     >
       <div>
-        <h2 id="makerworld-heading" className="text-lg font-semibold">
-          Import from MakerWorld
+        <h2 id="model-sources-heading" className="text-lg font-semibold">
+          Import from model sites
         </h2>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Paste a model page URL to bring its files and details into your library. Imports use the
-          linked print profile, or the first available profile.
+          Paste a MakerWorld, Printables, or Thingiverse model URL to bring its files and details
+          into your library. The source is detected from the URL.
         </p>
       </div>
       {targets.length === 0 ? (
@@ -99,7 +109,7 @@ export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
             setError(null)
             startTransition(async () => {
               try {
-                const result = await startMakerWorldImport({ libraryId, url })
+                const result = await startModelSourceImport({ libraryId, url })
                 if (!result.ok) {
                   setError(result.error)
                   return
@@ -130,11 +140,11 @@ export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
             </select>
           </label>
           <label className="block space-y-1 text-sm">
-            <span>MakerWorld model URL</span>
+            <span>Model page URL</span>
             <Input
               type="url"
               required
-              placeholder="https://makerworld.com/en/models/…"
+              placeholder="Paste a MakerWorld, Printables, or Thingiverse URL"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               disabled={pending || active}
@@ -150,6 +160,21 @@ export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
         {saved === null ? 'Status unavailable' : saved ? 'Cookie saved' : 'Not connected'}.{' '}
         <Link href="/settings#makerworld" className="underline">
           {saved ? 'Manage in account settings' : 'Connect in account settings'}
+        </Link>
+      </p>
+      <p className="text-sm text-[var(--color-ink-muted)]">
+        Printables: public free models need no account connection.
+      </p>
+      <p className="text-sm text-[var(--color-ink-muted)]">
+        Thingiverse connection:{' '}
+        {thingiverseSaved === null
+          ? 'Status unavailable'
+          : thingiverseSaved
+            ? 'API token saved'
+            : 'Not connected'}
+        .{' '}
+        <Link href="/settings#thingiverse" className="underline">
+          {thingiverseSaved ? 'Manage in account settings' : 'Connect in account settings'}
         </Link>
       </p>
       {cookieMessage && (

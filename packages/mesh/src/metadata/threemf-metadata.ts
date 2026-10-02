@@ -4,7 +4,7 @@ import { collectBounded } from '../parse/collect-bounded'
 import type { StreamSource } from '../types'
 
 /** Bump when selection/decoding changes so cached plate images are regenerated. */
-export const THREEMF_METADATA_VERSION = 1
+export const THREEMF_METADATA_VERSION = 2
 export const MAX_3MF_METADATA_ARCHIVE_BYTES = 128 * 1024 * 1024
 export const MAX_3MF_METADATA_XML_BYTES = 16 * 1024 * 1024
 export const MAX_3MF_EMBEDDED_IMAGE_BYTES = 4 * 1024 * 1024
@@ -16,6 +16,8 @@ export interface EmbeddedThumbnail {
   data: Uint8Array
   path: string
   contentType: 'image/png' | 'image/jpeg'
+  /** A plate render is a fallback when no package cover is usable. */
+  kind?: 'cover' | 'plate'
 }
 
 export interface ThreeMfMetadata {
@@ -28,7 +30,7 @@ export interface ThreeMfMetadata {
   application?: string
   /** Kept as identifiers, never interpreted as public model URLs. */
   sourceIdentifiers?: Record<string, string>
-  /** In OPC preference order; a corrupt cover can fall back to another cover. */
+  /** Covers and fallback plate renders; the renderer chooses a sharp usable cover. */
   thumbnails: EmbeddedThumbnail[]
 }
 
@@ -76,6 +78,7 @@ export function readThreeMfMetadata(bytes: Uint8Array): ThreeMfMetadata {
     ...thumbnailTargets(rootRelationships, ''),
     ...thumbnailTargets(modelRelationships, mainPart),
   ]
+  const explicitCovers = new Set(candidates.map((p) => p.toLowerCase()))
   // Some producers omit OPC cover relationships. Only documented cover locations
   // are considered; arbitrary textures and referenced HTTP images are not covers.
   candidates.push(
@@ -97,7 +100,13 @@ export function readThreeMfMetadata(bytes: Uint8Array): ThreeMfMetadata {
     const data = imageParts.get(p)
     if (!data) continue
     const contentType = imageContentType(data)
-    if (contentType) thumbnails.push({ path: p, data, contentType })
+    if (contentType)
+      thumbnails.push({
+        path: p,
+        data,
+        contentType,
+        kind: p === 'metadata/plate_1.png' && !explicitCovers.has(p) ? 'plate' : 'cover',
+      })
   }
   return { ...metadata, thumbnails }
 }

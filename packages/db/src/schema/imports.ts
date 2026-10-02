@@ -8,7 +8,8 @@ export const providerCredentials = pgTable('provider_credentials', {
   userId: text('user_id')
     .primaryKey()
     .references(() => user.id, { onDelete: 'cascade' }),
-  makerWorldCookieEncrypted: text('makerworld_cookie_encrypted').notNull(),
+  makerWorldCookieEncrypted: text('makerworld_cookie_encrypted'),
+  thingiverseTokenEncrypted: text('thingiverse_token_encrypted'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

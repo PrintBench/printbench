@@ -123,6 +123,11 @@ describeDb('searchModels', () => {
     await db.execute(sql`
       UPDATE models SET preview_file_id = ${PREVIEW_IMAGE} WHERE id = ${modelId('01')}
     `)
+    await db.execute(sql`
+      UPDATE model_files SET analysis_state = 'ok', bbox_x = 415, bbox_y = 385, bbox_z = 79,
+                             thumb_state = 'ok', thumb_key = 'search-thumb-v2'
+      WHERE model_id = ${modelId('01')} AND filename = 'stl/body.stl'
+    `)
 
     // A print against Benchy, so the never-printed filter has both sides.
     await db.execute(sql`
@@ -161,6 +166,8 @@ describeDb('searchModels', () => {
       const result = await search({ query: 'red dragon' })
       expect(result.hits[0]?.previewImageFileId).toBe(PREVIEW_IMAGE)
       expect(result.hits[0]?.previewExtension).toBe('stl')
+      expect(result.hits[0]).toMatchObject({ bboxX: 415, bboxY: 385, bboxZ: 79 })
+      expect(result.hits[0]?.thumbKey).toBe('search-thumb-v2')
     })
 
     /*

@@ -82,8 +82,10 @@ describeDb('lists and likes', () => {
   describe('the liked list', () => {
     it('keeps artwork independent of the printable model format', async () => {
       await db.execute(sql`
-        INSERT INTO model_files (model_id, filename, extension, category, size, media_type)
-        VALUES (${id('01')}, 'model.3mf', '3mf', 'model', 1000, 'model/3mf')`)
+        INSERT INTO model_files (model_id, filename, extension, category, size, media_type,
+                                 analysis_state, bbox_x, bbox_y, bbox_z, thumb_state, thumb_key)
+        VALUES (${id('01')}, 'model.3mf', '3mf', 'model', 1000, 'model/3mf',
+                'ok', 415, 385, 79, 'ok', 'liked-thumb-v2')`)
       const cover = await db.execute<{ id: string }>(sql`
         INSERT INTO model_files (model_id, filename, extension, category, size, media_type)
         VALUES (${id('01')}, 'cover.webp', 'webp', 'image', 2000, 'image/webp')
@@ -95,6 +97,8 @@ describeDb('lists and likes', () => {
       const [liked] = await listLiked(db, USER)
       expect(liked?.previewExtension).toBe('3mf')
       expect(liked?.previewImageFileId).toBe(cover.rows[0]!.id)
+      expect(liked).toMatchObject({ bboxX: 415, bboxY: 385, bboxZ: 79 })
+      expect(liked?.thumbKey).toBe('liked-thumb-v2')
     })
 
     it('is created on first use, not at sign-up', async () => {

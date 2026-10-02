@@ -4,10 +4,35 @@ import {
   renderEmbeddedThumbnail,
   renderRemoteThumbnail,
   MAX_3MF_EMBEDDED_IMAGE_PIXELS,
+  MAX_REMOTE_ARTWORK_BYTES,
 } from './embedded-thumbnail'
 import { MAX_3MF_EMBEDDED_IMAGE_BYTES } from './threemf-metadata'
 
 describe('safe embedded cover decoding', () => {
+  it('chooses the sharper cover instead of the first small thumbnail or a larger plate', async () => {
+    const make = (width: number, height: number, background: string) =>
+      sharp({ create: { width, height, channels: 3, background } })
+        .png()
+        .toBuffer()
+    const result = await renderEmbeddedThumbnail(
+      [
+        { path: 'small.png', data: await make(240, 180, '#ff0000'), contentType: 'image/png' },
+        { path: 'middle.png', data: await make(680, 510, '#00ff00'), contentType: 'image/png' },
+        {
+          path: 'plate.png',
+          data: await make(1024, 1024, '#0000ff'),
+          contentType: 'image/png',
+          kind: 'plate',
+        },
+      ],
+      { size: 2048, quality: 90 },
+    )
+    expect(result).toMatchObject({ width: 680, height: 510 })
+    const pixel = await sharp(result!.data).resize(1, 1).removeAlpha().raw().toBuffer()
+    expect(pixel[1]).toBeGreaterThan(240)
+    expect(pixel[0]).toBeLessThan(15)
+  })
+
   it('prefers a usable cover and returns real output dimensions', async () => {
     const png = await sharp({
       create: { width: 30, height: 20, channels: 3, background: '#336699' },
@@ -65,27 +90,34 @@ describe('safe embedded cover decoding', () => {
 })
 
 describe('safe remote artwork decoding', () => {
-  it.each(['png', 'jpeg', 'webp'] as const)('converts %s artwork with bounded dimensions', async (format) => {
-    const input = await sharp({
-      create: { width: 30, height: 20, channels: 3, background: '#336699' },
-    })
-      .toFormat(format)
-      .toBuffer()
-    const result = await renderRemoteThumbnail(input, { size: 15 })
-    expect(result).toMatchObject({ contentType: 'image/webp', width: 15, height: 10 })
-    expect((await sharp(result!.data).metadata()).format).toBe('webp')
-    if (format === 'webp') {
-      expect(
-        await renderEmbeddedThumbnail([{ path: 'cover.png', data: input, contentType: 'image/png' }]),
-      ).toBeNull()
-    }
-  })
+  it.each(['png', 'jpeg', 'webp'] as const)(
+    'converts %s artwork with bounded dimensions',
+    async (format) => {
+      const input = await sharp({
+        create: { width: 30, height: 20, channels: 3, background: '#336699' },
+      })
+        .toFormat(format)
+        .toBuffer()
+      const result = await renderRemoteThumbnail(input, { size: 15 })
+      expect(result).toMatchObject({ contentType: 'image/webp', width: 15, height: 10 })
+      expect((await sharp(result!.data).metadata()).format).toBe('webp')
+      if (format === 'webp') {
+        expect(
+          await renderEmbeddedThumbnail([
+            { path: 'cover.png', data: input, contentType: 'image/png' },
+          ]),
+        ).toBeNull()
+      }
+    },
+  )
 
   it('rejects oversized, corrupt, vector and animated artwork', async () => {
-    expect(await renderRemoteThumbnail(new Uint8Array(MAX_3MF_EMBEDDED_IMAGE_BYTES + 1))).toBeNull()
+    expect(await renderRemoteThumbnail(new Uint8Array(MAX_REMOTE_ARTWORK_BYTES + 1))).toBeNull()
     expect(await renderRemoteThumbnail(Buffer.from('RIFF0000WEBP'))).toBeNull()
     expect(
-      await renderRemoteThumbnail(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')),
+      await renderRemoteThumbnail(
+        Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'),
+      ),
     ).toBeNull()
     const pixels = Buffer.alloc(10 * 20 * 3, 0)
     pixels.fill(255, 10 * 10 * 3)

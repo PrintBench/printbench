@@ -1,7 +1,14 @@
 import Link from 'next/link'
 import { sql } from 'drizzle-orm'
 import { Boxes, ClipboardList, HardDrive, History, Printer, Wrench } from 'lucide-react'
-import { can, listRequests, modelFormatSql, printStats } from '@pb/core'
+import {
+  can,
+  listRequests,
+  modelFormatSql,
+  modelGeometrySql,
+  modelThumbnailSql,
+  printStats,
+} from '@pb/core'
 import { getSessionUser } from '@pb/auth'
 import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
@@ -40,6 +47,7 @@ type RecentModel = {
   preview_extension: string | null
   preview_image_file_id: string | null
   thumb_file_id: string | null
+  thumb_key: string | null
   bbox_x: string | null
   bbox_y: string | null
   bbox_z: string | null
@@ -52,15 +60,13 @@ async function recentModels(): Promise<RecentModel[]> {
            l.name AS library_name,
            ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
-           f.id AS thumb_file_id, f.bbox_x, f.bbox_y, f.bbox_z
+           thumb.id AS thumb_file_id, thumb.thumb_key,
+           geometry.bbox_x, geometry.bbox_y, geometry.bbox_z
     FROM models m
     JOIN libraries l ON l.id = m.library_id
     LEFT JOIN model_files selected ON selected.id = m.preview_file_id
-    LEFT JOIN LATERAL (
-      SELECT id, bbox_x, bbox_y, bbox_z FROM model_files
-      WHERE model_id = m.id AND thumb_state = 'ok' AND missing_at IS NULL
-      ORDER BY size DESC LIMIT 1
-    ) f ON true
+    LEFT JOIN LATERAL (${modelGeometrySql(sql`m.id`, sql`m.preview_file_id`)}) geometry ON true
+    LEFT JOIN LATERAL (${modelThumbnailSql(sql`m.id`, sql`m.preview_file_id`)}) thumb ON true
     WHERE m.missing_at IS NULL
     ORDER BY m.created_at DESC, m.id DESC
     LIMIT 8
@@ -288,6 +294,7 @@ export default async function DashboardPage() {
                 previewExtension={model.preview_extension}
                 previewImageFileId={model.preview_image_file_id}
                 thumbFileId={model.thumb_file_id}
+                thumbKey={model.thumb_key}
                 dimensions={formatDimensions(
                   Number(model.bbox_x ?? 0),
                   Number(model.bbox_y ?? 0),

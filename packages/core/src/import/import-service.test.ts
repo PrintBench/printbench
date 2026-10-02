@@ -11,18 +11,35 @@ import { searchModels } from '../search/search-service'
 import { updateModel } from '../services/model-service'
 import {
   createMakerWorldImport,
+  createModelSourceImport,
   getMakerWorldCookieStatus,
   getMakerWorldImportStatus,
+  getThingiverseTokenStatus,
   markMakerWorldImportQueueFailed,
   processMakerWorldImport,
   saveMakerWorldCookie,
+  saveThingiverseToken,
   type MakerWorldImportDependencies,
 } from './import-service'
 import type { MakerWorldModel } from './makerworld'
+import type { ExternalSourceModel, SourceFileFormat } from './source-provider-types'
 
 const describeDb = process.env.DATABASE_URL ? describe : describe.skip
 const sourceUrl = 'https://makerworld.com/en/models/123'
 const token = 'synthetic.own-session.value'
+const thingiverseToken = 'synthetic-own-thingiverse-token'
+const printablesUrl = 'https://www.printables.com/model/123'
+const thingiverseUrl = 'https://www.thingiverse.com/thing:123'
+const stlBytes = Buffer.from(`solid fixture
+facet normal 0 0 1
+outer loop
+vertex 0 0 0
+vertex 1 0 0
+vertex 0 1 0
+endloop
+endfacet
+endsolid fixture
+`)
 // Independently generated ZIP containing a three-vertex 3MF triangle. The
 // worker validates downloads; this service test exercises storage and indexing.
 const modelBytes = Buffer.from(
@@ -30,7 +47,7 @@ const modelBytes = Buffer.from(
   'base64',
 )
 
-describeDb('MakerWorld import service', () => {
+describeDb('model source import service', () => {
   let db: ReturnType<typeof createDb>['db']
   let pool: ReturnType<typeof createDb>['pool']
   let root: string
@@ -116,7 +133,7 @@ describeDb('MakerWorld import service', () => {
     await credentials()
     return createMakerWorldImport(db, { userId: memberId, libraryId, url })
   }
-  function dependencies(model = fixture) {
+  function dependencies(model: MakerWorldModel | ExternalSourceModel = fixture) {
     return {
       fetchModel: vi.fn<MakerWorldImportDependencies['fetchModel']>(async () => model),
       download: vi.fn<MakerWorldImportDependencies['download']>(async () =>
@@ -124,6 +141,24 @@ describeDb('MakerWorld import service', () => {
       ),
       onDerivedWork: vi.fn(async (_ids: string[]) => undefined),
     } satisfies MakerWorldImportDependencies
+  }
+  function sourceFixture(provider: 'printables' | 'thingiverse'): ExternalSourceModel {
+    return {
+      ...fixture,
+      sourceUrl: provider === 'printables' ? printablesUrl : thingiverseUrl,
+      title: `${provider} workshop bracket`,
+      files: [
+        {
+          id: '789',
+          filename: 'bracket.stl',
+          format: 'stl',
+          url:
+            provider === 'printables'
+              ? 'https://files.printables.com/bracket.stl'
+              : 'https://cdn.thingiverse.com/bracket.stl',
+        },
+      ],
+    }
   }
   async function job(id: string) {
     return (await db.select().from(schema.modelImports).where(eq(schema.modelImports.id, id)))[0]!
@@ -163,6 +198,155 @@ describeDb('MakerWorld import service', () => {
       saveMakerWorldCookie(db, otherId, 'token=private\r\nHeader: value'),
     ).rejects.toThrow('Paste the MakerWorld')
   })
+
+  it('encrypts Thingiverse tokens per user and keeps each provider on independent disconnects', async () => {
+    expect(await getThingiverseTokenStatus(db, memberId)).toBe(false)
+    await credentials()
+    await saveThingiverseToken(db, memberId, `Bearer ${thingiverseToken}`)
+    const [stored] = await db
+      .select()
+      .from(schema.providerCredentials)
+      .where(eq(schema.providerCredentials.userId, memberId))
+    expect(stored!.thingiverseTokenEncrypted).not.toContain(thingiverseToken)
+    expect(decryptSecret(stored!.thingiverseTokenEncrypted)).toBe(thingiverseToken)
+    expect(decryptSecret(stored!.makerWorldCookieEncrypted)).toBe(token)
+    expect(await getThingiverseTokenStatus(db, memberId)).toBe(true)
+    expect(await getThingiverseTokenStatus(db, otherId)).toBe(false)
+
+    await saveThingiverseToken(db, memberId, '')
+    expect(await getThingiverseTokenStatus(db, memberId)).toBe(false)
+    expect(await getMakerWorldCookieStatus(db, memberId)).toBe(true)
+    await saveThingiverseToken(db, memberId, thingiverseToken)
+    await saveMakerWorldCookie(db, memberId, '')
+    expect(await getMakerWorldCookieStatus(db, memberId)).toBe(false)
+    expect(await getThingiverseTokenStatus(db, memberId)).toBe(true)
+    await saveThingiverseToken(db, memberId, '')
+    expect(
+      await db
+        .select()
+        .from(schema.providerCredentials)
+        .where(eq(schema.providerCredentials.userId, memberId)),
+    ).toHaveLength(0)
+  })
+
+  it('authorizes Thingiverse credential reads and edits and rejects malformed tokens', async () => {
+    await expect(saveThingiverseToken(db, viewerId, thingiverseToken)).rejects.toThrow()
+    await expect(getThingiverseTokenStatus(db, viewerId)).rejects.toThrow()
+    await db.update(schema.user).set({ banned: true }).where(eq(schema.user.id, memberId))
+    await expect(saveThingiverseToken(db, memberId, thingiverseToken)).rejects.toThrow()
+    await expect(saveThingiverseToken(db, otherId, 'private\r\nHeader: value')).rejects.toThrow(
+      'Thingiverse API token',
+    )
+    expect(
+      await db
+        .select()
+        .from(schema.providerCredentials)
+        .where(eq(schema.providerCredentials.userId, viewerId)),
+    ).toHaveLength(0)
+  })
+
+  it('imports a public Printables STL without credentials and stores its metadata, tags and source', async () => {
+    const { id } = await createModelSourceImport(db, {
+      userId: memberId,
+      libraryId,
+      url: printablesUrl,
+    })
+    const external = sourceFixture('printables')
+    const deps = dependencies(external)
+    deps.download.mockResolvedValue(Readable.from([stlBytes]))
+    await processMakerWorldImport(db, id, deps)
+    const imported = await job(id)
+    expect(imported.state).toBe('complete')
+    const [model] = await db
+      .select()
+      .from(schema.models)
+      .where(eq(schema.models.id, imported.modelId!))
+    expect(model).toMatchObject({
+      name: external.title,
+      notes: external.description,
+      license: external.license,
+    })
+    const tags = await db
+      .select({ name: schema.tags.name })
+      .from(schema.modelTags)
+      .innerJoin(schema.tags, eq(schema.tags.id, schema.modelTags.tagId))
+      .where(eq(schema.modelTags.modelId, model!.id))
+    expect(tags.map((tag) => tag.name)).toEqual(external.tags)
+    expect(
+      await db.select().from(schema.modelLinks).where(eq(schema.modelLinks.modelId, model!.id)),
+    ).toMatchObject([{ url: printablesUrl, host: 'www.printables.com' }])
+    expect(await readFile(path.join(root, model!.path, '789-bracket.stl'))).toEqual(stlBytes)
+    expect(deps.fetchModel).toHaveBeenCalledWith(printablesUrl, '')
+    expect(deps.download).toHaveBeenCalledWith(external.files[0]!.url, 'stl', {
+      provider: 'printables',
+      token: '',
+    })
+    expect(deps.onDerivedWork).toHaveBeenCalled()
+    expect(await getMakerWorldCookieStatus(db, memberId)).toBe(false)
+  })
+
+  it('requires the owning Thingiverse token and never substitutes another user or MakerWorld credential', async () => {
+    await credentials()
+    await saveThingiverseToken(db, otherId, 'other-users-thingiverse-token')
+    await expect(
+      createModelSourceImport(db, { userId: memberId, libraryId, url: thingiverseUrl }),
+    ).rejects.toThrow('Thingiverse API token')
+    await saveThingiverseToken(db, memberId, thingiverseToken)
+    const { id } = await createModelSourceImport(db, {
+      userId: memberId,
+      libraryId,
+      url: thingiverseUrl,
+    })
+    const external = sourceFixture('thingiverse')
+    const deps = dependencies(external)
+    deps.download.mockResolvedValue(Readable.from([stlBytes]))
+    await processMakerWorldImport(db, id, deps)
+    expect((await job(id)).state).toBe('complete')
+    expect(deps.fetchModel).toHaveBeenCalledWith(thingiverseUrl, thingiverseToken)
+    expect(deps.download).toHaveBeenCalledWith(external.files[0]!.url, 'stl', {
+      provider: 'thingiverse',
+      token: thingiverseToken,
+    })
+    expect((await job(id)).error).toBeNull()
+  })
+
+  it('rechecks Thingiverse disconnect before a queued import starts', async () => {
+    await saveThingiverseToken(db, memberId, thingiverseToken)
+    const { id } = await createModelSourceImport(db, {
+      userId: memberId,
+      libraryId,
+      url: thingiverseUrl,
+    })
+    await saveThingiverseToken(db, memberId, '')
+    const deps = dependencies(sourceFixture('thingiverse'))
+    await processMakerWorldImport(db, id, deps)
+    expect((await job(id)).state).toBe('failed')
+    expect(deps.fetchModel).not.toHaveBeenCalled()
+    expect(deps.download).not.toHaveBeenCalled()
+  })
+
+  it.each(['provider', 'externalId', 'sourceUrl'] as const)(
+    'rejects provider responses with mismatched %s identity before storing files',
+    async (mismatch) => {
+      const { id } = await createModelSourceImport(db, {
+        userId: memberId,
+        libraryId,
+        url: printablesUrl,
+      })
+      const external = sourceFixture('printables')
+      if (mismatch === 'provider') external.sourceUrl = thingiverseUrl
+      if (mismatch === 'externalId') external.externalId = '999'
+      if (mismatch === 'sourceUrl') external.sourceUrl = 'https://www.printables.com/model/999'
+      const deps = dependencies(external)
+      await processMakerWorldImport(db, id, deps)
+      expect((await job(id)).state).toBe('failed')
+      expect(deps.download).not.toHaveBeenCalled()
+      expect(await filesOnDisk()).toHaveLength(0)
+      expect(
+        await db.select().from(schema.models).where(eq(schema.models.libraryId, libraryId)),
+      ).toHaveLength(0)
+    },
+  )
 
   it('requires own credentials and rejects invalid model URLs and read-only storage', async () => {
     await expect(
@@ -387,7 +571,7 @@ describeDb('MakerWorld import service', () => {
       ...fixture,
       thumbnailUrl: 'https://makerworld.bblmw.com/cover.webp',
     })
-    deps.download.mockImplementation(async (_url: string, kind: '3mf' | 'image') => {
+    deps.download.mockImplementation(async (_url: string, kind: SourceFileFormat | 'image') => {
       if (kind === 'image') throw new Error('artwork unavailable')
       return Readable.from([modelBytes])
     })
@@ -403,7 +587,7 @@ describeDb('MakerWorld import service', () => {
       thumbnailUrl: 'https://makerworld.bblmw.com/cover.webp',
     })
     const artwork = Buffer.from('synthetic image bytes; worker decoder is mocked')
-    deps.download.mockImplementation(async (_url: string, kind: '3mf' | 'image') =>
+    deps.download.mockImplementation(async (_url: string, kind: SourceFileFormat | 'image') =>
       Readable.from([kind === 'image' ? artwork : modelBytes]),
     )
     await processMakerWorldImport(db, id, deps)
@@ -497,10 +681,28 @@ describeDb('MakerWorld import service', () => {
 
   it('rolls back metadata when provenance insertion fails and preserves a later user edit on retry', async () => {
     const { id } = await queued()
-    // Fault injection at the database boundary: real provider validation never
-    // emits null, but a NOT NULL failure must roll back its metadata transaction.
-    const deps = dependencies({ ...fixture, sourceUrl: null as unknown as string })
-    await processMakerWorldImport(db, id, deps)
+    // Keep provider identity valid and inject the failure at the database
+    // boundary, after metadata updates but before provenance commits.
+    const deps = dependencies()
+    const originalTransaction = db.transaction.bind(db)
+    const transaction = vi
+      .spyOn(db, 'transaction')
+      .mockImplementationOnce((callback, config) => originalTransaction(callback, config))
+      .mockImplementationOnce((callback, config) =>
+        originalTransaction(async (tx) => {
+          const originalInsert = tx.insert.bind(tx)
+          tx.insert = ((table: Parameters<typeof tx.insert>[0]) => {
+            if (table === schema.modelLinks) throw new Error('Injected provenance failure')
+            return originalInsert(table)
+          }) as typeof tx.insert
+          return callback(tx)
+        }, config),
+      )
+    try {
+      await processMakerWorldImport(db, id, deps)
+    } finally {
+      transaction.mockRestore()
+    }
     expect((await job(id)).state).toBe('failed')
     const [model] = await db
       .select()

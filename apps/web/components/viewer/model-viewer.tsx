@@ -35,6 +35,8 @@ export interface ModelViewerProps {
   filename: string
   /** Shown before load and as the fallback for a file too large to auto-load. */
   thumbnailFileId?: string | null
+  /** Content version for immutable thumbnail URLs after regeneration. */
+  thumbnailKey?: string | null
   /** From settings. Falls back to the built-in limit when not supplied. */
   maxBytes?: number
   /** Pause rendering while another preview (such as artwork) is displayed. */
@@ -57,6 +59,7 @@ export function ModelViewer({
   fileSize,
   filename,
   thumbnailFileId,
+  thumbnailKey,
   maxBytes = AUTO_LOAD_LIMIT,
   active = true,
   urlFor = defaultUrlFor,
@@ -362,7 +365,12 @@ export function ModelViewer({
           {thumbnailFileId && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={urlFor(thumbnailFileId, 'thumb')}
+              src={
+                urlFor(thumbnailFileId, 'thumb') +
+                (thumbnailKey
+                  ? `${urlFor(thumbnailFileId, 'thumb').includes('?') ? '&' : '?'}v=${encodeURIComponent(thumbnailKey)}`
+                  : '')
+              }
               alt=""
               aria-hidden
               className="absolute inset-0 size-full object-contain p-6 opacity-30"

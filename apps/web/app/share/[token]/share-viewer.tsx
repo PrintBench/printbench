@@ -1,7 +1,6 @@
 'use client'
 
-import { ModelViewer } from '@/components/viewer/model-viewer'
-import { Card } from '@/components/ui/card'
+import { ModelPreview } from '@/components/viewer/model-preview'
 
 /**
  * The 3D viewer on a shared page.
@@ -17,6 +16,7 @@ export function ShareViewer({
   fileSize,
   filename,
   thumbnailFileId,
+  thumbnailKey,
 }: {
   token: string
   fileId: string | null
@@ -24,36 +24,31 @@ export function ShareViewer({
   fileSize: number
   filename: string
   thumbnailFileId: string | null
+  thumbnailKey: string | null
 }) {
-  if (!fileId) {
-    if (!thumbnailFileId) return null
-    return (
-      <Card className="overflow-hidden">
-        <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/api/share/${token}/files/${thumbnailFileId}?thumb=1`}
-            alt=""
-            className="size-full object-contain p-4"
-          />
-        </div>
-      </Card>
-    )
-  }
-
+  const imageUrl = thumbnailFileId
+    ? `/api/share/${token}/files/${thumbnailFileId}?thumb=1&v=${encodeURIComponent(thumbnailKey ?? '')}`
+    : null
   return (
-    <ModelViewer
-      fileId={fileId}
-      format={format}
-      fileSize={fileSize}
-      filename={filename}
-      thumbnailFileId={thumbnailFileId}
-      urlFor={(id, kind) =>
-        kind === 'thumb'
-          ? `/api/share/${token}/files/${id}?thumb=1`
-          : `/api/share/${token}/files/${id}?inline=1`
+    <ModelPreview
+      name={filename || 'Shared model'}
+      imageUrl={imageUrl}
+      model={
+        fileId
+          ? {
+              fileId,
+              format,
+              fileSize,
+              filename,
+              thumbnailFileId,
+              thumbnailKey,
+              urlFor: (id, kind) =>
+                kind === 'thumb'
+                  ? `/api/share/${token}/files/${id}?thumb=1`
+                  : `/api/share/${token}/files/${id}?inline=1`,
+            }
+          : null
       }
-      className="aspect-[16/10]"
     />
   )
 }

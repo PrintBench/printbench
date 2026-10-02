@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import type { Readable } from 'node:stream'
 import type { Database } from '@pb/db'
@@ -15,6 +15,13 @@ import {
   parseMakerWorldUrl,
   type MakerWorldModel,
 } from './makerworld'
+import { normalizeThingiverseToken } from './thingiverse'
+import {
+  sourceFilename,
+  type ExternalSourceModel,
+  type SourceFileFormat,
+} from './source-provider-types'
+import { parseModelSourceUrl, type ModelSourceProvider } from './source-router'
 
 /** Only deliberately safe, user-facing messages cross the server-action boundary. */
 export class MakerWorldImportError extends Error {
@@ -49,7 +56,11 @@ export async function saveMakerWorldCookie(
 ): Promise<void> {
   await authorize(db, userId)
   if (!cookie.trim()) {
-    await db.delete(schema.providerCredentials).where(eq(schema.providerCredentials.userId, userId))
+    await db
+      .update(schema.providerCredentials)
+      .set({ makerWorldCookieEncrypted: null })
+      .where(eq(schema.providerCredentials.userId, userId))
+    await removeEmptyCredentials(db, userId)
     return
   }
   let token: string
@@ -68,7 +79,73 @@ export async function saveMakerWorldCookie(
     })
 }
 
+async function removeEmptyCredentials(db: Database, userId: string) {
+  await db
+    .delete(schema.providerCredentials)
+    .where(
+      and(
+        eq(schema.providerCredentials.userId, userId),
+        isNull(schema.providerCredentials.makerWorldCookieEncrypted),
+        isNull(schema.providerCredentials.thingiverseTokenEncrypted),
+      ),
+    )
+}
+
+export async function getThingiverseTokenStatus(db: Database, userId: string): Promise<boolean> {
+  await authorize(db, userId)
+  const [row] = await db
+    .select()
+    .from(schema.providerCredentials)
+    .where(eq(schema.providerCredentials.userId, userId))
+    .limit(1)
+  return Boolean(decryptSecret(row?.thingiverseTokenEncrypted))
+}
+
+export async function saveThingiverseToken(
+  db: Database,
+  userId: string,
+  input: string,
+): Promise<void> {
+  await authorize(db, userId)
+  if (!input.trim()) {
+    await db
+      .update(schema.providerCredentials)
+      .set({ thingiverseTokenEncrypted: null })
+      .where(eq(schema.providerCredentials.userId, userId))
+    await removeEmptyCredentials(db, userId)
+    return
+  }
+  let token: string
+  try {
+    token = normalizeThingiverseToken(input)
+  } catch {
+    throw new MakerWorldImportError('Enter your Thingiverse API token.')
+  }
+  const encrypted = encryptSecret(token)
+  await db
+    .insert(schema.providerCredentials)
+    .values({ userId, thingiverseTokenEncrypted: encrypted })
+    .onConflictDoUpdate({
+      target: schema.providerCredentials.userId,
+      set: { thingiverseTokenEncrypted: encrypted, updatedAt: new Date() },
+    })
+}
+
 export async function createMakerWorldImport(
+  db: Database,
+  input: { userId: string; libraryId: string; url: string },
+): Promise<{ id: string }> {
+  // Preserve the original API's provider constraint for existing callers.
+  await authorize(db, input.userId)
+  try {
+    parseMakerWorldUrl(input.url)
+  } catch {
+    throw new MakerWorldImportError('Enter an https://makerworld.com model-page URL.')
+  }
+  return createModelSourceImport(db, input)
+}
+
+export async function createModelSourceImport(
   db: Database,
   input: {
     userId: string
@@ -78,11 +155,13 @@ export async function createMakerWorldImport(
 ): Promise<{ id: string }> {
   await authorize(db, input.userId)
   if (!validId(input.libraryId)) throw new MakerWorldImportError('Choose a writable library.')
-  let parsed: ReturnType<typeof parseMakerWorldUrl>
+  let parsed: ReturnType<typeof parseModelSourceUrl>
   try {
-    parsed = parseMakerWorldUrl(input.url)
+    parsed = parseModelSourceUrl(input.url)
   } catch {
-    throw new MakerWorldImportError('Enter an https://makerworld.com model-page URL.')
+    throw new MakerWorldImportError(
+      'Enter a MakerWorld, Printables, or Thingiverse model-page URL.',
+    )
   }
   const [library] = await db
     .select()
@@ -95,10 +174,15 @@ export async function createMakerWorldImport(
   if (!library.scanEnabled || (library.backend === 'local' ? !library.path : !library.s3Bucket)) {
     throw new MakerWorldImportError('That library needs working storage and scanning enabled.')
   }
-  if (!(await getMakerWorldCookieStatus(db, input.userId))) {
+  if (parsed.provider === 'makerworld' && !(await getMakerWorldCookieStatus(db, input.userId))) {
     throw new MakerWorldImportError('Save your MakerWorld cookie before importing.')
   }
-  const sourceUrl = parsed.sourceUrl + (parsed.profileId ? `#profileId-${parsed.profileId}` : '')
+  if (parsed.provider === 'thingiverse' && !(await getThingiverseTokenStatus(db, input.userId))) {
+    throw new MakerWorldImportError(
+      'Save your Thingiverse API token in Account settings before importing.',
+    )
+  }
+  const sourceUrl = parsed.sourceUrl
   const [created] = await db
     .insert(schema.modelImports)
     .values({
@@ -169,9 +253,13 @@ export async function markMakerWorldImportQueueFailed(
 }
 
 export interface MakerWorldImportDependencies {
-  fetchModel: (url: string, token: string) => Promise<MakerWorldModel>
+  fetchModel: (url: string, token: string) => Promise<MakerWorldModel | ExternalSourceModel>
   /** Worker owns temporary download files and format validation. */
-  download: (url: string, kind: '3mf' | 'image') => Promise<Readable>
+  download: (
+    url: string,
+    kind: SourceFileFormat | 'image',
+    context?: { provider: ModelSourceProvider; token: string },
+  ) => Promise<Readable>
   onDerivedWork?: (fileIds: string[]) => Promise<void>
 }
 
@@ -226,28 +314,53 @@ async function runMakerWorldImport(
       .from(schema.providerCredentials)
       .where(eq(schema.providerCredentials.userId, job.userId))
       .limit(1)
-    const token = decryptSecret(credential?.makerWorldCookieEncrypted)
-    if (!token)
-      throw new MakerWorldImportError('Your MakerWorld cookie is unavailable. Save it again.')
-    const model = await deps.fetchModel(job.sourceUrl, token)
+    const parsed = parseModelSourceUrl(job.sourceUrl)
+    const token =
+      parsed.provider === 'makerworld'
+        ? decryptSecret(credential?.makerWorldCookieEncrypted)
+        : parsed.provider === 'thingiverse'
+          ? decryptSecret(credential?.thingiverseTokenEncrypted)
+          : ''
+    if (!token && parsed.provider !== 'printables')
+      throw new MakerWorldImportError(
+        `Your ${parsed.provider === 'makerworld' ? 'MakerWorld cookie' : 'Thingiverse API token'} is unavailable. Save it again.`,
+      )
+    const model = await deps.fetchModel(job.sourceUrl, token ?? '')
+    const identity = parseModelSourceUrl(model.sourceUrl)
+    if (
+      identity.provider !== parsed.provider ||
+      identity.externalId !== parsed.externalId ||
+      model.externalId !== parsed.externalId
+    )
+      throw new MakerWorldImportError('The source returned a different model. Try again.')
     if (!model.files.length || model.files.length > 20) {
-      throw new MakerWorldImportError('This model has no downloadable print profile.')
+      throw new MakerWorldImportError(
+        'This model has no supported printable files, or too many files to import.',
+      )
     }
     const storage = createStorageAdapter(libraryLocationFromRow(library))
     importStorage = storage
     // The request's UUID reserves its own folder. A retry never overwrites an
     // existing library model or treats someone else's folder as staging space.
-    const folder = `makerworld-${parseMakerWorldUrl(job.sourceUrl).externalId}-${job.id}`
+    const folder = `${parsed.provider}-${parsed.externalId}-${job.id}`
+    const download = (url: string, kind: SourceFileFormat | 'image') =>
+      deps.download(url, kind, { provider: parsed.provider, token: token ?? '' })
     const staged: { from: string; to: string }[] = []
     for (const file of model.files) {
-      if (!/^[1-9]\d{0,15}$/.test(file.profileId))
-        throw new MakerWorldImportError('Invalid MakerWorld print profile.')
-      const to = `${folder}/profile-${file.profileId}.3mf`
+      const fileId = 'profileId' in file ? file.profileId : file.id
+      const format = 'format' in file ? file.format : '3mf'
+      if (!/^[1-9]\d{0,15}$/.test(fileId) || !['stl', '3mf', 'obj', 'ply'].includes(format))
+        throw new MakerWorldImportError('Invalid source model file.')
+      const named = sourceFilename(file.filename, fileId)
+      if (!named || named.format !== format)
+        throw new MakerWorldImportError('Invalid source model filename.')
+      const leaf = 'profileId' in file ? `profile-${fileId}.3mf` : `${fileId}-${named.filename}`
+      const to = `${folder}/${leaf}`
       if (await storage.stat(to)) continue
-      const from = `.imports/${job.id}/profile-${file.profileId}-${nanoid(8)}.3mf`
+      const from = `.imports/${job.id}/file-${fileId}-${nanoid(8)}.${format}`
       temporaryPaths.push(from)
       try {
-        await storage.write(from, await deps.download(file.url, '3mf'))
+        await storage.write(from, await download(file.url, format))
       } catch (error) {
         await storage.remove(from).catch(() => undefined)
         throw error
@@ -258,7 +371,7 @@ async function runMakerWorldImport(
       const from = `.imports/${job.id}/cover-${nanoid(8)}.webp`
       temporaryPaths.push(from)
       try {
-        await storage.write(from, await deps.download(model.thumbnailUrl, 'image'))
+        await storage.write(from, await download(model.thumbnailUrl, 'image'))
         staged.push({ from, to: `${folder}/cover.webp` })
       } catch {
         await storage.remove(from).catch(() => undefined)
@@ -327,8 +440,13 @@ async function runMakerWorldImport(
         .values({
           modelId: imported.id,
           url: model.sourceUrl,
-          host: 'makerworld.com',
-          title: 'MakerWorld',
+          host: new URL(model.sourceUrl).hostname,
+          title:
+            parsed.provider === 'makerworld'
+              ? 'MakerWorld'
+              : parsed.provider === 'printables'
+                ? 'Printables'
+                : 'Thingiverse',
         })
         .onConflictDoNothing()
     })
@@ -354,7 +472,7 @@ async function runMakerWorldImport(
     const message =
       error instanceof MakerWorldImportError || error instanceof ImportProviderError
         ? error.message
-        : 'Import failed. Check the connection, storage, and MakerWorld access, then try again.'
+        : 'Import failed. Check the connection, storage, and source access, then try again.'
     await db
       .update(schema.modelImports)
       .set({ state: 'failed', error: message, updatedAt: new Date() })

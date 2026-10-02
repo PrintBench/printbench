@@ -14,6 +14,7 @@ import {
   isLiked,
   listCollections,
   listPrints,
+  modelGeometrySql,
   openRequestsForModel,
   printStats,
   printSuggestions,
@@ -52,6 +53,9 @@ type ModelDetail = {
   missing_at: string | null
   share_token: string | null
   preview_file_id: string | null
+  bbox_x: string | null
+  bbox_y: string | null
+  bbox_z: string | null
   library_name: string
   library_path: string
   /** Only a library this app owns may have its files deleted. */
@@ -76,6 +80,7 @@ type FileRow = {
   presupported: boolean
   missing_at: string | null
   thumb_state: string
+  thumb_key: string | null
   triangle_count: number | null
   bbox_x: string | null
   bbox_y: string | null
@@ -99,9 +104,11 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
            m.file_count, m.total_size, m.is_file_model, m.is_package,
            m.missing_at, m.share_token,
            m.preview_file_id,
+           geometry.bbox_x, geometry.bbox_y, geometry.bbox_z,
            l.name AS library_name, l.path AS library_path,
            (l.kind = 'managed' OR l.allow_writes) AS library_writable
     FROM models m JOIN libraries l ON l.id = m.library_id
+    LEFT JOIN LATERAL (${modelGeometrySql(sql`m.id`, sql`m.preview_file_id`)}) geometry ON true
     WHERE m.public_id = ${publicId} LIMIT 1
   `)
 
@@ -137,7 +144,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const files = await db.execute<FileRow>(sql`
     SELECT id, filename, extension, category, size, previewable, presupported, missing_at,
-           thumb_state, triangle_count, bbox_x, bbox_y, bbox_z
+           thumb_state, thumb_key, triangle_count, bbox_x, bbox_y, bbox_z
     FROM model_files WHERE model_id = ${model.id}
     ORDER BY category, filename
   `)
@@ -220,9 +227,11 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     : undefined
   const selectedImage = selectedPreview?.category === 'image' ? selectedPreview : undefined
 
-  const heroDimensions = hero
-    ? formatDimensions(Number(hero.bbox_x ?? 0), Number(hero.bbox_y ?? 0), Number(hero.bbox_z ?? 0))
-    : null
+  const heroDimensions = formatDimensions(
+    Number(model.bbox_x ?? 0),
+    Number(model.bbox_y ?? 0),
+    Number(model.bbox_z ?? 0),
+  )
 
   /*
    * The viewer needs a mesh we can parse in the browser, which is not
@@ -372,10 +381,9 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 selectedImage
                   ? `/api/files/${selectedImage.id}/raw?inline=1`
                   : hero
-                    ? `/api/files/${hero.id}/thumb`
+                    ? `/api/files/${hero.id}/thumb?v=${encodeURIComponent(hero.thumb_key ?? '')}`
                     : null
               }
-              preferImage={Boolean(selectedImage)}
               model={
                 viewable
                   ? {
@@ -384,6 +392,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                       fileSize: Number(viewable.size),
                       filename: viewable.filename.split('/').pop() ?? viewable.filename,
                       thumbnailFileId: hero?.id ?? null,
+                      thumbnailKey: hero?.thumb_key ?? null,
                       maxBytes: settings.viewerMaxBytes,
                     }
                   : null

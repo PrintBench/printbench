@@ -16,7 +16,7 @@ vi.mock('@pb/core', () => ({
   PolicyError: class PolicyError extends Error {},
   MakerWorldImportError: class MakerWorldImportError extends Error {},
   assertCan: mocks.assertCan,
-  createMakerWorldImport: mocks.create,
+  createModelSourceImport: mocks.create,
   getMakerWorldImportStatus: mocks.status,
   markMakerWorldImportQueueFailed: mocks.queueFailed,
 }))
@@ -25,8 +25,8 @@ vi.mock('@pb/jobs', () => ({
   getStartedQueue: async () => ({ send: mocks.send }),
 }))
 
-import { PolicyError } from '@pb/core'
-import { pollMakerWorldImport, startMakerWorldImport } from './makerworld-actions'
+import { MakerWorldImportError, PolicyError } from '@pb/core'
+import { pollMakerWorldImport, startModelSourceImport } from './source-actions'
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -35,13 +35,44 @@ beforeEach(() => {
   mocks.send.mockResolvedValue('job-id')
 })
 
-describe('MakerWorld action boundaries', () => {
+describe('model source action boundaries', () => {
+  it.each([
+    'https://makerworld.com/en/models/1',
+    'https://www.printables.com/model/123-example',
+    'https://www.thingiverse.com/thing:123',
+  ])('delegates source detection for %s without trusting a supplied provider', async (url) => {
+    const input = { libraryId: 'lib', url, provider: 'attacker', userId: 'victim' }
+    expect(await startModelSourceImport(input)).toEqual({ ok: true, id: 'import-id' })
+    expect(mocks.create).toHaveBeenCalledWith('db', {
+      libraryId: 'lib',
+      url,
+      userId: mocks.user.id,
+    })
+  })
+
+  it('shows controlled provider errors while hiding unexpected upstream details', async () => {
+    mocks.create.mockRejectedValue(new MakerWorldImportError('Save your Thingiverse API token.'))
+    expect(
+      await startModelSourceImport({
+        libraryId: 'lib',
+        url: 'https://www.thingiverse.com/thing:1',
+      }),
+    ).toEqual({ ok: false, error: 'Save your Thingiverse API token.' })
+    mocks.create.mockRejectedValue(new Error('private-token'))
+    const result = await startModelSourceImport({
+      libraryId: 'lib',
+      url: 'https://www.printables.com/model/1',
+    })
+    expect(JSON.stringify(result)).not.toContain('private-token')
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
   it('authorizes every call including banned state before accessing private data', async () => {
     mocks.assertCan.mockImplementation(() => {
       throw new PolicyError('file:upload')
     })
     const results = await Promise.all([
-      startMakerWorldImport({ libraryId: 'lib', url: 'https://makerworld.com/en/models/1' }),
+      startModelSourceImport({ libraryId: 'lib', url: 'https://makerworld.com/en/models/1' }),
       pollMakerWorldImport('someone-elses-import'),
     ])
     expect(results.every((result) => !result.ok)).toBe(true)
@@ -54,7 +85,7 @@ describe('MakerWorld action boundaries', () => {
 
   it('uses the signed-in identity even with extra untrusted input properties', async () => {
     const input = { userId: 'victim', libraryId: 'lib', url: 'https://makerworld.com/en/models/1' }
-    expect(await startMakerWorldImport(input)).toEqual({ ok: true, id: 'import-id' })
+    expect(await startModelSourceImport(input)).toEqual({ ok: true, id: 'import-id' })
     expect(mocks.create).toHaveBeenCalledWith('db', { ...input, userId: mocks.user.id })
     expect(mocks.send).toHaveBeenCalledWith(
       'makerworld-import',
@@ -67,7 +98,7 @@ describe('MakerWorld action boundaries', () => {
     mocks.send.mockResolvedValue(null)
     mocks.status.mockResolvedValue({ state: 'importing', error: null, publicId: null })
     expect(
-      await startMakerWorldImport({ libraryId: 'lib', url: 'https://makerworld.com/en/models/1' }),
+      await startModelSourceImport({ libraryId: 'lib', url: 'https://makerworld.com/en/models/1' }),
     ).toEqual({ ok: true, id: 'import-id' })
     expect(mocks.queueFailed).not.toHaveBeenCalled()
   })
@@ -83,7 +114,7 @@ describe('MakerWorld action boundaries', () => {
 
   it('marks failed enqueueing and never exposes raw queue errors', async () => {
     mocks.send.mockRejectedValue(new Error('credential-secret'))
-    const result = await startMakerWorldImport({
+    const result = await startModelSourceImport({
       libraryId: 'lib',
       url: 'https://makerworld.com/en/models/1',
     })

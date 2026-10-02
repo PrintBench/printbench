@@ -27,6 +27,7 @@ import type { JobPayload } from '@pb/jobs'
 import { JOB } from '@pb/jobs'
 
 const THUMBNAIL_SIZE = 512
+const EMBEDDED_ARTWORK_SIZE = 2048
 
 /**
  * Per-file jobs: geometry analysis, thumbnail rendering, and content hashing.
@@ -193,7 +194,7 @@ export async function handleFileThumbnail(
     digest: file.digest,
     size: file.size,
     mtimeMs: file.mtimeMs,
-    size_px: THUMBNAIL_SIZE,
+    size_px: format === '3mf' ? EMBEDDED_ARTWORK_SIZE : THUMBNAIL_SIZE,
     rendererVersion:
       format === '3mf' ? RENDERER_VERSION * 1000 + THREEMF_METADATA_VERSION : RENDERER_VERSION,
     format: 'webp',
@@ -221,7 +222,10 @@ export async function handleFileThumbnail(
             byteLength: file.size ?? undefined,
           },
         )
-        embedded = await renderEmbeddedThumbnail(metadata.thumbnails, { size: THUMBNAIL_SIZE })
+        embedded = await renderEmbeddedThumbnail(metadata.thumbnails, {
+          size: EMBEDDED_ARTWORK_SIZE,
+          quality: 90,
+        })
       } catch {
         // A malformed/oversized metadata part still gets a geometry preview.
       }

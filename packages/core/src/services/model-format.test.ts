@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createDb } from '@pb/db'
-import { modelFormatSql } from './model-format'
+import { modelFormatSql, modelGeometrySql, modelThumbnailSql } from './model-format'
 
 const url = process.env.DATABASE_URL
 const describeDb = url ? describe : describe.skip
@@ -36,17 +36,27 @@ describeDb('model format badges', () => {
     filename: string,
     category: 'model' | 'slicer' | 'image',
     size: number,
-    options: { selected?: boolean; missing?: boolean } = {},
+    options: {
+      selected?: boolean
+      missing?: boolean
+      dimensions?: [number, number, number]
+      analysisState?: 'ok' | 'pending' | 'failed'
+    } = {},
   ) {
     const result = await db.execute<{ id: string }>(sql`
-      INSERT INTO model_files (model_id, filename, extension, category, size, media_type, missing_at)
+      INSERT INTO model_files (model_id, filename, extension, category, size, media_type, missing_at,
+                               bbox_x, bbox_y, bbox_z, analysis_state, thumb_state)
       VALUES (${MODEL}, ${filename}, ${filename.split('.').at(-1)}, ${category}, ${size},
-              'application/octet-stream', ${options.missing ? sql`now()` : null})
+              'application/octet-stream', ${options.missing ? sql`now()` : null},
+              ${options.dimensions?.[0] ?? null}, ${options.dimensions?.[1] ?? null},
+              ${options.dimensions?.[2] ?? null},
+              ${options.analysisState ?? (options.dimensions ? 'ok' : 'pending')}, 'failed')
       RETURNING id`)
     if (options.selected) {
       await db.execute(sql`UPDATE models SET preview_file_id = ${result.rows[0]!.id}
         WHERE id = ${MODEL}`)
     }
+    return result.rows[0]!.id
   }
 
   async function format() {
@@ -54,6 +64,20 @@ describeDb('model format badges', () => {
       SELECT ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS format
       FROM models m WHERE m.id = ${MODEL}`)
     return result.rows[0]!.format
+  }
+
+  async function geometry() {
+    const result = await db.execute<{
+      id: string | null
+      bbox_x: string | null
+      bbox_y: string | null
+      bbox_z: string | null
+    }>(sql`
+      SELECT geometry.id, geometry.bbox_x, geometry.bbox_y, geometry.bbox_z
+      FROM models m
+      LEFT JOIN LATERAL (${modelGeometrySql(sql`m.id`, sql`m.preview_file_id`)}) geometry ON true
+      WHERE m.id = ${MODEL}`)
+    return result.rows[0]!
   }
 
   it('uses a 3MF format while a larger WEBP remains the selected artwork', async () => {
@@ -84,5 +108,67 @@ describeDb('model format badges', () => {
   it('has no model format badge for artwork-only packages', async () => {
     await file('cover.webp', 'image', 1000, { selected: true })
     expect(await format()).toBeNull()
+  })
+
+  it('uses analyzed geometry with selected artwork even when thumbnail rendering failed', async () => {
+    const model = await file('profile.3mf', 'model', 100, { dimensions: [415, 385, 79] })
+    await file('cover.webp', 'image', 1000, { selected: true, dimensions: [1, 1, 1] })
+    expect(await geometry()).toEqual({
+      id: model,
+      bbox_x: '415.0000',
+      bbox_y: '385.0000',
+      bbox_z: '79.0000',
+    })
+  })
+
+  it('honours selected analyzed model geometry over the largest file', async () => {
+    await file('body.stl', 'model', 1000, { dimensions: [100, 100, 100] })
+    const selected = await file('project.3mf', 'model', 100, {
+      selected: true,
+      dimensions: [20, 30, 40],
+    })
+    expect((await geometry()).id).toBe(selected)
+  })
+
+  it('falls back from pending or missing selected geometry to a live analyzed model', async () => {
+    const live = await file('body.stl', 'model', 100, { dimensions: [20, 30, 40] })
+    await file('pending.3mf', 'model', 1000, {
+      selected: true,
+      dimensions: [100, 100, 100],
+      analysisState: 'pending',
+    })
+    expect((await geometry()).id).toBe(live)
+    await file('missing.3mf', 'model', 2000, {
+      selected: true,
+      missing: true,
+      dimensions: [200, 200, 200],
+    })
+    expect((await geometry()).id).toBe(live)
+  })
+
+  it('does not display incomplete or invalid geometry as model dimensions', async () => {
+    await file('invalid.3mf', 'model', 2000, { dimensions: [-1, 20, 30], selected: true })
+    await file('unknown.stl', 'model', 1000)
+    await file('cover.webp', 'image', 3000, { dimensions: [1, 1, 1] })
+    expect(await geometry()).toEqual({ id: null, bbox_x: null, bbox_y: null, bbox_z: null })
+  })
+
+  it('returns the cache key with the selected live thumbnail and excludes missing previews', async () => {
+    const fallback = await file('body.stl', 'model', 1000)
+    const selected = await file('project.3mf', 'model', 100, { selected: true })
+    await db.execute(sql`UPDATE model_files SET thumb_state = 'ok', thumb_key = 'fallback-v1'
+      WHERE id = ${fallback}`)
+    await db.execute(sql`UPDATE model_files SET thumb_state = 'ok', thumb_key = 'selected-v2'
+      WHERE id = ${selected}`)
+    const thumbnail = async () => {
+      const result = await db.execute<{ id: string; thumb_key: string }>(sql`
+        SELECT thumb.id, thumb.thumb_key FROM models m
+        LEFT JOIN LATERAL (${modelThumbnailSql(sql`m.id`, sql`m.preview_file_id`)}) thumb ON true
+        WHERE m.id = ${MODEL}`)
+      return result.rows[0]
+    }
+    expect(await thumbnail()).toEqual({ id: selected, thumb_key: 'selected-v2' })
+    await db.execute(sql`UPDATE model_files SET missing_at = now() WHERE id = ${selected}`)
+    expect(await thumbnail()).toEqual({ id: fallback, thumb_key: 'fallback-v1' })
   })
 })

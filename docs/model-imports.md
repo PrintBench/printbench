@@ -1,4 +1,4 @@
-# Model metadata and MakerWorld imports
+# Model metadata and model site imports
 
 ## Uploading a 3MF
 
@@ -30,14 +30,15 @@ MakerWorld `DesignModelId`, the worker makes bounded public metadata requests:
 it resolves the internal identifier through Bambu Cloud's model mapping endpoint,
 then checks that the public design has the same internal identifier before
 adding its tags, description, creator, license and source link. No cookie or
-remote model download is needed for this enrichment. Its embedded cover remains
+remote model download is needed for this enrichment. Its sharpest usable embedded cover remains
 preferred. If the source is unavailable, private, changed, or rate limited, the
 local package's metadata is still imported and geometry processing continues.
 Projects without this recognized identifier remain entirely local.
 
 Model cards describe the printable file format, even when the selected artwork is
-a WEBP or another image. The detail page offers **Thumbnail** and **3D model**
-controls when both previews exist. Switching retains the loaded model and camera
+a WEBP or another image. Detail and shared pages default to the thumbnail and offer **Thumbnail** and
+**3D model** controls when both previews exist. Embedded cover selection prefers
+higher resolution artwork over small thumbnails and plate renders. Switching retains the loaded model and camera
 while pausing rendering when the thumbnail is displayed.
 
 ## Importing a MakerWorld link
@@ -69,7 +70,43 @@ response or authentication requirements change. Public metadata is available
 without a session; resolving download links requires one. Network requests are
 restricted to the API host and known download hosts, use HTTPS and public DNS
 addresses, reject redirects, and do not forward the session to download hosts.
-3MF downloads are limited to 512 MiB; optional artwork to 4 MiB.
+Model downloads are limited to 512 MiB per file, with at most 20 supported files
+per import. Optional remote artwork is limited to 16 MiB and 16 megapixels;
+embedded artwork remains limited to 4 MiB. Raster previews preserve source
+resolution up to 2048 pixels without enlarging smaller images.
+
+## Importing Printables and Thingiverse links
+
+On **Upload**, paste a MakerWorld, Printables, or Thingiverse model-page URL into
+the same import form and choose a writable library. PrintBench detects the
+provider from the URL. Upload shows connection status and links to the relevant
+account settings; credentials are entered only in settings.
+
+Public free Printables models do not require a saved cookie or API token.
+Paid or private content is not supported by this importer.
+
+For Thingiverse, open **Account settings → Thingiverse** and save your own API
+token. [Thingiverse's developer documentation](https://www.thingiverse.com/developers)
+explains creating an app and obtaining API access. The token field is masked;
+after saving, only its saved status is displayed. **Remove API token** removes
+the connection for your own PrintBench account.
+
+Then paste a `https://www.thingiverse.com/thing:…` model URL on **Upload**.
+Printables model URLs use `https://www.printables.com/model/…`. The form follows
+background import progress and links to the indexed model when complete. Imports
+bring in the title, creator, description, tags, license, cover, source link, and
+supported STL/3MF/OBJ/PLY files. Original filenames are preserved with a source
+file ID prefix to avoid collisions.
+
+Printables uses its public website GraphQL endpoint, which is not a documented
+stable API contract. Thingiverse uses its documented authenticated API. Requests
+are restricted to each provider's API and documented download/image hosts;
+credentials are never forwarded to CDN hosts. Removing one provider's credentials
+preserves the other connection.
+
+A local Printables or Thingiverse file cannot be identified from its filename
+alone. Generic embedded 3MF metadata still imports, but website metadata requires
+a model-page link. This importer does not guess a source or search by filename.
 
 ## Verification
 
