@@ -6,6 +6,7 @@ import {
   getPreviewStore,
   libraryLocationFromRow,
   previewKey,
+  applyEmbeddedModelMetadata,
   type StorageAdapter,
 } from '@pb/core'
 import {
@@ -15,6 +16,9 @@ import {
   boxSize,
   renderThumbnail,
   supportedFormat,
+  THREEMF_METADATA_VERSION,
+  readThreeMfMetadataFromSource,
+  renderEmbeddedThumbnail,
 } from '@pb/mesh'
 import type { JobPayload } from '@pb/jobs'
 import { JOB } from '@pb/jobs'
@@ -33,6 +37,7 @@ const THUMBNAIL_SIZE = 512
 
 interface FileContext {
   file: typeof schema.modelFiles.$inferSelect
+  model: typeof schema.models.$inferSelect
   storage: StorageAdapter
   relativePath: string
 }
@@ -64,6 +69,7 @@ async function loadFile(fileId: string): Promise<FileContext | null> {
 
   return {
     file: row.file,
+    model: row.model,
     storage: createStorageAdapter(libraryLocationFromRow(row.library)),
     relativePath,
   }
@@ -79,6 +85,28 @@ export async function handleFileAnalyze(
   const db = getDb()
   const { file, storage, relativePath } = context
   const format = supportedFormat(file.extension)
+
+  if (format === '3mf' && context.model.embeddedMetadataState === 'pending') {
+    // Descriptive metadata does not depend on geometry succeeding. A designer's
+    // title and cover remain useful even when this parser cannot read the mesh.
+    try {
+      let metadata = {}
+      try {
+        metadata = await readThreeMfMetadataFromSource(
+          () => storage.createReadStream(relativePath),
+          {
+            byteLength: file.size ?? undefined,
+          },
+        )
+      } catch (error) {
+        console.warn(`[metadata] ${file.filename}: ${message(error)}`)
+      }
+      await applyEmbeddedModelMetadata(db, file.modelId, file.id, metadata)
+    } catch (error) {
+      // Metadata failures never block or repeatedly retry geometry analysis.
+      console.warn(`[metadata] could not save for ${file.filename}: ${message(error)}`)
+    }
+  }
 
   if (!format) {
     await db
@@ -139,7 +167,8 @@ export async function handleFileThumbnail(
     size: file.size,
     mtimeMs: file.mtimeMs,
     size_px: THUMBNAIL_SIZE,
-    rendererVersion: RENDERER_VERSION,
+    rendererVersion:
+      format === '3mf' ? RENDERER_VERSION * 1000 + THREEMF_METADATA_VERSION : RENDERER_VERSION,
     format: 'webp',
   })
 
@@ -156,11 +185,28 @@ export async function handleFileThumbnail(
   }
 
   try {
-    const result = await renderThumbnail(format, () => storage.createReadStream(relativePath), {
-      size: THUMBNAIL_SIZE,
-      format: 'webp',
-      byteLength: file.size ?? undefined,
-    })
+    let embedded = null
+    if (format === '3mf') {
+      try {
+        const metadata = await readThreeMfMetadataFromSource(
+          () => storage.createReadStream(relativePath),
+          {
+            byteLength: file.size ?? undefined,
+          },
+        )
+        embedded = await renderEmbeddedThumbnail(metadata.thumbnails, { size: THUMBNAIL_SIZE })
+      } catch {
+        // A malformed/oversized metadata part still gets a geometry preview.
+      }
+    }
+    const result =
+      embedded ??
+      (await renderThumbnail(format, () => storage.createReadStream(relativePath), {
+        size: THUMBNAIL_SIZE,
+        format: 'webp',
+        byteLength: file.size ?? undefined,
+        preferEmbedded: format !== '3mf',
+      }))
 
     await store.write(key, result.data)
 

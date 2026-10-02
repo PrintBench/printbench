@@ -1,0 +1,1 @@
+ALTER TABLE "models" ADD COLUMN "embedded_metadata_state" text DEFAULT 'done' NOT NULL;

@@ -63,7 +63,10 @@ export async function updateModel(
   const row = rows[0]
   if (!row) return { ok: false, error: 'That model no longer exists.', sidecarWritten: false }
 
-  const updates: Partial<typeof schema.models.$inferInsert> = { updatedAt: new Date() }
+  const updates: Partial<typeof schema.models.$inferInsert> = {
+    updatedAt: new Date(),
+    embeddedMetadataState: 'done',
+  }
 
   if (patch.name !== undefined) {
     const name = patch.name.trim()
@@ -335,6 +338,10 @@ export async function bulkUpdateModels(
 ): Promise<{ updated: number }> {
   if (modelIds.length === 0) return { updated: 0 }
   const ids = modelIds.slice(0, 1000)
+  await db
+    .update(schema.models)
+    .set({ embeddedMetadataState: 'done' })
+    .where(inArray(schema.models.id, ids))
 
   if (patch.creator !== undefined) {
     const creatorId = await resolveCreator(db, patch.creator)

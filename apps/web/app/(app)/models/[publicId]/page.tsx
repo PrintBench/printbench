@@ -355,6 +355,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
       */}
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0 space-y-6">
+          {model.notes && (
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="mb-2 text-sm font-semibold">Description and notes</h2>
+                <p className="whitespace-pre-wrap break-words text-sm text-[var(--color-ink-muted)]">
+                  {model.notes}
+                </p>
+              </CardContent>
+            </Card>
+          )}
           {selectedImage ? (
             <Card className="overflow-hidden">
               <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">

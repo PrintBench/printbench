@@ -368,6 +368,7 @@ async function upsertModel(
         libraryId,
         path: model.path,
         name: model.name,
+        embeddedMetadataState: 'pending',
         slug: slugify(model.name) || 'model',
         publicId: nanoid(12),
         isFileModel: model.isFileModel,
@@ -773,6 +774,12 @@ async function restoreFromSidecar(
     return false
   }
   if (!data) return false
+
+  // A sidecar records a curator's decisions, including deliberately empty fields.
+  await db
+    .update(schema.models)
+    .set({ embeddedMetadataState: 'done' })
+    .where(eq(schema.models.id, modelId))
 
   const updates: string[] = []
   if (data.name) updates.push('name')
