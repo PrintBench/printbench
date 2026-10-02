@@ -99,33 +99,36 @@ describe('external source transport', () => {
     await pending
     expect(mocks.request).not.toHaveBeenCalled()
   })
-  it('follows one fixed Thingiverse download hop while stripping authorization', async () => {
-    serve([
-      {
-        status: 302,
-        body: '',
-        headers: { location: 'https://cdn.thingiverse.com/assets/model.stl' },
-      },
-      { status: 200, body: 'model' },
-    ])
-    const dir = await mkdtemp(join(tmpdir(), 'source-network-'))
-    try {
-      const destination = join(dir, 'model.stl')
-      expect(
-        await downloadSourceFile(
-          'thingiverse',
-          'https://api.thingiverse.com/files/123/download',
-          destination,
-          { ...options, token: 'private' },
-        ),
-      ).toBe(5)
-      expect(await readFile(destination, 'utf8')).toBe('model')
-      expect(mocks.request.mock.calls[0]![1].headers.Authorization).toBe('Bearer private')
-      expect(mocks.request.mock.calls[1]![1].headers.Authorization).toBeUndefined()
-    } finally {
-      await rm(dir, { recursive: true, force: true })
-    }
-  })
+  it.each(['files/123/download', 'v2/files/123/download?increment_download=false'])(
+    'follows fixed Thingiverse download path %s while stripping authorization',
+    async (pathname) => {
+      serve([
+        {
+          status: 302,
+          body: '',
+          headers: { location: 'https://cdn.thingiverse.com/assets/model.stl' },
+        },
+        { status: 200, body: 'model' },
+      ])
+      const dir = await mkdtemp(join(tmpdir(), 'source-network-'))
+      try {
+        const destination = join(dir, 'model.stl')
+        expect(
+          await downloadSourceFile(
+            'thingiverse',
+            `https://api.thingiverse.com/${pathname}`,
+            destination,
+            { ...options, token: 'private' },
+          ),
+        ).toBe(5)
+        expect(await readFile(destination, 'utf8')).toBe('model')
+        expect(mocks.request.mock.calls[0]![1].headers.Authorization).toBe('Bearer private')
+        expect(mocks.request.mock.calls[1]![1].headers.Authorization).toBeUndefined()
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    },
+  )
   it('rejects a Thingiverse download redirect to an unknown host', async () => {
     serve([{ status: 302, body: '', headers: { location: 'https://evil.example/collect' } }])
     await expect(

@@ -195,14 +195,19 @@ export async function fetchThingiverseModel(
     try {
       const api = new URL(url).hostname === 'api.thingiverse.com'
       const validated = validateSourceRemoteUrl('thingiverse', url, api)
-      if (api && validated.pathname !== `/files/${file.id}/download`)
+      if (
+        api &&
+        ![`/files/${file.id}/download`, `/v2/files/${file.id}/download`].includes(
+          validated.pathname,
+        )
+      )
         throw new Error('Unexpected file download identity')
       // Preserve signed query bytes; authorization goes only to a fixed API host.
       url = file.direct_url || file.download_url || validated.href
     } catch {
       throw new ImportProviderError(
         'INVALID_RESPONSE',
-        'Thingiverse returned an unsupported download host',
+        'Thingiverse returned an unsupported download URL',
       )
     }
     model.files.push({ id: String(file.id), ...name, url })

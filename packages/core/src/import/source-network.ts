@@ -143,7 +143,7 @@ export async function downloadSourceFile(
   const started = Date.now()
   const apiDownload = provider === 'thingiverse' && parsed.hostname === 'api.thingiverse.com'
   const url = validateSourceRemoteUrl(provider, value, apiDownload)
-  if (apiDownload && !/^\/files\/[1-9]\d{0,15}\/download$/.test(url.pathname))
+  if (apiDownload && !/^\/(?:v2\/)?files\/[1-9]\d{0,15}\/download$/.test(url.pathname))
     throw new Error('Unsupported source download endpoint')
   if (apiDownload && (!options.token || !/^[A-Za-z0-9._~-]{1,16384}$/.test(options.token)))
     throw new Error('Thingiverse access token is required')

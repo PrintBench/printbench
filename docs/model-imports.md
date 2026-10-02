@@ -85,8 +85,9 @@ account settings; credentials are entered only in settings.
 Public free Printables models do not require a saved cookie or API token.
 Paid or private content is not supported by this importer.
 
-For Thingiverse, open **Account settings → Thingiverse** and save your own API
-token. [Thingiverse's developer documentation](https://www.thingiverse.com/developers)
+For Thingiverse, open **Account settings → Thingiverse** and save your own App
+Token/access token. PrintBench does not use the Client ID or Client Secret and
+does not perform an OAuth browser login or callback. [Thingiverse's developer documentation](https://www.thingiverse.com/developers)
 explains creating an app and obtaining API access. The token field is masked;
 after saving, only its saved status is displayed. **Remove API token** removes
 the connection for your own PrintBench account.

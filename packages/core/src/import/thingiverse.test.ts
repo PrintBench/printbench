@@ -123,6 +123,35 @@ describe('Thingiverse import provider', () => {
     )
     expect(result.files[0]?.url).toBe('https://api.thingiverse.com/files/456/download')
   })
+  it('accepts current v2 download URLs without changing their query bytes', async () => {
+    const url = 'https://api.thingiverse.com/v2/files/456/download?increment_download=false'
+    const result = await fetchThingiverseModel(
+      'https://www.thingiverse.com/thing:123',
+      'own-token',
+      {
+        request: fakeRequest({
+          'https://api.thingiverse.com/things/123/files': [
+            { id: 456, name: 'model.stl', direct_url: url },
+          ],
+        }),
+      },
+    )
+    expect(result.files[0]?.url).toBe(url)
+  })
+  it.each(['v2/files/457/download', 'v3/files/456/download', 'v2/files/456/delete'])(
+    'rejects a mismatched or unsupported API download path %s',
+    async (pathname) => {
+      await expect(
+        fetchThingiverseModel('https://www.thingiverse.com/thing:123', 'own-token', {
+          request: fakeRequest({
+            'https://api.thingiverse.com/things/123/files': [
+              { id: 456, name: 'model.stl', direct_url: `https://api.thingiverse.com/${pathname}` },
+            ],
+          }),
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+    },
+  )
   it.each([
     [401, 'AUTH_REQUIRED'],
     [403, 'FORBIDDEN'],
