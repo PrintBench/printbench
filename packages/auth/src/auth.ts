@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth'
+import { hashPassword, verifyPassword } from 'better-auth/crypto'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins/admin'
 import { nextCookies } from 'better-auth/next-js'
@@ -16,6 +17,13 @@ import { ROLES, type Role } from './roles'
  * to first request also means a database blip at boot does not kill the process.
  */
 let instance: ReturnType<typeof build> | undefined
+
+export const PASSWORD_MIN_LENGTH = 10
+export const PASSWORD_MAX_LENGTH = 200
+
+/** Keep password encoding compatible with the configured authentication library. */
+export const hashAccountPassword = hashPassword
+export const verifyAccountPassword = verifyPassword
 
 export function getAuth(): ReturnType<typeof build> {
   instance ??= build()
@@ -79,8 +87,8 @@ function build() {
       // Self-hosted instances rarely have SMTP configured. Requiring verification
       // by default would lock people out of their own server.
       requireEmailVerification: false,
-      minPasswordLength: 10,
-      maxPasswordLength: 200,
+      minPasswordLength: PASSWORD_MIN_LENGTH,
+      maxPasswordLength: PASSWORD_MAX_LENGTH,
     },
 
     user: {
