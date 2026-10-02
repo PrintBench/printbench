@@ -8,24 +8,21 @@ import { Input } from '@/components/ui/input'
 import type { UploadTarget } from './actions'
 import {
   pollMakerWorldImport,
-  readMakerWorldCookieStatus,
-  setMakerWorldCookie,
   startMakerWorldImport,
   type MakerWorldImportStatus,
 } from './makerworld-actions'
+import { readMakerWorldCookieStatus } from '../settings/makerworld-actions'
 
 export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
   const router = useRouter()
   const [libraryId, setLibraryId] = useState(targets[0]?.id ?? '')
   const [url, setUrl] = useState('')
-  const [cookie, setCookie] = useState('')
   const [saved, setSaved] = useState<boolean | null>(null)
   const [cookieMessage, setCookieMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
   const [status, setStatus] = useState<MakerWorldImportStatus | null>(null)
   const [pending, startTransition] = useTransition()
-  const [cookiePending, startCookieTransition] = useTransition()
   const [pollAttempt, setPollAttempt] = useState(0)
   const [pollError, setPollError] = useState<string | null>(null)
   const active = status?.state === 'queued' || status?.state === 'importing'
@@ -72,24 +69,6 @@ export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
       clearTimeout(timer)
     }
   }, [importId, active, pollAttempt, router])
-
-  function updateCookie(value: string) {
-    setCookieMessage('')
-    startCookieTransition(async () => {
-      try {
-        const result = await setMakerWorldCookie(value)
-        if (!result.ok) {
-          setCookieMessage(result.error)
-          return
-        }
-        setSaved(result.saved)
-        setCookie('')
-        setCookieMessage(result.saved ? 'Cookie saved for your account.' : 'Cookie removed.')
-      } catch {
-        setCookieMessage('Could not update your MakerWorld connection.')
-      }
-    })
-  }
 
   return (
     <section
@@ -166,46 +145,18 @@ export function MakerWorldImportForm({ targets }: { targets: UploadTarget[] }) {
           </Button>
         </form>
       )}
-      <details className="rounded-[var(--radius-control)] border border-[var(--color-border)] p-3">
-        <summary className="cursor-pointer text-sm font-medium">MakerWorld account cookie</summary>
-        <div className="mt-3 space-y-3 text-sm">
-          <p className="text-[var(--color-ink-muted)]">
-            Save your MakerWorld token cookie to download print profiles. It is saved for your
-            PrintBench account and never shown again.
-          </p>
-          <p>Cookie: {saved === null ? 'Status unavailable' : saved ? 'Saved' : 'Not saved'}</p>
-          <label className="block space-y-1">
-            <span>Account cookie</span>
-            <Input
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              value={cookie}
-              onChange={(event) => setCookie(event.target.value)}
-              disabled={cookiePending}
-            />
-          </label>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={cookiePending || !cookie.trim()}
-              onClick={() => updateCookie(cookie)}
-            >
-              Save cookie
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={cookiePending || saved !== true}
-              onClick={() => updateCookie('')}
-            >
-              Remove cookie
-            </Button>
-          </div>
-          <p role="status">{cookieMessage}</p>
-        </div>
-      </details>
+      <p className="text-sm text-[var(--color-ink-muted)]">
+        MakerWorld connection:{' '}
+        {saved === null ? 'Status unavailable' : saved ? 'Cookie saved' : 'Not connected'}.{' '}
+        <Link href="/settings#makerworld" className="underline">
+          {saved ? 'Manage in account settings' : 'Connect in account settings'}
+        </Link>
+      </p>
+      {cookieMessage && (
+        <p role="status" className="text-sm">
+          {cookieMessage}
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-sm text-[var(--color-danger)]">
           {error}

@@ -30,9 +30,11 @@ MakerWorld automatically.
 
 ## Importing a MakerWorld link
 
-On **Upload**, choose a writable library, save your own MakerWorld token cookie
-(or a Cookie header containing `token=...`), and paste a MakerWorld model-page
-URL. A `#profileId-...` fragment selects that published print profile. Without a
+In **Account settings → MakerWorld**, save your own MakerWorld token cookie
+(or a Cookie header containing `token=...`). This personal settings page is
+available from the navigation and account menu to users who can upload. Then
+on **Upload**, choose a writable library and paste a MakerWorld model-page URL.
+A `#profileId-...` fragment selects that published print profile. Without a
 fragment, the first published profile is imported.
 
 The worker fetches the model's title, creator, description, tags, license, source

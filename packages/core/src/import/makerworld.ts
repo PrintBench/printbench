@@ -116,7 +116,13 @@ const designSchema = z.object({
     .object({ name: z.string().max(512), handle: z.string().max(256).optional() })
     .nullish(),
   instances: z
-    .array(z.object({ id: numericId, title: z.string().max(1000).default('') }))
+    .array(
+      z.object({
+        id: numericId,
+        profileId: numericId.optional(),
+        title: z.string().max(1000).default(''),
+      }),
+    )
     .max(1000)
     .default([]),
 })
@@ -197,6 +203,11 @@ export async function fetchMakerWorldModel(
     } catch {
       throw new ImportProviderError('UNAVAILABLE', 'MakerWorld could not be reached')
     }
+    if (response.status === 400)
+      throw new ImportProviderError(
+        'INVALID_RESPONSE',
+        'MakerWorld rejected the model or print profile',
+      )
     if (response.status === 401)
       throw new ImportProviderError(
         'AUTH_REQUIRED',
@@ -281,8 +292,18 @@ export async function fetchMakerWorldModel(
     )
   }
   for (const profileId of new Set(selected)) {
+    // The URL fragment uses the instance id; the download API uses profileId.
+    // Never guess between them: they identify different provider records.
+    const internalId = design.instances.find(
+      (profile) => String(profile.id) === profileId,
+    )?.profileId
+    if (!internalId)
+      throw new ImportProviderError(
+        'INVALID_RESPONSE',
+        'MakerWorld did not provide a download profile ID',
+      )
     const response = await getJson(
-      `/v1/iot-service/api/user/profile/${profileId}?model_id=${encodeURIComponent(design.modelId)}`,
+      `/v1/iot-service/api/user/profile/${internalId}?model_id=${encodeURIComponent(design.modelId)}`,
       true,
     )
     const download = z

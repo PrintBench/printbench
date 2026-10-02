@@ -7,9 +7,7 @@ import {
   MakerWorldImportError,
   markMakerWorldImportQueueFailed,
   createMakerWorldImport,
-  getMakerWorldCookieStatus,
   getMakerWorldImportStatus,
-  saveMakerWorldCookie,
 } from '@pb/core'
 import { getDb } from '@pb/db'
 import { getStartedQueue, JOB } from '@pb/jobs'
@@ -37,29 +35,6 @@ function failure(error: unknown, message: string): Failure {
         : error instanceof MakerWorldImportError
           ? error.message
           : message,
-  }
-}
-
-export async function readMakerWorldCookieStatus(): Promise<
-  { ok: true; saved: boolean } | Failure
-> {
-  try {
-    const user = await authorize()
-    return { ok: true, saved: await getMakerWorldCookieStatus(getDb(), user.id) }
-  } catch (error) {
-    return failure(error, 'Could not check your MakerWorld connection.')
-  }
-}
-
-export async function setMakerWorldCookie(
-  cookie: string,
-): Promise<{ ok: true; saved: boolean } | Failure> {
-  try {
-    const user = await authorize()
-    await saveMakerWorldCookie(getDb(), user.id, cookie)
-    return { ok: true, saved: await getMakerWorldCookieStatus(getDb(), user.id) }
-  } catch (error) {
-    return failure(error, 'Could not save your MakerWorld cookie. Check its value and try again.')
   }
 }
 

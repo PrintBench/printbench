@@ -6,8 +6,6 @@ const mocks = vi.hoisted(() => ({
   assertCan: vi.fn(),
   create: vi.fn(),
   status: vi.fn(),
-  cookieStatus: vi.fn(),
-  saveCookie: vi.fn(),
   queueFailed: vi.fn(),
   send: vi.fn(),
 }))
@@ -20,8 +18,6 @@ vi.mock('@pb/core', () => ({
   assertCan: mocks.assertCan,
   createMakerWorldImport: mocks.create,
   getMakerWorldImportStatus: mocks.status,
-  getMakerWorldCookieStatus: mocks.cookieStatus,
-  saveMakerWorldCookie: mocks.saveCookie,
   markMakerWorldImportQueueFailed: mocks.queueFailed,
 }))
 vi.mock('@pb/jobs', () => ({
@@ -30,19 +26,13 @@ vi.mock('@pb/jobs', () => ({
 }))
 
 import { PolicyError } from '@pb/core'
-import {
-  pollMakerWorldImport,
-  readMakerWorldCookieStatus,
-  setMakerWorldCookie,
-  startMakerWorldImport,
-} from './makerworld-actions'
+import { pollMakerWorldImport, startMakerWorldImport } from './makerworld-actions'
 
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.requireUser.mockResolvedValue(mocks.user)
   mocks.create.mockResolvedValue({ id: 'import-id' })
   mocks.send.mockResolvedValue('job-id')
-  mocks.cookieStatus.mockResolvedValue(true)
 })
 
 describe('MakerWorld action boundaries', () => {
@@ -51,15 +41,13 @@ describe('MakerWorld action boundaries', () => {
       throw new PolicyError('file:upload')
     })
     const results = await Promise.all([
-      readMakerWorldCookieStatus(),
-      setMakerWorldCookie('secret'),
       startMakerWorldImport({ libraryId: 'lib', url: 'https://makerworld.com/en/models/1' }),
       pollMakerWorldImport('someone-elses-import'),
     ])
     expect(results.every((result) => !result.ok)).toBe(true)
-    expect(mocks.requireUser).toHaveBeenCalledTimes(4)
+    expect(mocks.requireUser).toHaveBeenCalledTimes(2)
     expect(mocks.assertCan).toHaveBeenCalledWith(mocks.user, 'file:upload')
-    for (const service of [mocks.create, mocks.status, mocks.cookieStatus, mocks.saveCookie]) {
+    for (const service of [mocks.create, mocks.status]) {
       expect(service).not.toHaveBeenCalled()
     }
   })
@@ -101,13 +89,5 @@ describe('MakerWorld action boundaries', () => {
     })
     expect(mocks.queueFailed).toHaveBeenCalledWith('db', mocks.user.id, 'import-id')
     expect(result).toEqual({ ok: false, error: 'Could not queue the import. Please try again.' })
-  })
-
-  it('returns only cookie status and hides unexpected credential errors', async () => {
-    expect(await setMakerWorldCookie('secret-cookie')).toEqual({ ok: true, saved: true })
-    expect(mocks.saveCookie).toHaveBeenCalledWith('db', mocks.user.id, 'secret-cookie')
-    mocks.saveCookie.mockRejectedValue(new Error('secret-cookie'))
-    const result = await setMakerWorldCookie('secret-cookie')
-    expect(JSON.stringify(result)).not.toContain('secret-cookie')
   })
 })

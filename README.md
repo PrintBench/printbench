@@ -124,8 +124,8 @@ web shell is replaceable without touching the app.
   licenses, source-file dates and covers are read by the worker, with existing
   edits and sidecars taking precedence.
 - **MakerWorld links import files and details.** Save your own account cookie
-  on Upload, paste a model URL, and the worker imports its selected print profile
-  with metadata and a source link. See [Model imports](docs/model-imports.md) for
+  in Account settings → MakerWorld, then paste a model URL on Upload. The worker
+  imports its selected print profile with metadata and a source link. See [Model imports](docs/model-imports.md) for
   session requirements, limits and the unofficial API caveat.
 - **S3 is a full backend, not just a source.** A library can live on local
   disk, a NAS mount or an S3-compatible bucket, and read _and_ write the same

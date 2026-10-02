@@ -15,7 +15,7 @@ const design = {
   coverUrl: 'https://makerworld.bblmw.com/cover.png',
   instances: [
     { id: 456, profileId: 999, title: 'Default' },
-    { id: 789, title: 'Alternate' },
+    { id: 789, profileId: 1001, title: 'Alternate' },
   ],
 }
 const response = (body: unknown, status = 200) => ({
@@ -58,7 +58,7 @@ describe('MakerWorld provider', () => {
     expect(model.files).toEqual([{ profileId: '789', filename: 'Useful Model.3mf', url }])
     expect(request.mock.calls[0]?.[1].headers).toEqual({})
     expect(request.mock.calls[1]?.[0]).toBe(
-      'https://api.bambulab.com/v1/iot-service/api/user/profile/789?model_id=USexample',
+      'https://api.bambulab.com/v1/iot-service/api/user/profile/1001?model_id=USexample',
     )
     expect(request.mock.calls[1]?.[1].headers).toEqual({ Authorization: 'Bearer own.token' })
   })
@@ -73,6 +73,9 @@ describe('MakerWorld provider', () => {
     })
     expect(model.files).toHaveLength(1)
     expect(model.files[0]?.profileId).toBe('456')
+    expect(request.mock.calls[1]?.[0]).toBe(
+      'https://api.bambulab.com/v1/iot-service/api/user/profile/999?model_id=USexample',
+    )
     request
       .mockReset()
       .mockResolvedValueOnce(response(design))
@@ -87,6 +90,16 @@ describe('MakerWorld provider', () => {
     ).toHaveLength(1)
   })
 
+  it('refuses a missing internal profile ID instead of sending the page ID', async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValue(response({ ...design, instances: [{ id: 456, title: 'Default' }] }))
+    await expect(
+      fetchMakerWorldModel('https://makerworld.com/models/123', 'value', { request }),
+    ).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+    expect(request).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects a profile not belonging to the resolved design before an authenticated request', async () => {
     const request = vi.fn().mockResolvedValue(response(design))
     await expect(
@@ -96,6 +109,7 @@ describe('MakerWorld provider', () => {
   })
 
   it.each([
+    [400, 'INVALID_RESPONSE'],
     [401, 'AUTH_REQUIRED'],
     [403, 'FORBIDDEN'],
     [404, 'NOT_FOUND'],
