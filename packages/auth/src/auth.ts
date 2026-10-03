@@ -1,9 +1,11 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { and, eq } from 'drizzle-orm'
 import { betterAuth } from 'better-auth'
 import { hashPassword, verifyPassword } from 'better-auth/crypto'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins/admin'
 import { nextCookies } from 'better-auth/next-js'
-import { getDb, schema } from '@pb/db'
+import { getDb, schema, type Database } from '@pb/db'
 import { ROLES, type Role } from './roles'
 
 /**
@@ -16,7 +18,7 @@ import { ROLES, type Role } from './roles'
  * module during the build, where DATABASE_URL is legitimately absent. Deferring
  * to first request also means a database blip at boot does not kill the process.
  */
-let instance: ReturnType<typeof build> | undefined
+let instance: ReturnType<typeof createAuth> | undefined
 
 export const PASSWORD_MIN_LENGTH = 10
 export const PASSWORD_MAX_LENGTH = 200
@@ -25,8 +27,8 @@ export const PASSWORD_MAX_LENGTH = 200
 export const hashAccountPassword = hashPassword
 export const verifyAccountPassword = verifyPassword
 
-export function getAuth(): ReturnType<typeof build> {
-  instance ??= build()
+export function getAuth(): ReturnType<typeof createAuth> {
+  instance ??= createAuth(getDb())
   return instance
 }
 
@@ -63,16 +65,106 @@ function trustedOrigins(): string[] {
   ].filter((origin): origin is string => Boolean(origin))
 }
 
-function build() {
-  const baseURL = configuredBaseUrl()
+/** Builds the same auth instance against an explicit pool for isolated tests. */
+export function createAuth(database: Database): ReturnType<typeof buildNativeAuth> {
+  type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0]
+  const transactions = new AsyncLocalStorage<Transaction>()
+  // The supported Drizzle adapter reads the supplied database on each operation.
+  // Keep its queries (including new-session creation) in the credential lock's
+  // transaction, while unrelated requests continue using the normal pool.
+  const requestDatabase = new Proxy(database, {
+    get(target, property) {
+      const current = transactions.getStore() ?? target
+      const value: unknown = Reflect.get(current, property, current)
+      return typeof value === 'function' ? value.bind(current) : value
+    },
+  })
 
+  const auth = buildNativeAuth(requestDatabase)
+
+  class FailedAuthResponse extends Error {
+    constructor(readonly response: Response) {
+      super('Authentication endpoint failed')
+    }
+  }
+
+  async function serializePasswordChange<T>(
+    headers:
+      | NonNullable<
+          Parameters<ReturnType<typeof buildNativeAuth>['api']['getSession']>[0]
+        >['headers']
+      | undefined,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    if (!headers) return run()
+    // Identify the cookie's user without refreshing it. The native endpoint
+    // re-reads the session after the lock: a reset that won the race has revoked
+    // it, and must not let this request verify an old hash or mint a new session.
+    const session = await api.getSession({
+      headers,
+      query: { disableRefresh: true, disableCookieCache: true },
+    })
+    if (!session) return run()
+    try {
+      return await database.transaction(async (tx) => {
+        await tx.select().from(schema.user).where(eq(schema.user.id, session.user.id)).for('update')
+        await tx
+          .select()
+          .from(schema.account)
+          .where(
+            and(
+              eq(schema.account.userId, session.user.id),
+              eq(schema.account.providerId, 'credential'),
+            ),
+          )
+          .for('update')
+        return transactions.run(tx, async () => {
+          const result = await run()
+          // HTTP endpoints return error Responses instead of throwing. Ensure
+          // a failed mutation also rolls back any writes preceding that error.
+          if (result instanceof Response && !result.ok) throw new FailedAuthResponse(result)
+          return result
+        })
+      })
+    } catch (error) {
+      if (error instanceof FailedAuthResponse) return error.response as T
+      throw error
+    }
+  }
+
+  const nativeChangePassword = auth.api.changePassword
+  const api = {
+    ...auth.api,
+    changePassword: Object.assign(
+      ((input: Parameters<typeof nativeChangePassword>[0]) =>
+        serializePasswordChange(input?.headers ?? input?.request?.headers, () =>
+          nativeChangePassword(input),
+        )) as typeof nativeChangePassword,
+      { path: nativeChangePassword.path, options: nativeChangePassword.options },
+    ),
+  }
+  return {
+    ...auth,
+    api,
+    handler: (request: Request): Promise<Response> => {
+      const pathname = new URL(request.url).pathname.replace(/\/+$/, '')
+      if (request.method === 'POST' && pathname.endsWith(nativeChangePassword.path)) {
+        return serializePasswordChange(request.headers, () => auth.handler(request))
+      }
+      return auth.handler(request)
+    },
+  }
+}
+
+function buildNativeAuth(database: Database) {
+  const baseURL = configuredBaseUrl()
   return betterAuth({
     appName: 'PrintBench',
     baseURL,
     trustedOrigins: trustedOrigins(),
     secret: process.env.BETTER_AUTH_SECRET,
 
-    database: drizzleAdapter(getDb(), {
+    database: drizzleAdapter(database, {
       provider: 'pg',
       schema: {
         user: schema.user,
@@ -140,6 +232,6 @@ function build() {
   })
 }
 
-export type Auth = ReturnType<typeof build>
+export type Auth = ReturnType<typeof createAuth>
 export type Session = Auth['$Infer']['Session']
 export type AuthUser = Session['user'] & { role?: Role | null }
