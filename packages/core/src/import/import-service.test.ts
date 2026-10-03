@@ -5,6 +5,12 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { eq, inArray } from 'drizzle-orm'
+import { LocalAdapter } from '../storage/local-adapter'
+import { scanLibrary } from '../scan/scan-service'
+import {
+  applyEmbeddedModelMetadata,
+  isEmbeddedMetadataSource,
+} from '../services/embedded-metadata-service'
 import { createDb, schema } from '@pb/db'
 import { decryptSecret } from '../security/secret-box'
 import { searchModels } from '../search/search-service'
@@ -485,6 +491,162 @@ describeDb('model source import service', () => {
     expect(models[0]?.name).toBe('My chosen name')
   })
 
+  it('rolls back newly published files if a scan aborts before reserving the imported model', async () => {
+    const { id } = await queued()
+    await db.insert(schema.models).values(
+      Array.from({ length: 5 }, (_, index) => ({
+        libraryId,
+        path: `Unavailable-${index}`,
+        name: `Unavailable ${index}`,
+        slug: `unavailable-${index}`,
+        publicId: `gone-${randomUUID()}`,
+      })),
+    )
+    await processMakerWorldImport(db, id, dependencies())
+    expect(await job(id)).toMatchObject({ state: 'failed', modelId: null })
+    expect(await filesOnDisk()).toHaveLength(0)
+    const location = {
+      id: libraryId,
+      kind: 'managed' as const,
+      backend: 'local' as const,
+      path: root,
+      allowWrites: true,
+    }
+    expect(
+      (
+        await scanLibrary(
+          { db, storage: new LocalAdapter(location), library: location },
+          { force: true },
+        )
+      ).status,
+    ).toBe('succeeded')
+  })
+
+  it('reserves source metadata while a normal scan overlaps publication of a metadata-free 3MF', async () => {
+    const { id } = await queued()
+    const deps = dependencies()
+    const location = {
+      id: libraryId,
+      kind: 'managed' as const,
+      backend: 'local' as const,
+      path: root,
+      allowWrites: true,
+    }
+    const storage = new LocalAdapter(location)
+    const health = vi.spyOn(storage, 'healthCheck')
+    let metadataEntered!: () => void
+    let releaseMetadata!: () => void
+    let scanAttempted!: () => void
+    const metadataStarted = new Promise<void>((resolve) => {
+      metadataEntered = resolve
+    })
+    const held = new Promise<void>((resolve) => {
+      releaseMetadata = resolve
+    })
+    const scanWaiting = new Promise<void>((resolve) => {
+      scanAttempted = resolve
+    })
+    const originalTransaction = db.transaction.bind(db)
+    let count = 0
+    const transaction = vi.spyOn(db, 'transaction').mockImplementation((callback, config) =>
+      originalTransaction(async (tx) => {
+        const execute = tx.execute.bind(tx)
+        tx.execute = ((query: Parameters<typeof tx.execute>[0]) =>
+          execute(query).then((result) => {
+            if ((result.rows[0] as { acquired?: boolean } | undefined)?.acquired === false)
+              scanAttempted()
+            return result
+          })) as typeof tx.execute
+        // Import-id lease, library lease, atomic model reservation, then metadata.
+        if (++count === 4) {
+          metadataEntered()
+          await held
+        }
+        return callback(tx)
+      }, config),
+    )
+    const importing = processMakerWorldImport(db, id, deps)
+    let scanning: ReturnType<typeof scanLibrary> | undefined
+    try {
+      await metadataStarted
+      const reserved = await job(id)
+      expect(reserved).toMatchObject({ state: 'importing' })
+      expect(reserved.modelId).not.toBeNull()
+      const [file] = await db
+        .select()
+        .from(schema.modelFiles)
+        .where(eq(schema.modelFiles.modelId, reserved.modelId!))
+      expect(await isEmbeddedMetadataSource(db, reserved.modelId!, file!.id)).toBe(false)
+      // An already delivered analysis job must not turn an empty metadata
+      // result into authority and prevent the provider's description from saving.
+      expect(await applyEmbeddedModelMetadata(db, reserved.modelId!, file!.id, {})).toMatchObject({
+        applied: false,
+        reason: 'Source import metadata is reserved.',
+      })
+      scanning = scanLibrary(
+        { db, storage, library: location },
+        {
+          onDerivedWork: async (ids) => {
+            for (const fileId of ids)
+              await applyEmbeddedModelMetadata(db, reserved.modelId!, fileId, {})
+          },
+        },
+      )
+      await scanWaiting
+      expect(health).not.toHaveBeenCalled()
+      releaseMetadata()
+      await importing
+      expect((await scanning).status).toBe('succeeded')
+      const completed = await job(id)
+      expect(completed).toMatchObject({ state: 'complete', modelId: reserved.modelId, error: null })
+      const models = await db
+        .select()
+        .from(schema.models)
+        .where(eq(schema.models.libraryId, libraryId))
+      expect(models).toHaveLength(1)
+      expect(models[0]).toMatchObject({
+        name: fixture.title,
+        notes: fixture.description,
+        license: fixture.license,
+        embeddedMetadataState: 'done',
+      })
+      const [creator] = await db
+        .select()
+        .from(schema.creators)
+        .where(eq(schema.creators.id, models[0]!.creatorId!))
+      expect(creator?.name).toBe(fixture.creator!.name)
+      const tags = await db
+        .select({ name: schema.tags.name })
+        .from(schema.modelTags)
+        .innerJoin(schema.tags, eq(schema.tags.id, schema.modelTags.tagId))
+        .where(eq(schema.modelTags.modelId, reserved.modelId!))
+      expect(tags.map((tag) => tag.name)).toEqual(fixture.tags)
+      expect(
+        (
+          await db
+            .select()
+            .from(schema.modelLinks)
+            .where(eq(schema.modelLinks.modelId, reserved.modelId!))
+        )[0]?.url,
+      ).toBe(sourceUrl)
+      expect(
+        await db
+          .select()
+          .from(schema.modelFiles)
+          .where(eq(schema.modelFiles.modelId, reserved.modelId!)),
+      ).toHaveLength(1)
+      expect(await readFile(path.join(root, models[0]!.path, 'profile-456.3mf'))).toEqual(
+        modelBytes,
+      )
+    } finally {
+      releaseMetadata()
+      await importing
+      await scanning
+      transaction.mockRestore()
+      health.mockRestore()
+    }
+  })
+
   it('keeps progress visible while a concurrent duplicate delivery exits without downloading', async () => {
     const { id } = await queued()
     const deps = dependencies()
@@ -685,19 +847,16 @@ describeDb('model source import service', () => {
     // boundary, after metadata updates but before provenance commits.
     const deps = dependencies()
     const originalTransaction = db.transaction.bind(db)
-    const transaction = vi
-      .spyOn(db, 'transaction')
-      .mockImplementationOnce((callback, config) => originalTransaction(callback, config))
-      .mockImplementationOnce((callback, config) =>
-        originalTransaction(async (tx) => {
-          const originalInsert = tx.insert.bind(tx)
-          tx.insert = ((table: Parameters<typeof tx.insert>[0]) => {
-            if (table === schema.modelLinks) throw new Error('Injected provenance failure')
-            return originalInsert(table)
-          }) as typeof tx.insert
-          return callback(tx)
-        }, config),
-      )
+    const transaction = vi.spyOn(db, 'transaction').mockImplementation((callback, config) =>
+      originalTransaction(async (tx) => {
+        const originalInsert = tx.insert.bind(tx)
+        tx.insert = ((table: Parameters<typeof tx.insert>[0]) => {
+          if (table === schema.modelLinks) throw new Error('Injected provenance failure')
+          return originalInsert(table)
+        }) as typeof tx.insert
+        return callback(tx)
+      }, config),
+    )
     try {
       await processMakerWorldImport(db, id, deps)
     } finally {
@@ -726,6 +885,39 @@ describeDb('model source import service', () => {
       await db.select().from(schema.modelLinks).where(eq(schema.modelLinks.modelId, model!.id)),
     ).toHaveLength(0)
 
+    const [reservedFile] = await db
+      .select()
+      .from(schema.modelFiles)
+      .where(eq(schema.modelFiles.modelId, model!.id))
+    expect((await job(id)).modelId).toBe(model!.id)
+    expect(await isEmbeddedMetadataSource(db, model!.id, reservedFile!.id)).toBe(false)
+    expect(await applyEmbeddedModelMetadata(db, model!.id, reservedFile!.id, {})).toMatchObject({
+      applied: false,
+      reason: 'Source import metadata is reserved.',
+    })
+    // A failed metadata transaction must release the library mutex: ordinary
+    // scans still index geometry, while the failed source job reserves metadata.
+    expect(
+      (
+        await scanLibrary({
+          db,
+          storage: new LocalAdapter({
+            id: libraryId,
+            kind: 'managed',
+            backend: 'local',
+            path: root,
+            allowWrites: true,
+          }),
+          library: {
+            id: libraryId,
+            kind: 'managed',
+            backend: 'local',
+            path: root,
+            allowWrites: true,
+          },
+        })
+      ).status,
+    ).toBe('succeeded')
     await updateModel(db, model!.id, {
       name: 'My repaired bracket',
       notes: 'My own assembly instructions.',

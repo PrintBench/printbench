@@ -28,6 +28,8 @@ export async function isEmbeddedMetadataSource(
   const result = await db.execute<{ id: string }>(sql`
     SELECT model_files.id FROM model_files JOIN models ON models.id = model_files.model_id
     WHERE models.id = ${modelId} AND models.embedded_metadata_state = 'pending'
+      AND NOT EXISTS (SELECT 1 FROM model_imports i
+        WHERE i.model_id = models.id AND i.state <> 'complete')
       AND lower(model_files.extension) = '3mf' AND model_files.missing_at IS NULL
     ORDER BY model_files.filename COLLATE "C", model_files.id LIMIT 1
   `)
@@ -56,6 +58,11 @@ export async function applyEmbeddedModelMetadata(
     if (!locked.rows[0] || locked.rows[0].embedded_metadata_state !== 'pending') {
       return { applied: false, reason: 'Metadata is already authoritative.' }
     }
+    const reserved = await tx.execute<{ id: string }>(sql`
+      SELECT id FROM model_imports WHERE model_id = ${modelId} AND state <> 'complete' LIMIT 1
+    `)
+    if (reserved.rows.length)
+      return { applied: false, reason: 'Source import metadata is reserved.' }
     const canonical = await tx.execute<{ id: string }>(sql`
       SELECT id FROM model_files
       WHERE model_id = ${modelId} AND lower(extension) = '3mf' AND missing_at IS NULL

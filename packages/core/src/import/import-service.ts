@@ -6,7 +6,8 @@ import { schema } from '@pb/db'
 import { assertCan } from '../policy/policy'
 import { decryptSecret, encryptSecret } from '../security/secret-box'
 import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
-import { scanLibrary } from '../scan/scan-service'
+import { scanLibraryUnderLock } from '../scan/scan-service'
+import { withLibraryScanLock } from '../scan/library-scan-lock'
 import { updateModel, syncSidecar } from '../services/model-service'
 import type { StorageAdapter } from '../storage/types'
 import {
@@ -378,95 +379,119 @@ async function runMakerWorldImport(
         // Optional remote artwork never blocks a usable 3MF import.
       }
     }
-    for (const file of staged) await storage.move(file.from, file.to)
-    const derived: string[] = []
-    const location = { ...libraryLocationFromRow(library), groupingMode: library.groupingMode }
-    const outcome = await scanLibrary(
-      { db, storage, library: location },
-      {
-        mode: 'deep',
-        onDerivedWork: (ids) => {
-          derived.push(...ids)
-        },
-      },
-    )
-    if (outcome.status !== 'succeeded')
-      throw new MakerWorldImportError(
-        'Files were downloaded, but the library scan could not finish. Try again.',
-      )
-    const [imported] = await db
-      .select()
-      .from(schema.models)
-      .where(and(eq(schema.models.libraryId, library.id), eq(schema.models.path, folder)))
-      .limit(1)
-    if (!imported)
-      throw new MakerWorldImportError('The library could not index the downloaded model.')
-    // Metadata and its provenance marker commit together. A row lock also
-    // preserves an edit made after an interrupted attempt, even without a link.
-    await db.transaction(async (transaction) => {
-      const tx = transaction as unknown as Database
-      const locked = await tx.execute<{ embedded_metadata_state: string }>(sql`
+    await withLibraryScanLock(db, library.id, async (lease) => {
+      const published: string[] = []
+      try {
+        for (const file of staged) {
+          await storage.move(file.from, file.to)
+          published.push(file.to)
+        }
+        const derived: string[] = []
+        const location = { ...libraryLocationFromRow(library), groupingMode: library.groupingMode }
+        const outcome = await scanLibraryUnderLock(
+          { db, storage, library: location },
+          {
+            mode: 'deep',
+            onDerivedWork: (ids) => {
+              derived.push(...ids)
+            },
+          },
+          lease,
+          { id: job.id, modelPath: folder },
+        )
+        if (outcome.status !== 'succeeded')
+          throw new MakerWorldImportError(
+            'Files were downloaded, but the library scan could not finish. Try again.',
+          )
+        const [imported] = await db
+          .select()
+          .from(schema.models)
+          .where(and(eq(schema.models.libraryId, library.id), eq(schema.models.path, folder)))
+          .limit(1)
+        if (!imported)
+          throw new MakerWorldImportError('The library could not index the downloaded model.')
+        // Metadata and its provenance marker commit together. A row lock also
+        // preserves an edit made after an interrupted attempt, even without a link.
+        await db.transaction(async (transaction) => {
+          const tx = transaction as unknown as Database
+          const locked = await tx.execute<{ embedded_metadata_state: string }>(sql`
         SELECT embedded_metadata_state FROM models WHERE id = ${imported.id} FOR UPDATE
       `)
-      if (!locked.rows[0]) throw new MakerWorldImportError('The downloaded model no longer exists.')
-      const [previousSource] = await tx
-        .select({ id: schema.modelLinks.id })
-        .from(schema.modelLinks)
-        .where(
-          and(
-            eq(schema.modelLinks.modelId, imported.id),
-            eq(schema.modelLinks.url, model.sourceUrl),
-          ),
-        )
-        .limit(1)
-      if (!previousSource && locked.rows[0].embedded_metadata_state === 'pending') {
-        const saved = await updateModel(
-          tx,
-          imported.id,
-          {
-            name: model.title,
-            notes: model.description,
-            license: model.license?.slice(0, 120) ?? null,
-            creator: model.creator?.name ?? null,
-            tags: model.tags,
-          },
-          { deferSidecar: true },
-        )
-        if (!saved.ok)
-          throw new MakerWorldImportError('The downloaded model metadata could not be saved.')
-      }
-      await tx
-        .insert(schema.modelLinks)
-        .values({
-          modelId: imported.id,
-          url: model.sourceUrl,
-          host: new URL(model.sourceUrl).hostname,
-          title:
-            parsed.provider === 'makerworld'
-              ? 'MakerWorld'
-              : parsed.provider === 'printables'
-                ? 'Printables'
-                : 'Thingiverse',
+          if (!locked.rows[0])
+            throw new MakerWorldImportError('The downloaded model no longer exists.')
+          const [previousSource] = await tx
+            .select({ id: schema.modelLinks.id })
+            .from(schema.modelLinks)
+            .where(
+              and(
+                eq(schema.modelLinks.modelId, imported.id),
+                eq(schema.modelLinks.url, model.sourceUrl),
+              ),
+            )
+            .limit(1)
+          if (!previousSource && locked.rows[0].embedded_metadata_state === 'pending') {
+            const saved = await updateModel(
+              tx,
+              imported.id,
+              {
+                name: model.title,
+                notes: model.description,
+                license: model.license?.slice(0, 120) ?? null,
+                creator: model.creator?.name ?? null,
+                tags: model.tags,
+              },
+              { deferSidecar: true },
+            )
+            if (!saved.ok)
+              throw new MakerWorldImportError('The downloaded model metadata could not be saved.')
+          }
+          await tx
+            .insert(schema.modelLinks)
+            .values({
+              modelId: imported.id,
+              url: model.sourceUrl,
+              host: new URL(model.sourceUrl).hostname,
+              title:
+                parsed.provider === 'makerworld'
+                  ? 'MakerWorld'
+                  : parsed.provider === 'printables'
+                    ? 'Printables'
+                    : 'Thingiverse',
+            })
+            .onConflictDoNothing()
         })
-        .onConflictDoNothing()
+        await syncSidecar(db, imported.id)
+        // A retry may find already-indexed files after queueing failed. Include the
+        // imported model's live files so that those jobs are not lost on replay.
+        const liveFiles = await db
+          .select({ id: schema.modelFiles.id })
+          .from(schema.modelFiles)
+          .where(
+            and(
+              eq(schema.modelFiles.modelId, imported.id),
+              sql`${schema.modelFiles.missingAt} is null`,
+            ),
+          )
+        await deps.onDerivedWork?.([...new Set([...derived, ...liveFiles.map((file) => file.id)])])
+        await db
+          .update(schema.modelImports)
+          .set({ state: 'complete', modelId: imported.id, error: null, updatedAt: new Date() })
+          .where(eq(schema.modelImports.id, id))
+      } catch (error) {
+        const [reservation] = await db
+          .select({ modelId: schema.modelImports.modelId })
+          .from(schema.modelImports)
+          .where(eq(schema.modelImports.id, id))
+          .limit(1)
+        if (!reservation?.modelId) {
+          // A scan can abort before indexing the folder. Roll back only files
+          // published by this attempt, while scans still cannot see them. Files
+          // of a reserved model stay available for a deliberate metadata retry.
+          for (const file of published) await storage.remove(file)
+        }
+        throw error
+      }
     })
-    await syncSidecar(db, imported.id)
-    // A retry may find already-indexed files after queueing failed. Include the
-    // imported model's live files so that those jobs are not lost on replay.
-    const liveFiles = await db
-      .select({ id: schema.modelFiles.id })
-      .from(schema.modelFiles)
-      .where(
-        and(
-          eq(schema.modelFiles.modelId, imported.id),
-          sql`${schema.modelFiles.missingAt} is null`,
-        ),
-      )
-    await deps.onDerivedWork?.([...new Set([...derived, ...liveFiles.map((file) => file.id)])])
-    await db
-      .update(schema.modelImports)
-      .set({ state: 'complete', modelId: imported.id, error: null, updatedAt: new Date() })
-      .where(eq(schema.modelImports.id, id))
   } catch (error) {
     // Never persist arbitrary network errors or signed URLs, let alone a token.
     const message =
