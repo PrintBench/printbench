@@ -40,9 +40,13 @@ services:
       ACCEL_MOUNTS: /_protected/library/=/libraries,/_protected/managed/=/data/libraries
     volumes:
       - previews:/data
-      # Existing collections are read-only by default. Set LIBRARY_MODE=rw
+      # Existing collections are read-only by default. Set LIBRARY_READ_ONLY=false
       # only when PrintBench should be allowed to save metadata sidecars.
-      - ${LIBRARY_PATH:-./libraries}:/libraries:${LIBRARY_MODE:-ro}
+      # Long syntax keeps interpolation colons out of Coolify's volume parser.
+      - type: bind
+        source: ${LIBRARY_PATH:-./libraries}
+        target: /libraries
+        read_only: ${LIBRARY_READ_ONLY:-true}
     healthcheck:
       # The standalone server binds the container interface, not loopback.
       # Double-dollar defers hostname expansion until the check runs in Docker.
@@ -66,7 +70,10 @@ services:
       WORKER_MEMORY_LOG: ${WORKER_MEMORY_LOG:-0}
     volumes:
       - previews:/data
-      - ${LIBRARY_PATH:-./libraries}:/libraries:${LIBRARY_MODE:-ro}
+      - type: bind
+        source: ${LIBRARY_PATH:-./libraries}
+        target: /libraries
+        read_only: ${LIBRARY_READ_ONLY:-true}
 
   nginx:
     build: { context: ., dockerfile: docker/nginx.Dockerfile }
@@ -76,7 +83,10 @@ services:
       - '80'
     volumes:
       - previews:/data:ro
-      - ${LIBRARY_PATH:-./libraries}:/libraries:ro
+      - type: bind
+        source: ${LIBRARY_PATH:-./libraries}
+        target: /libraries
+        read_only: true
 
 volumes:
   pgdata:
