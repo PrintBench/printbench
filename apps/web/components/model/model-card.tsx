@@ -23,12 +23,15 @@ export interface ModelCardProps {
   fileCount: number
   totalSize: number
   libraryName?: string
+  /** Printable model format, independent of the file used as its artwork. */
   previewExtension?: string | null
   isPackage?: boolean
   /** Selected creator-supplied image, served directly instead of as a generated mesh thumbnail. */
   previewImageFileId?: string | null
   /** Set once a thumbnail has been rendered for the preview file. */
   thumbFileId?: string | null
+  /** Content-addressed cache version; changes when the thumbnail is regenerated. */
+  thumbKey?: string | null
   dimensions?: string | null
 }
 
@@ -43,6 +46,7 @@ export function ModelCard({
   isPackage,
   previewImageFileId,
   thumbFileId,
+  thumbKey,
   dimensions,
 }: ModelCardProps) {
   const hue = hashHue(publicId)
@@ -77,7 +81,7 @@ export function ModelCard({
             src={
               previewImageFileId
                 ? `/api/files/${previewImageFileId}/raw?inline=1`
-                : `/api/files/${thumbFileId}/thumb`
+                : `/api/files/${thumbFileId}/thumb${thumbKey ? `?v=${encodeURIComponent(thumbKey)}` : ''}`
             }
             alt=""
             loading="lazy"

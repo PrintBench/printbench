@@ -15,6 +15,8 @@ const config: NextConfig = {
   // Workspace packages are shipped as TypeScript source, not built dist output.
   transpilePackages: ['@pb/db', '@pb/core', '@pb/auth', '@pb/mesh'],
   typedRoutes: true,
+  // Server Functions can receive credentials. Never log their arguments.
+  logging: { serverFunctions: false },
 
   /*
    * ZIP downloads are built by the worker process, not this one. In production

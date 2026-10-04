@@ -14,6 +14,7 @@ import {
   isLiked,
   listCollections,
   listPrints,
+  modelGeometrySql,
   openRequestsForModel,
   printStats,
   printSuggestions,
@@ -23,7 +24,7 @@ import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatBytes, formatDimensions } from '@/components/model/model-card'
-import { ModelViewer } from '@/components/viewer/model-viewer'
+import { ModelPreview } from '@/components/viewer/model-preview'
 import { DownloadModelButton } from './download-button'
 import { ModelEditor } from './model-editor'
 import { FileTree } from './file-tree'
@@ -52,6 +53,9 @@ type ModelDetail = {
   missing_at: string | null
   share_token: string | null
   preview_file_id: string | null
+  bbox_x: string | null
+  bbox_y: string | null
+  bbox_z: string | null
   library_name: string
   library_path: string
   /** Only a library this app owns may have its files deleted. */
@@ -76,6 +80,7 @@ type FileRow = {
   presupported: boolean
   missing_at: string | null
   thumb_state: string
+  thumb_key: string | null
   triangle_count: number | null
   bbox_x: string | null
   bbox_y: string | null
@@ -99,9 +104,11 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
            m.file_count, m.total_size, m.is_file_model, m.is_package,
            m.missing_at, m.share_token,
            m.preview_file_id,
+           geometry.bbox_x, geometry.bbox_y, geometry.bbox_z,
            l.name AS library_name, l.path AS library_path,
            (l.kind = 'managed' OR l.allow_writes) AS library_writable
     FROM models m JOIN libraries l ON l.id = m.library_id
+    LEFT JOIN LATERAL (${modelGeometrySql(sql`m.id`, sql`m.preview_file_id`)}) geometry ON true
     WHERE m.public_id = ${publicId} LIMIT 1
   `)
 
@@ -137,7 +144,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const files = await db.execute<FileRow>(sql`
     SELECT id, filename, extension, category, size, previewable, presupported, missing_at,
-           thumb_state, triangle_count, bbox_x, bbox_y, bbox_z
+           thumb_state, thumb_key, triangle_count, bbox_x, bbox_y, bbox_z
     FROM model_files WHERE model_id = ${model.id}
     ORDER BY category, filename
   `)
@@ -177,6 +184,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const creator = meta.rows[0]?.creator ?? null
   const creatorId = meta.rows[0]?.creator_id ?? null
   const tags = meta.rows[0]?.tags ?? []
+  const sources = await db.execute<{ url: string; title: string | null }>(sql`
+    SELECT url, title FROM model_links WHERE model_id = ${model.id} ORDER BY position, url
+  `)
+  const safeSources = sources.rows.filter((source) => {
+    try {
+      return ['https:', 'http:'].includes(new URL(source.url).protocol)
+    } catch {
+      return false
+    }
+  })
 
   const user = await getSessionUser()
   const policyUser = { id: user?.id ?? '', role: user?.role ?? null }
@@ -210,9 +227,11 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     : undefined
   const selectedImage = selectedPreview?.category === 'image' ? selectedPreview : undefined
 
-  const heroDimensions = hero
-    ? formatDimensions(Number(hero.bbox_x ?? 0), Number(hero.bbox_y ?? 0), Number(hero.bbox_z ?? 0))
-    : null
+  const heroDimensions = formatDimensions(
+    Number(model.bbox_x ?? 0),
+    Number(model.bbox_y ?? 0),
+    Number(model.bbox_z ?? 0),
+  )
 
   /*
    * The viewer needs a mesh we can parse in the browser, which is not
@@ -260,7 +279,6 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
       <PageHeader
         title={model.name}
-        description={model.notes ?? undefined}
         actions={
           model.missing_at ? (
             <Badge tone="danger">Missing from disk</Badge>
@@ -355,40 +373,44 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
       */}
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0 space-y-6">
-          {selectedImage ? (
-            <Card className="overflow-hidden">
-              <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/files/${selectedImage.id}/raw?inline=1`}
-                  alt={`Preview of ${model.name}`}
-                  className="size-full object-contain"
-                />
-              </div>
-            </Card>
-          ) : viewable ? (
-            <ModelViewer
-              fileId={viewable.id}
-              format={viewable.extension.toLowerCase() as 'stl' | '3mf' | 'obj' | 'ply'}
-              fileSize={Number(viewable.size)}
-              filename={viewable.filename.split('/').pop() ?? viewable.filename}
-              thumbnailFileId={hero?.id ?? null}
-              maxBytes={settings.viewerMaxBytes}
-              className="aspect-[16/10]"
+          {(viewable || selectedImage || hero) && (
+            <ModelPreview
+              key={model.public_id}
+              name={model.name}
+              imageUrl={
+                selectedImage
+                  ? `/api/files/${selectedImage.id}/raw?inline=1`
+                  : hero
+                    ? `/api/files/${hero.id}/thumb?v=${encodeURIComponent(hero.thumb_key ?? '')}`
+                    : null
+              }
+              model={
+                viewable
+                  ? {
+                      fileId: viewable.id,
+                      format: viewable.extension.toLowerCase() as 'stl' | '3mf' | 'obj' | 'ply',
+                      fileSize: Number(viewable.size),
+                      filename: viewable.filename.split('/').pop() ?? viewable.filename,
+                      thumbnailFileId: hero?.id ?? null,
+                      thumbnailKey: hero?.thumb_key ?? null,
+                      maxBytes: settings.viewerMaxBytes,
+                    }
+                  : null
+              }
             />
-          ) : (
-            hero && (
-              <Card className="overflow-hidden">
-                <div className="flex aspect-[16/10] items-center justify-center bg-[var(--color-surface-2)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/files/${hero.id}/thumb`}
-                    alt={`Render of ${model.name}`}
-                    className="size-full object-contain p-4"
-                  />
-                </div>
-              </Card>
-            )
+          )}
+
+          {model.notes && (
+            <Card>
+              <details className="p-4">
+                <summary className="cursor-pointer text-sm font-semibold">
+                  Description and notes
+                </summary>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[var(--color-ink-muted)]">
+                  {model.notes}
+                </p>
+              </details>
+            </Card>
           )}
 
           {model.is_package && packageChildren.rows.length > 0 && (
@@ -477,6 +499,24 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
         </div>
 
         <aside className="min-w-0 space-y-4">
+          {safeSources.length > 0 && (
+            <Card>
+              <CardContent className="space-y-2 p-4 text-sm">
+                <h2 className="font-semibold">Source links</h2>
+                {safeSources.map((source) => (
+                  <a
+                    key={source.url}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block break-words text-[var(--color-accent)] hover:underline"
+                  >
+                    {source.title || new URL(source.url).hostname}
+                  </a>
+                ))}
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardContent className="space-y-3 p-4 text-sm">
               <div>
@@ -579,8 +619,6 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               </div>
             </CardContent>
           </Card>
-
-          <p className="text-xs text-[var(--color-ink-faint)]">Drag to rotate, scroll to zoom.</p>
         </aside>
       </div>
     </>

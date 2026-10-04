@@ -26,6 +26,8 @@ import { RENDERER_VERSION, Rasterizer, isRenderable, type RenderOptions } from '
  */
 
 export interface ThumbnailOptions extends RenderOptions {
+  /** False after the worker's bounded OPC cover selection already failed. */
+  preferEmbedded?: boolean
   /** Output format. WebP is markedly smaller than PNG at the same quality. */
   format?: 'webp' | 'png'
   quality?: number
@@ -107,7 +109,11 @@ export async function renderThumbnail(
   if (format === '3mf') {
     const buffer = await collectBounded(source, MAX_3MF_BYTES, '3mf', options)
     const result = readThreeMf(buffer, noop)
-    if (result.thumbnail && result.thumbnail.data.byteLength > 0) {
+    if (
+      options.preferEmbedded !== false &&
+      result.thumbnail &&
+      result.thumbnail.data.byteLength > 0
+    ) {
       try {
         const data = await sharp(Buffer.from(result.thumbnail.data))
           .resize(size, size, { fit: 'inside', withoutEnlargement: true })
