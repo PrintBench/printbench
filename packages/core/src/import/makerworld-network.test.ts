@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 const mocks = vi.hoisted(() => ({ lookup: vi.fn(), request: vi.fn() }))
 vi.mock('node:dns/promises', () => ({ lookup: mocks.lookup }))
 vi.mock('node:https', () => ({ request: mocks.request }))
-import { requestMakerWorldJson } from './makerworld-network'
+import { requestMakerWorldJson, requestBambuAuthJson } from './makerworld-network'
 
 const options = { maxBytes: 100, timeoutMs: 1000, headers: { Authorization: 'Bearer private' } }
 function serve(status: number, body: string, headers: Record<string, string> = {}) {
@@ -87,5 +87,51 @@ describe('MakerWorld transport boundary', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await pending
     expect(mocks.request).not.toHaveBeenCalled()
+  })
+})
+
+describe('Bambu authentication transport boundary', () => {
+  it('sends the POST body only to an exact allowed endpoint', async () => {
+    serve(200, '{}')
+    await requestBambuAuthJson('https://api.bambulab.com/v1/user-service/user/login', {
+      ...options,
+      method: 'POST',
+      body: '{"account":"synthetic@example.test","password":"synthetic"}',
+    })
+    expect(mocks.request.mock.calls[0]![1].method).toBe('POST')
+    for (const url of [
+      'https://attacker.example/api/sign-in/tfa',
+      'https://bambulab.com/redirect',
+      'https://bambulab.com/api/sign-in/tfa?redirect=evil',
+      'https://api.bambulab.com/v1/user-service/user/login/',
+      'http://api.bambulab.com/v1/user-service/user/login',
+    ]) {
+      await expect(requestBambuAuthJson(url, options)).rejects.toThrow('not allowed')
+    }
+    expect(mocks.request).toHaveBeenCalledTimes(1)
+  })
+  it('preserves Set-Cookie for CSRF and token extraction without following redirects', async () => {
+    serve(302, '{}', { 'set-cookie': ['bbl_csrf_token=synthetic; Secure'] } as unknown as Record<
+      string,
+      string
+    >)
+    const result = await requestBambuAuthJson('https://bambulab.com/api/csrf', options)
+    expect(result.status).toBe(302)
+    expect(result.setCookies).toEqual(['bbl_csrf_token=synthetic; Secure'])
+    expect(mocks.request).toHaveBeenCalledTimes(1)
+  })
+  it('applies public DNS pinning and size limits to the additional web host', async () => {
+    mocks.lookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }])
+    await expect(requestBambuAuthJson('https://bambulab.com/api/csrf', options)).rejects.toThrow(
+      'not public',
+    )
+    expect(mocks.request).not.toHaveBeenCalled()
+    await expect(
+      requestBambuAuthJson('https://bambulab.com/api/sign-in/tfa', {
+        ...options,
+        method: 'POST',
+        body: 'x'.repeat(8193),
+      }),
+    ).rejects.toThrow('Invalid')
   })
 })

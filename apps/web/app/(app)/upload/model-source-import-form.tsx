@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { UploadTarget } from './actions'
 import {
   pollMakerWorldImport,
   startModelSourceImport,
@@ -14,9 +13,14 @@ import {
 import { readMakerWorldCookieStatus } from '../settings/makerworld-actions'
 import { readThingiverseTokenStatus } from '../settings/thingiverse-actions'
 
-export function ModelSourceImportForm({ targets }: { targets: UploadTarget[] }) {
+export function ModelSourceImportForm({
+  libraryId,
+  onBusyChange,
+}: {
+  libraryId: string
+  onBusyChange: (busy: boolean) => void
+}) {
   const router = useRouter()
-  const [libraryId, setLibraryId] = useState(targets[0]?.id ?? '')
   const [url, setUrl] = useState('')
   const [saved, setSaved] = useState<boolean | null>(null)
   const [thingiverseSaved, setThingiverseSaved] = useState<boolean | null>(null)
@@ -28,6 +32,18 @@ export function ModelSourceImportForm({ targets }: { targets: UploadTarget[] }) 
   const [pollAttempt, setPollAttempt] = useState(0)
   const [pollError, setPollError] = useState<string | null>(null)
   const active = status?.state === 'queued' || status?.state === 'importing'
+
+  useEffect(() => {
+    onBusyChange(pending || active)
+  }, [pending, active, onBusyChange])
+
+  let source = ''
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+    if (['makerworld.com', 'printables.com', 'thingiverse.com'].includes(host)) source = host
+  } catch {
+    /* Connection help appears once a supported URL is entered. */
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -81,66 +97,39 @@ export function ModelSourceImportForm({ targets }: { targets: UploadTarget[] }) 
   }, [importId, active, pollAttempt, router])
 
   return (
-    <section
-      aria-labelledby="model-sources-heading"
-      className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
-    >
+    <section aria-labelledby="model-sources-heading" className="space-y-3">
       <div>
         <h2 id="model-sources-heading" className="text-lg font-semibold">
-          Import from model sites
+          Import a model link
         </h2>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Paste a MakerWorld, Printables, or Thingiverse model URL to bring its files and details
-          into your library. The source is detected from the URL.
+          Bring files and details from MakerWorld, Printables, or Thingiverse.
         </p>
       </div>
-      {targets.length === 0 ? (
-        <p className="text-sm text-[var(--color-ink-muted)]">
-          <Link href="/admin/libraries/new" className="underline">
-            Create a writable library
-          </Link>{' '}
-          to import models.
-        </p>
-      ) : (
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault()
-            setError(null)
-            startTransition(async () => {
-              try {
-                const result = await startModelSourceImport({ libraryId, url })
-                if (!result.ok) {
-                  setError(result.error)
-                  return
-                }
-                setImportId(result.id)
-                setStatus({ state: 'queued', publicId: null, error: null })
-                setPollError(null)
-              } catch {
-                setError('Could not start the import. Please try again.')
+      <form
+        className="space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          setError(null)
+          startTransition(async () => {
+            try {
+              const result = await startModelSourceImport({ libraryId, url })
+              if (!result.ok) {
+                setError(result.error)
+                return
               }
-            })
-          }}
-        >
-          <label className="block space-y-1 text-sm">
-            <span>Import to library</span>
-            <select
-              required
-              value={libraryId}
-              onChange={(event) => setLibraryId(event.target.value)}
-              disabled={pending || active}
-              className="h-10 w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3"
-            >
-              {targets.map((target) => (
-                <option key={target.id} value={target.id}>
-                  {target.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-1 text-sm">
-            <span>Model page URL</span>
+              setImportId(result.id)
+              setStatus({ state: 'queued', publicId: null, error: null })
+              setPollError(null)
+            } catch {
+              setError('Could not start the import. Please try again.')
+            }
+          })
+        }}
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="block flex-1 text-sm">
+            <span className="block pb-2">Model page URL</span>
             <Input
               type="url"
               required
@@ -150,36 +139,39 @@ export function ModelSourceImportForm({ targets }: { targets: UploadTarget[] }) 
               disabled={pending || active}
             />
           </label>
-          <Button type="submit" disabled={pending || active}>
+          <Button type="submit" disabled={pending || active || !url.trim()} className="shrink-0">
             {pending ? 'Starting import…' : active ? 'Import in progress…' : 'Import model'}
           </Button>
-        </form>
+        </div>
+      </form>
+      {source === 'makerworld.com' && (
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          {cookieMessage ||
+            (saved === null
+              ? 'Checking MakerWorld connection…'
+              : saved
+                ? 'MakerWorld connection saved.'
+                : 'Connect your Bambu account to download MakerWorld print profiles.')}{' '}
+          <Link href="/settings#makerworld" className="underline">
+            {saved ? 'Manage connection' : 'Set up MakerWorld'}
+          </Link>
+        </p>
       )}
-      <p className="text-sm text-[var(--color-ink-muted)]">
-        MakerWorld connection:{' '}
-        {saved === null ? 'Status unavailable' : saved ? 'Cookie saved' : 'Not connected'}.{' '}
-        <Link href="/settings#makerworld" className="underline">
-          {saved ? 'Manage in account settings' : 'Connect in account settings'}
-        </Link>
-      </p>
-      <p className="text-sm text-[var(--color-ink-muted)]">
-        Printables: public free models need no account connection.
-      </p>
-      <p className="text-sm text-[var(--color-ink-muted)]">
-        Thingiverse connection:{' '}
-        {thingiverseSaved === null
-          ? 'Status unavailable'
-          : thingiverseSaved
-            ? 'API token saved'
-            : 'Not connected'}
-        .{' '}
-        <Link href="/settings#thingiverse" className="underline">
-          {thingiverseSaved ? 'Manage in account settings' : 'Connect in account settings'}
-        </Link>
-      </p>
-      {cookieMessage && (
-        <p role="status" className="text-sm">
-          {cookieMessage}
+      {source === 'printables.com' && (
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          Public free Printables models need no account connection.
+        </p>
+      )}
+      {source === 'thingiverse.com' && (
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          {thingiverseSaved === null
+            ? 'Thingiverse connection status unavailable.'
+            : thingiverseSaved
+              ? 'Thingiverse API token saved.'
+              : 'Thingiverse needs an API token.'}{' '}
+          <Link href="/settings#thingiverse" className="underline">
+            {thingiverseSaved ? 'Manage connection' : 'Set up Thingiverse'}
+          </Link>
         </p>
       )}
       {error && (
