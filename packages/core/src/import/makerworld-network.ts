@@ -8,6 +8,8 @@ import { pipeline } from 'node:stream/promises'
 
 export interface MakerWorldRequest {
   headers?: Record<string, string>
+  method?: 'GET' | 'POST'
+  body?: string
   maxBytes: number
   timeoutMs: number
 }
@@ -15,6 +17,7 @@ export interface MakerWorldRequest {
 export interface MakerWorldResponse {
   status: number
   body: Buffer
+  setCookies?: string[]
 }
 
 /** A narrow outbound policy, not a general URL fetcher. */
@@ -93,7 +96,7 @@ async function openResponse(url: URL, options: MakerWorldRequest) {
     const req = request(
       url,
       {
-        method: 'GET',
+        method: options.method ?? 'GET',
         agent: false,
         headers: { Accept: 'application/json', 'Accept-Encoding': 'identity', ...options.headers },
         lookup: (_hostname, _options, callback) => {
@@ -116,7 +119,7 @@ async function openResponse(url: URL, options: MakerWorldRequest) {
     )
     req.on('close', () => clearTimeout(timer))
     req.on('error', () => reject(new Error('MakerWorld network request failed')))
-    req.end()
+    req.end(options.body)
   })
 }
 
@@ -125,7 +128,34 @@ export async function requestMakerWorldJson(
   url: string,
   options: MakerWorldRequest,
 ): Promise<MakerWorldResponse> {
-  const response = await openResponse(validateMakerWorldRemoteUrl(url, true), options)
+  return readJsonResponse(
+    await openResponse(validateMakerWorldRemoteUrl(url, true), options),
+    options,
+  )
+}
+
+/** Auth has its own exact URL allowlist; credentials cannot go to arbitrary web/CDN paths. */
+export async function requestBambuAuthJson(
+  url: string,
+  options: MakerWorldRequest,
+): Promise<MakerWorldResponse> {
+  const allowed = [
+    'https://api.bambulab.com/v1/user-service/user/login',
+    'https://api.bambulab.com/v1/design-user-service/my/preference',
+    'https://bambulab.com/api/csrf',
+    'https://bambulab.com/api/sign-in/tfa',
+  ]
+  if (!allowed.includes(url)) throw new Error('Bambu sign-in endpoint is not allowed')
+  if (options.body && (options.method !== 'POST' || Buffer.byteLength(options.body) > 8192)) {
+    throw new Error('Invalid Bambu sign-in request')
+  }
+  return readJsonResponse(await openResponse(new URL(url), options), options)
+}
+
+async function readJsonResponse(
+  response: import('node:http').IncomingMessage,
+  options: MakerWorldRequest,
+): Promise<MakerWorldResponse> {
   const chunks: Buffer[] = []
   let size = 0
   try {
@@ -139,7 +169,11 @@ export async function requestMakerWorldJson(
     response.destroy()
     throw new Error('Could not read MakerWorld response within the limits')
   }
-  return { status: response.statusCode ?? 502, body: Buffer.concat(chunks) }
+  return {
+    status: response.statusCode ?? 502,
+    body: Buffer.concat(chunks),
+    setCookies: response.headers['set-cookie'],
+  }
 }
 
 /** Worker-only streaming download. The caller supplies a new staging path. */

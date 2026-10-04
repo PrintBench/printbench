@@ -43,10 +43,38 @@ while pausing rendering when the thumbnail is displayed.
 
 ## Importing a MakerWorld link
 
-In **Account settings → MakerWorld**, save your own MakerWorld token cookie
-(or a Cookie header containing `token=...`). This personal settings page is
-available from the navigation and account menu to users who can upload. Then
-on **Upload**, choose a writable library and paste a MakerWorld model-page URL.
+In **Account settings → MakerWorld**, choose **Connect MakerWorld** and enter
+your Bambu account email and password. If prompted, enter the six-digit email
+verification code or current authenticator code. This direct sign-in supports
+Global accounts on `makerworld.com`; it is not an OAuth redirect and does not
+support China-region accounts. Google/Apple-only accounts may need the fallback.
+
+Passwords and verification codes are used only for the request to Bambu and are
+never stored. Pending verification details are encrypted, scoped to the signed-in
+PrintBench user, and expire after ten minutes. Successful tokens use the existing
+encrypted per-user credential storage. **Check connection** asks Bambu whether
+a stored token is accepted; outages and access challenges do not remove it or
+claim it has expired. Only a successful check shows **Connected**.
+
+The sign-in transport uses an exact endpoint allowlist, public DNS pinning, TLS,
+bounded responses and timeouts, and no redirects. Requests identify PrintBench;
+they do not impersonate Bambu Studio. Sign-in and verification share an eight
+attempts per five minutes limit per PrintBench user, stored in Postgres so it
+applies across web processes. A remote block pauses sign-in for five minutes.
+There is no CAPTCHA bypass or automatic retry. The endpoints are undocumented
+and may change without notice. Direct sign-in has been checked with a real
+account; authenticated downloads still need a separate import check.
+
+If direct sign-in is unavailable, open **Advanced: use a cookie instead**, then
+**How to connect MakerWorld**. Choose Chrome/Edge or Firefox and copy the **Value**
+of the cookie named **token** from MakerWorld's browser cookie panel. Paste it
+into **MakerWorld token cookie** and choose **Save cookie**. A Cookie header
+containing `token=...` also works. The guide links to illustrated browser
+instructions. Saving a fallback cookie does not verify it; use **Check connection**.
+
+This personal settings page is available from the navigation and account menu
+to users who can upload. On **Upload**, choose **Save to library** and either
+select local files/folders or paste a MakerWorld model-page URL into the same card.
 A `#profileId-...` fragment selects that published print profile. Without a
 fragment, the first published profile is imported.
 
@@ -78,9 +106,10 @@ resolution up to 2048 pixels without enlarging smaller images.
 ## Importing Printables and Thingiverse links
 
 On **Upload**, paste a MakerWorld, Printables, or Thingiverse model-page URL into
-the same import form and choose a writable library. PrintBench detects the
-provider from the URL. Upload shows connection status and links to the relevant
-account settings; credentials are entered only in settings.
+the model-link field. **Save to library** is shared by local uploads and link
+imports and cannot be changed while either is running. PrintBench detects the
+provider from the URL and shows only that provider's connection help and settings
+link; credentials are entered only in settings.
 
 Public free Printables models do not require a saved cookie or API token.
 Paid or private content is not supported by this importer.

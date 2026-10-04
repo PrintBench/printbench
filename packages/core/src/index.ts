@@ -45,3 +45,6 @@ export * from './import/source-router'
 export { fetchPrintablesModel } from './import/printables'
 export { fetchThingiverseModel } from './import/thingiverse'
 export { downloadSourceFile } from './import/source-network'
+
+export * from './import/makerworld-auth'
+export * from './import/makerworld-auth-service'
