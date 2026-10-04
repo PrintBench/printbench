@@ -108,8 +108,9 @@ web shell is replaceable without touching the app.
   thumbnail and the in-browser view. three's own 3MFLoader cannot run in a Web
   Worker, because it depends on DOMParser.
 - **Metadata is written back to disk** as a `.printbench.json` sidecar per
-  model, so the database can be rebuilt by rescanning. That restore drill is
-  covered by tests, not just intent. The file is also a declaration: drop one
+  model, so the database can be rebuilt by rescanning. Sidecars preserve
+  creator, tags, notes, licence details, and source or additional links. That
+  restore drill is covered by tests, not just intent. The file is also a declaration: drop one
   into a folder by hand and that folder becomes a single model, whatever the
   grouping heuristic would otherwise make of it — which is how you stop a pack
   with subfolders from splitting into one model per subfolder. The app never

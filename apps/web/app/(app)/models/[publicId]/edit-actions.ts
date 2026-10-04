@@ -21,8 +21,13 @@ export async function saveModel(
     name?: string
     notes?: string | null
     license?: string | null
+    licenseUrl?: string | null
+    licenseExpiresAt?: string | null
+    commercialUse?: boolean | null
+    licenseNotes?: string | null
     creator?: string | null
     tags?: string[]
+    links?: { title?: string | null; url: string }[]
     previewFileId?: string | null
   },
 ): Promise<Result> {

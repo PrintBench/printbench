@@ -222,8 +222,9 @@ a scan, and the files are already on disk.
 ### The sidecar, which is the real safety net
 
 With `writeSidecars` on (the default), a `.printbench.json` is written beside
-each model in a writable library holding its tags, creator, licence and notes.
-The database can then be rebuilt from disk alone: drop it, migrate, rescan, and
+each model in a writable library holding its tags, creator, notes, licence
+details, and source or additional links. The database can then be rebuilt from
+disk alone: drop it, migrate, rescan, and
 the metadata comes back. There is a test that performs exactly that drill.
 
 It is worth doing once yourself, on purpose, before you need it.

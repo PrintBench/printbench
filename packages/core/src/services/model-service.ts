@@ -5,6 +5,7 @@ import { schema } from '@pb/db'
 import { slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
 import {
+  isValidIsoDate,
   readSidecar,
   readPackageSidecar,
   sidecarUnchanged,
@@ -26,10 +27,16 @@ export interface ModelPatch {
   name?: string
   notes?: string | null
   license?: string | null
+  licenseUrl?: string | null
+  licenseExpiresAt?: string | null
+  commercialUse?: boolean | null
+  licenseNotes?: string | null
   /** Creator name; created if it does not exist. Empty string clears it. */
   creator?: string | null
   /** Full replacement set of tag names. Created as needed. */
   tags?: string[]
+  /** Full replacement set of external links, preserved in display order. */
+  links?: { title?: string | null; url: string }[]
   previewFileId?: string | null
 }
 
@@ -47,6 +54,16 @@ export interface UpdateResult {
 const MAX_NAME = 225
 const MAX_NOTES = 20_000
 const MAX_TAGS = 200
+const MAX_LINKS = 50
+const MAX_LINK_TITLE = 300
+const MAX_LINK_URL = 2000
+
+const SINGLETON_LINK_TITLES = new Set([
+  'Original model page',
+  'Assembly video',
+  'Printing instructions',
+  'Designer page',
+])
 
 export async function updateModel(
   db: Database,
@@ -69,6 +86,54 @@ export async function updateModel(
     embeddedMetadataState: 'done',
   }
 
+  if (patch.links !== undefined) {
+    const links = patch.links
+      .map((link) => ({
+        title: link.title?.trim() || null,
+        url: link.url.trim(),
+      }))
+      .filter((link) => link.url !== '')
+
+    if (links.length > MAX_LINKS) {
+      return {
+        ok: false,
+        error: `A model can have at most ${MAX_LINKS} links.`,
+        sidecarWritten: false,
+      }
+    }
+
+    const singletonTitles = new Set<string>()
+
+    for (const link of links) {
+      if (link.url.length > MAX_LINK_URL) {
+        return {
+          ok: false,
+          error: `Link URLs can be at most ${MAX_LINK_URL} characters.`,
+          sidecarWritten: false,
+        }
+      }
+
+      if (link.title !== null && link.title.length > MAX_LINK_TITLE) {
+        return {
+          ok: false,
+          error: `Link titles can be at most ${MAX_LINK_TITLE} characters.`,
+          sidecarWritten: false,
+        }
+      }
+
+      if (link.title !== null && SINGLETON_LINK_TITLES.has(link.title)) {
+        if (singletonTitles.has(link.title)) {
+          return {
+            ok: false,
+            error: `Only one "${link.title}" link is allowed.`,
+            sidecarWritten: false,
+          }
+        }
+        singletonTitles.add(link.title)
+      }
+    }
+  }
+
   if (patch.name !== undefined) {
     const name = patch.name.trim()
     if (name.length === 0) {
@@ -87,6 +152,32 @@ export async function updateModel(
     // Empty is stored as null: "unknown licence" and "no licence" are the same
     // thing here, and null keeps the facet clean.
     updates.license = license.length > 0 ? license : null
+  }
+
+  if (patch.licenseUrl !== undefined) {
+    const value = patch.licenseUrl?.trim() ?? ''
+    updates.licenseUrl = value.length > 0 ? value.slice(0, 2000) : null
+  }
+
+  if (patch.licenseExpiresAt !== undefined) {
+    const value = patch.licenseExpiresAt?.trim() ?? ''
+    if (value.length > 0 && !isValidIsoDate(value)) {
+      return {
+        ok: false,
+        error: 'Licence expiry must be a valid date in YYYY-MM-DD format.',
+        sidecarWritten: false,
+      }
+    }
+    updates.licenseExpiresAt = value.length > 0 ? value : null
+  }
+
+  if (patch.commercialUse !== undefined) {
+    updates.commercialUse = patch.commercialUse
+  }
+
+  if (patch.licenseNotes !== undefined) {
+    updates.licenseNotes =
+      patch.licenseNotes === null ? null : patch.licenseNotes.slice(0, MAX_NOTES)
   }
 
   if (patch.creator !== undefined) {
@@ -124,6 +215,32 @@ export async function updateModel(
 
   if (patch.tags !== undefined) {
     await setModelTags(db, modelId, patch.tags)
+  }
+
+  if (patch.links !== undefined) {
+    await db.execute(sql`DELETE FROM model_links WHERE model_id = ${modelId}`)
+
+    for (const [position, link] of patch.links.entries()) {
+      const url = link.url.trim()
+      if (!url) continue
+
+      const title = link.title?.trim() || null
+      let host: string | null = null
+      try {
+        host = new URL(url).hostname
+      } catch {
+        // Preserve non-standard URLs just as the sidecar scanner does.
+      }
+
+      await db.execute(sql`
+        INSERT INTO model_links (model_id, url, title, host, position)
+        VALUES (${modelId}, ${url}, ${title}, ${host}, ${position})
+        ON CONFLICT (model_id, url) DO UPDATE SET
+          title = EXCLUDED.title,
+          host = EXCLUDED.host,
+          position = EXCLUDED.position
+      `)
+    }
   }
 
   // Rebuilt in the same operation: a renamed model that is not findable by its
@@ -303,11 +420,16 @@ export async function buildSidecarContent(db: Database, modelId: string): Promis
     name: string
     notes: string | null
     license: string | null
+    license_url: string | null
+    license_expires_at: string | null
+    commercial_use: boolean | null
+    license_notes: string | null
     creator: string | null
     tags: string[] | null
     preview_file: string | null
   }>(sql`
     SELECT m.name, m.notes, m.license,
+           m.license_url, m.license_expires_at, m.commercial_use, m.license_notes,
            c.name AS creator,
            (SELECT array_agg(t.name ORDER BY t.name)
               FROM model_tags mt JOIN tags t ON t.id = mt.tag_id
@@ -326,17 +448,17 @@ export async function buildSidecarContent(db: Database, modelId: string): Promis
     name: row.name,
     notes: row.notes,
     license: row.license,
+    licenseUrl: row.license_url,
+    licenseExpiresAt: row.license_expires_at,
+    commercialUse: row.commercial_use,
+    licenseNotes: row.license_notes,
     creator: row.creator,
     tags: row.tags ?? [],
+    links: links.map((link) => ({
+      url: link.url,
+      ...(link.title ? { title: link.title } : {}),
+    })),
     previewFile: row.preview_file,
-    ...(links.length
-      ? {
-          links: links.map((link) => ({
-            url: link.url,
-            ...(link.title ? { title: link.title } : {}),
-          })),
-        }
-      : {}),
   }
 }
 

@@ -46,6 +46,10 @@ type ModelDetail = {
   path: string
   notes: string | null
   license: string | null
+  license_url: string | null
+  license_expires_at: string | null
+  commercial_use: boolean | null
+  license_notes: string | null
   file_count: number
   total_size: string
   is_file_model: boolean
@@ -68,6 +72,12 @@ type PackageRelation = {
   path: string
   file_count: number
   total_size: string
+}
+
+type ModelLink = {
+  url: string
+  title: string | null
+  host: string | null
 }
 
 type FileRow = {
@@ -101,6 +111,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const models = await db.execute<ModelDetail>(sql`
     SELECT m.id, m.library_id, m.public_id, m.name, m.path, m.notes, m.license,
+           m.license_url, m.license_expires_at, m.commercial_use, m.license_notes,
            m.file_count, m.total_size, m.is_file_model, m.is_package,
            m.missing_at, m.share_token,
            m.preview_file_id,
@@ -148,6 +159,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     FROM model_files WHERE model_id = ${model.id}
     ORDER BY category, filename
   `)
+
+  const modelLinks = await db.execute<ModelLink>(sql`
+    SELECT url, title, host
+    FROM model_links
+    WHERE model_id = ${model.id}
+    ORDER BY position, id
+  `)
+
+  const sourceLink = modelLinks.rows.find((link) => link.title === 'Original model page')
+  const additionalLinks = modelLinks.rows.filter((link) => link.title !== 'Original model page')
 
   // Grouping by category makes a 40-file model legible; a flat list does not.
   const byCategory = new Map<string, FileRow[]>()
@@ -232,6 +253,30 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     Number(model.bbox_y ?? 0),
     Number(model.bbox_z ?? 0),
   )
+
+  const licenceExpiry = model.license_expires_at
+    ? (() => {
+        const parts = model.license_expires_at.split('-')
+        const year = Number(parts[0])
+        const month = Number(parts[1])
+        const day = Number(parts[2])
+        const expiresAt = Date.UTC(year, month - 1, day)
+        const now = new Date()
+        const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+        const daysRemaining = Math.floor((expiresAt - today) / 86_400_000)
+
+        return {
+          label: new Intl.DateTimeFormat('en-GB', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            timeZone: 'UTC',
+          }).format(new Date(expiresAt)),
+          expired: daysRemaining < 0,
+          expiringSoon: daysRemaining >= 0 && daysRemaining <= 30,
+        }
+      })()
+    : null
 
   /*
    * The viewer needs a mesh we can parse in the browser, which is not
@@ -340,8 +385,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   name: model.name,
                   notes: model.notes,
                   license: model.license,
+                  licenseUrl: model.license_url,
+                  licenseExpiresAt: model.license_expires_at,
+                  commercialUse: model.commercial_use,
+                  licenseNotes: model.license_notes,
                   creator,
                   tags,
+                  links: modelLinks.rows.map((link) => ({
+                    title: link.title,
+                    url: link.url,
+                  })),
                 }}
               />
               <DownloadModelButton publicId={model.public_id} />
@@ -519,6 +572,10 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           )}
           <Card>
             <CardContent className="space-y-3 p-4 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+                Model Information
+              </p>
+
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
                   Library
@@ -571,6 +628,22 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 </div>
               )}
 
+              {sourceLink && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Source
+                  </p>
+                  <a
+                    href={sourceLink.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-0.5 block break-words text-[var(--color-accent)] hover:underline"
+                  >
+                    {sourceLink.title ?? sourceLink.host ?? 'Original model page'}
+                  </a>
+                </div>
+              )}
+
               {memberships.length > 0 && (
                 <div>
                   <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
@@ -608,17 +681,112 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-3 p-4 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+                Licence
+              </p>
+
+              <div>
+                {model.license_url ? (
+                  <a
+                    href={model.license_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-0.5 block break-words text-[var(--color-accent)] hover:underline"
+                  >
+                    {model.license ?? 'View licence'}
+                  </a>
+                ) : (
+                  <p className="mt-0.5 text-[var(--color-ink-muted)]">
+                    {model.license ?? 'Not recorded'}
+                  </p>
+                )}
+              </div>
 
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
-                  Licence
+                  Commercial use
                 </p>
-                <p className="mt-0.5 text-[var(--color-ink-muted)]">
-                  {model.license ?? 'Not recorded'}
+                <p
+                  className={
+                    model.commercial_use === true
+                      ? 'mt-0.5 text-[var(--color-success)]'
+                      : model.commercial_use === false
+                        ? 'mt-0.5 text-[var(--color-danger)]'
+                        : 'mt-0.5 text-[var(--color-ink-muted)]'
+                  }
+                >
+                  {model.commercial_use === true
+                    ? 'Licensed'
+                    : model.commercial_use === false
+                      ? 'Not permitted'
+                      : 'Not recorded'}
                 </p>
               </div>
+
+              {licenceExpiry && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Expiry
+                  </p>
+                  <p
+                    className={
+                      licenceExpiry.expired
+                        ? 'mt-0.5 text-[var(--color-danger)]'
+                        : licenceExpiry.expiringSoon
+                          ? 'mt-0.5 text-[var(--color-warning)]'
+                          : 'mt-0.5'
+                    }
+                  >
+                    {licenceExpiry.label}
+                    {licenceExpiry.expired
+                      ? ' — Expired'
+                      : licenceExpiry.expiringSoon
+                        ? ' — Expiring soon'
+                        : ''}
+                  </p>
+                </div>
+              )}
+
+              {model.license_notes && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Notes
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-wrap break-words text-[var(--color-ink-muted)]">
+                    {model.license_notes}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {additionalLinks.length > 0 && (
+            <Card>
+              <CardContent className="space-y-3 p-4 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+                  Additional Links
+                </p>
+                <div className="space-y-2">
+                  {additionalLinks.map((link) => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block break-words text-[var(--color-accent)] hover:underline"
+                    >
+                      {link.title ?? link.host ?? link.url}
+                    </a>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </aside>
       </div>
     </>
