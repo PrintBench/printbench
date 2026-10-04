@@ -82,7 +82,7 @@ export function MoveButton({
   function poll(destinationId: string, attempt: number) {
     if (attempt >= MAX_POLLS) {
       setMoving(null)
-      setError('This is taking a while. It is still running — reload to see where it got to.')
+      setError('This is taking a while. It is still running. Reload to see where it got to.')
       return
     }
 

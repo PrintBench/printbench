@@ -116,7 +116,7 @@ export default async function QueuePage({
           title={empty ? 'Nothing in the queue' : `Nothing ${filter.label.toLowerCase()}`}
           description={
             empty
-              ? 'When someone asks you to print something, put it here. Requests do not need a file — add what they asked for and link it to your library later, if the model turns up.'
+              ? 'When someone asks you to print something, put it here. Requests do not need a file. Add what they asked for and link it to your library later, if the model turns up.'
               : 'Nothing in the queue matches this filter.'
           }
           action={
@@ -156,5 +156,5 @@ function summarise(stats: {
   if (stats.done > 0) parts.push(`${stats.done} printed`)
 
   // Everything is closed: the queue is clear, which is worth saying outright.
-  return parts.length > 0 ? parts.join(' · ') : 'Nothing waiting — the queue is clear.'
+  return parts.length > 0 ? parts.join(' · ') : 'Nothing waiting. The queue is clear.'
 }

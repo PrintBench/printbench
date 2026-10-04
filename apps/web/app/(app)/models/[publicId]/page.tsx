@@ -410,7 +410,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               This model was not found during the last scan.
             </p>
             <p className="mt-1 text-[var(--color-ink-muted)]">
-              Its record is kept for 30 days in case the folder comes back — nothing has been
+              Its record is kept for 30 days in case the folder comes back. Nothing has been
               deleted. If the drive is unmounted, remount it and scan again.
             </p>
           </CardContent>

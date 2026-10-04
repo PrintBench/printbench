@@ -136,7 +136,7 @@ export function SchedulePicker({
           )}
 
           <p className="text-xs text-[var(--color-ink-faint)]">
-            Times are the server&apos;s local time. Scheduled scans are fast scans — they trust
+            Times are the server&apos;s local time. Scheduled scans are fast scans. They trust
             directory timestamps. Run a deep scan by hand when you have edited files in place.
           </p>
         </>

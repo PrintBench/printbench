@@ -144,7 +144,7 @@ export function RequestRow({ request, canRun }: { request: QueueRow; canRun: boo
               >
                 {request.modelName}
               </Link>
-              {request.modelMissing && ' — missing from disk'}
+              {request.modelMissing && ' (missing from disk)'}
               {details.length > 0 && ` · ${details.join(' · ')}`}
             </>
           ) : (

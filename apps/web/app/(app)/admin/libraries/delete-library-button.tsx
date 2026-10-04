@@ -70,8 +70,8 @@ export function DeleteLibraryButton({
 
         <p className="text-xs text-[var(--color-ink-muted)]">
           PrintBench forgets this library and the {modelCount.toLocaleString('en-GB')} model
-          {modelCount === 1 ? '' : 's'} it indexed. <strong>No files are deleted</strong> — every
-          one stays exactly where it is on disk.
+          {modelCount === 1 ? '' : 's'} it indexed. <strong>No files are deleted.</strong> Every one
+          stays exactly where it is on disk.
         </p>
 
         {modelCount > 0 && (

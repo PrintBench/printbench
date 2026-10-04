@@ -121,7 +121,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
             {files.rows.map((file) => (
               <li key={file.id} className="flex items-center gap-3 px-4 py-2.5">
                 <span className="w-10 shrink-0 rounded bg-[var(--color-surface-2)] px-1.5 py-0.5 text-center text-[10px] font-medium uppercase text-[var(--color-ink-faint)]">
-                  {file.extension || '—'}
+                  {file.extension || 'Unknown'}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm">{file.filename}</span>
                 <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-muted)]">

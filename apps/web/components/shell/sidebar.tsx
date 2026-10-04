@@ -41,7 +41,7 @@ export function Sidebar({
           <Menu className="size-5" />
         </button>
         <Link href="/" className="flex items-center gap-2 font-semibold">
-          <PrintBenchMark className="h-7 w-auto" />
+          <PrintBenchMark className="h-7 w-auto shrink-0" />
           {siteName}
         </Link>
         <div className="ml-auto">
@@ -63,26 +63,26 @@ export function Sidebar({
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex h-14 items-center gap-2 px-4">
-          <Link href="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
-            <PrintBenchMark className="h-8 w-auto" />
-            {siteName}
+        <div className="flex h-16 shrink-0 items-center gap-2 px-4">
+          <Link href="/" className="flex min-w-0 items-center gap-2.5 font-semibold tracking-tight">
+            <PrintBenchMark className="h-8 w-auto shrink-0" />
+            <span className="truncate">{siteName}</span>
           </Link>
           <button
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Close navigation"
-            className="ml-auto flex size-8 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] lg:hidden"
+            className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] lg:hidden"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="px-3 pb-2">
+        <div className="shrink-0 px-3 pb-3">
           <CommandTrigger />
         </div>
 
-        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-2">
+        <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-2">
           {sections.map((section, i) => (
             <div key={section.title ?? i} className="space-y-0.5">
               {section.title && (
@@ -97,7 +97,7 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="hidden border-t border-[var(--color-border)] p-3 lg:block">
+        <div className="hidden shrink-0 border-t border-[var(--color-border)] p-3 lg:block">
           <UserMenu user={user} />
         </div>
       </aside>

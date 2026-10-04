@@ -31,7 +31,7 @@ export default async function PrintersPage() {
     <>
       <PageHeader
         title="Printers"
-        description="Networked printers you can send a sliced file to. Bambu printers are driven through Bambu Studio instead — use Open in… on the model page."
+        description="Networked printers you can send a sliced file to. Bambu printers are driven through Bambu Studio instead. Use Open in… on the model page."
       />
 
       <PrinterList

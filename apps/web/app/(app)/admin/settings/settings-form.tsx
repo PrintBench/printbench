@@ -77,7 +77,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
           <Field
             label="Keep missing models for"
             htmlFor="grace-days"
-            hint="A model whose files vanish is kept this long before it can be removed. This is what makes an unmounted drive recoverable — shorten it with care."
+            hint="A model whose files vanish is kept this long before it can be removed. This is what makes an unmounted drive recoverable. Shorten it with care."
           >
             <div className="flex items-center gap-2">
               <Input
@@ -124,7 +124,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
 
           <Toggle
             label="Track metadata problems"
-            hint="Reports models with no licence, creator, tags or preview on the health page. Turn off if you do not curate that far — the important checks keep running either way."
+            hint="Reports models with no licence, creator, tags or preview on the health page. Turn off if you do not curate that far. The important checks keep running either way."
             checked={values.trackMetadataProblems}
             onChange={(value) => set('trackMetadataProblems', value)}
           />

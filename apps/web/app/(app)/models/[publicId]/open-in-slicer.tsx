@@ -52,7 +52,7 @@ export function OpenInSlicer({ fileId, filename }: Props) {
       result.lossy
         ? 'Sent as 3MF. Geometry is preserved; colours and materials are not.'
         : result.converted
-          ? 'Sent as 3MF — the only format Bambu Studio accepts over a link.'
+          ? 'Sent as 3MF, the only format Bambu Studio accepts over a link.'
           : null,
     )
   }

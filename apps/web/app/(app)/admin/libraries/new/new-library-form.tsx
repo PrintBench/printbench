@@ -235,8 +235,8 @@ export function NewLibraryForm() {
             <p className="mt-3 font-medium">S3-compatible storage</p>
             <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
               {kind === 'managed'
-                ? 'A bucket this app uploads into — AWS S3, MinIO, Backblaze, or anything speaking the same API.'
-                : 'A bucket you already have files in — AWS S3, MinIO, Backblaze, or anything speaking the same API.'}
+                ? 'A bucket this app uploads into: AWS S3, MinIO, Backblaze, or anything speaking the same API.'
+                : 'A bucket you already have files in: AWS S3, MinIO, Backblaze, or anything speaking the same API.'}
             </p>
           </button>
         </div>
@@ -257,7 +257,7 @@ export function NewLibraryForm() {
               <Upload className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)]" />
               {backend === 's3'
                 ? 'Uploads are written straight into this bucket, in parts, so a multi-gigabyte model never has to fit in the server’s memory.'
-                : 'A folder is created for this library and the app writes uploads into it. You do not choose where — it lives with the application’s own data so it is covered by the same backup.'}
+                : 'A folder is created for this library and the app writes uploads into it. You do not choose where. It lives with the application’s own data so it is covered by the same backup.'}
             </p>
 
             <Field
@@ -499,7 +499,7 @@ export function NewLibraryForm() {
                   Saves tags, creator and notes to a small{' '}
                   <code className="font-mono text-xs">.printbench.json</code> file, so your metadata
                   survives a database loss and moves with the files. This is the only thing ever
-                  written into an indexed folder — your model files are never touched.
+                  written into an indexed folder. Your model files are never touched.
                 </span>
               </span>
             </label>

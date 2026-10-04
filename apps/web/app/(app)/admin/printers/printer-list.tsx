@@ -60,7 +60,7 @@ export function PrinterList({ hosts }: { hosts: PrintHostView[] }) {
       setProbe((current) => ({
         ...current,
         [host.id]: result.ok
-          ? `Reachable${result.version ? ` — ${result.version}` : ''}${result.state ? ` (${result.state})` : ''}`
+          ? `Reachable${result.version ? `: ${result.version}` : ''}${result.state ? ` (${result.state})` : ''}`
           : result.error,
       }))
       router.refresh()
@@ -257,7 +257,7 @@ function PrinterForm({
         <Field
           label="Address"
           htmlFor="host-endpoint"
-          hint="Include http:// — for example http://octopi.local or http://192.168.1.42"
+          hint="Include http://, for example http://octopi.local or http://192.168.1.42"
         >
           <Input
             value={endpoint}
