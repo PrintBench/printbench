@@ -31,6 +31,11 @@ Set these before starting anything:
 | `BETTER_AUTH_URL`    | The same value.                                          |
 | `LIBRARY_PATH`       | Host folder holding your print files. Mounted read-only. |
 
+Existing collections are read-only by default. Set `LIBRARY_READ_ONLY=false`
+to allow the web and worker services to write metadata sidecars; nginx always
+mounts the collection read-only. This replaces `LIBRARY_MODE`: migrate `rw` to
+`LIBRARY_READ_ONLY=false`, or `ro` to `LIBRARY_READ_ONLY=true`.
+
 The compose file also sets two variables you only need to touch if you change
 the mounts:
 
@@ -57,6 +62,13 @@ first admin account. That page stops working the moment a user exists.
 ## Coolify
 
 Coolify runs the same `docker-compose.yml`. Two things to know.
+
+The library mounts use long YAML syntax so Coolify can parse the host path and
+read-only setting independently. If an older 0.5.0 compose file fails with
+`Invalid volume source: contains forbidden character '${'`, replace the
+short library mount entries with the long-form entries in the current compose
+file. Changing `LIBRARY_PATH` in Environment Variables alone does not fix the
+parser error. Keep the same host path and persistent volumes when redeploying.
 
 ### Let Coolify terminate TLS
 
