@@ -133,6 +133,7 @@ export default async function SearchPage({
                     isPackage={hit.isPackage}
                     previewImageFileId={hit.previewImageFileId}
                     thumbFileId={hit.thumbFileId}
+                    thumbKey={hit.thumbKey}
                     dimensions={formatDimensions(hit.bboxX ?? 0, hit.bboxY ?? 0, hit.bboxZ ?? 0)}
                   />
                 ))}

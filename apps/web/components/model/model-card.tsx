@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { Box, FileStack, Package } from 'lucide-react'
+import { FileStack, Package } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { CardPreview } from './card-preview'
 
 export function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
@@ -23,12 +24,15 @@ export interface ModelCardProps {
   fileCount: number
   totalSize: number
   libraryName?: string
+  /** Printable model format, independent of the file used as its artwork. */
   previewExtension?: string | null
   isPackage?: boolean
   /** Selected creator-supplied image, served directly instead of as a generated mesh thumbnail. */
   previewImageFileId?: string | null
   /** Set once a thumbnail has been rendered for the preview file. */
   thumbFileId?: string | null
+  /** Content-addressed cache version; changes when the thumbnail is regenerated. */
+  thumbKey?: string | null
   dimensions?: string | null
 }
 
@@ -43,6 +47,7 @@ export function ModelCard({
   isPackage,
   previewImageFileId,
   thumbFileId,
+  thumbKey,
   dimensions,
 }: ModelCardProps) {
   const hue = hashHue(publicId)
@@ -77,7 +82,7 @@ export function ModelCard({
             src={
               previewImageFileId
                 ? `/api/files/${previewImageFileId}/raw?inline=1`
-                : `/api/files/${thumbFileId}/thumb`
+                : `/api/files/${thumbFileId}/thumb${thumbKey ? `?v=${encodeURIComponent(thumbKey)}` : ''}`
             }
             alt=""
             loading="lazy"
@@ -85,9 +90,8 @@ export function ModelCard({
             className="size-full object-contain transition-transform duration-200 group-hover:scale-[1.03]"
           />
         ) : (
-          <Box className="size-8 text-white/70" strokeWidth={1.5} />
+          <CardPreview publicId={publicId} hue={hue} />
         )}
-
         {previewExtension && (
           <span className="absolute bottom-2 right-2 rounded bg-black/35 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/90 backdrop-blur-sm">
             {previewExtension}

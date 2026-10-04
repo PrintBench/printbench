@@ -69,6 +69,7 @@ export async function updateModel(
   db: Database,
   modelId: string,
   patch: ModelPatch,
+  options: { deferSidecar?: boolean } = {},
 ): Promise<UpdateResult> {
   const rows = await db
     .select({ model: schema.models, library: schema.libraries })
@@ -80,7 +81,10 @@ export async function updateModel(
   const row = rows[0]
   if (!row) return { ok: false, error: 'That model no longer exists.', sidecarWritten: false }
 
-  const updates: Partial<typeof schema.models.$inferInsert> = { updatedAt: new Date() }
+  const updates: Partial<typeof schema.models.$inferInsert> = {
+    updatedAt: new Date(),
+    embeddedMetadataState: 'done',
+  }
 
   if (patch.links !== undefined) {
     const links = patch.links
@@ -243,7 +247,8 @@ export async function updateModel(
   // new name until some later sweep is worse than a slightly slower save.
   await refreshModelSearchVectors(db, [modelId])
 
-  const sidecarWritten = await syncSidecar(db, modelId)
+  // A surrounding transaction must commit before an external filesystem write.
+  const sidecarWritten = options.deferSidecar ? false : await syncSidecar(db, modelId)
   return { ok: true, sidecarWritten }
 }
 
@@ -405,6 +410,12 @@ async function hasNestedModel(
 }
 
 export async function buildSidecarContent(db: Database, modelId: string): Promise<SidecarContent> {
+  const links = await db
+    .select({ url: schema.modelLinks.url, title: schema.modelLinks.title })
+    .from(schema.modelLinks)
+    .where(eq(schema.modelLinks.modelId, modelId))
+    .orderBy(schema.modelLinks.position, schema.modelLinks.url)
+    .limit(50)
   const result = await db.execute<{
     name: string
     notes: string | null
@@ -433,13 +444,6 @@ export async function buildSidecarContent(db: Database, modelId: string): Promis
   const row = result.rows[0]
   if (!row) return {}
 
-  const links = await db.execute<{ url: string; title: string | null }>(sql`
-    SELECT url, title
-    FROM model_links
-    WHERE model_id = ${modelId}
-    ORDER BY position, id
-  `)
-
   return {
     name: row.name,
     notes: row.notes,
@@ -450,7 +454,7 @@ export async function buildSidecarContent(db: Database, modelId: string): Promis
     licenseNotes: row.license_notes,
     creator: row.creator,
     tags: row.tags ?? [],
-    links: links.rows.map((link) => ({
+    links: links.map((link) => ({
       url: link.url,
       ...(link.title ? { title: link.title } : {}),
     })),
@@ -472,6 +476,10 @@ export async function bulkUpdateModels(
 ): Promise<{ updated: number }> {
   if (modelIds.length === 0) return { updated: 0 }
   const ids = modelIds.slice(0, 1000)
+  await db
+    .update(schema.models)
+    .set({ embeddedMetadataState: 'done' })
+    .where(inArray(schema.models.id, ids))
 
   if (patch.creator !== undefined) {
     const creatorId = await resolveCreator(db, patch.creator)

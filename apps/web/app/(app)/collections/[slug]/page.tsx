@@ -2,7 +2,14 @@ import Link from 'next/link'
 import type { Route } from 'next'
 import { notFound } from 'next/navigation'
 import { sql } from 'drizzle-orm'
-import { can, collectionBySlug, listCollections } from '@pb/core'
+import {
+  can,
+  collectionBySlug,
+  listCollections,
+  modelFormatSql,
+  modelGeometrySql,
+  modelThumbnailSql,
+} from '@pb/core'
 import { getSessionUser } from '@pb/auth'
 import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
@@ -23,6 +30,7 @@ type Row = {
   preview_extension: string | null
   preview_image_file_id: string | null
   thumb_file_id: string | null
+  thumb_key: string | null
   bbox_x: string | null
   bbox_y: string | null
   bbox_z: string | null
@@ -54,18 +62,16 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
   const models = await db.execute<Row>(sql`
     SELECT m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
-           selected.extension AS preview_extension,
+           ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
-           f.id AS thumb_file_id, f.bbox_x, f.bbox_y, f.bbox_z
+           thumb.id AS thumb_file_id, thumb.thumb_key,
+           geometry.bbox_x, geometry.bbox_y, geometry.bbox_z
     FROM collection_models cm
     JOIN models m ON m.id = cm.model_id
     JOIN libraries l ON l.id = m.library_id
     LEFT JOIN model_files selected ON selected.id = m.preview_file_id
-    LEFT JOIN LATERAL (
-      SELECT id, bbox_x, bbox_y, bbox_z FROM model_files
-      WHERE model_id = m.id AND thumb_state = 'ok' AND missing_at IS NULL
-      ORDER BY size DESC LIMIT 1
-    ) f ON true
+    LEFT JOIN LATERAL (${modelGeometrySql(sql`m.id`, sql`m.preview_file_id`)}) geometry ON true
+    LEFT JOIN LATERAL (${modelThumbnailSql(sql`m.id`, sql`m.preview_file_id`)}) thumb ON true
     WHERE cm.collection_id = ${collection.id} AND m.missing_at IS NULL
     ORDER BY cm.position, m.name`)
 
@@ -136,6 +142,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
               previewExtension={model.preview_extension}
               previewImageFileId={model.preview_image_file_id}
               thumbFileId={model.thumb_file_id}
+              thumbKey={model.thumb_key}
               dimensions={formatDimensions(
                 Number(model.bbox_x ?? 0),
                 Number(model.bbox_y ?? 0),

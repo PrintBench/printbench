@@ -1,7 +1,7 @@
 {
   "name": "printbench",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.2",
   "description": "Self-hosted web app for managing and finding your 3D print files (STL, 3MF, OBJ, PLY). Postgres is the only dependency.",
   "keywords": [
     "3d-printing",
@@ -48,6 +48,7 @@
     "test:watch": "vitest",
     "verify:phase1": "tsx scripts/verify-phase1.mts",
     "auth:schema": "tsx scripts/introspect-auth-schema.mts",
+    "auth:reset": "tsx scripts/issue-password-reset.mts",
     "verify:phase2": "tsx scripts/verify-phase2.mts",
     "verify:phase2:ui": "tsx scripts/verify-phase2-ui.mts",
     "verify:phase3": "tsx scripts/verify-phase3.mts",
@@ -62,15 +63,15 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@next/eslint-plugin-next": "^16.3.5",
-    "@types/node": "^26.6.1",
+    "@next/eslint-plugin-next": "^16.3.6",
+    "@types/node": "^26.6.2",
     "concurrently": "^10.0.5",
-    "eslint": "^10.10.0",
+    "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "prettier": "^3.9.7",
-    "tsx": "^4.23.13",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.70.0",
+    "typescript-eslint": "^8.70.1",
     "vitest": "^5.0.1",
     "wait-on": "^9.1.0"
   }

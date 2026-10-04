@@ -1,5 +1,5 @@
 {
-  "id": "ddabd758-a2b9-400d-8b3e-1d1b30347e92",
+  "id": "513625cf-9c07-4216-be5f-e9cf57a3f91b",
   "prevId": "3a0a1dc8-d8cb-4d42-b3f8-c232881b6f3c",
   "version": "7",
   "dialect": "postgresql",
@@ -1948,32 +1948,15 @@
           "primaryKey": false,
           "notNull": false
         },
+        "embedded_metadata_state": {
+          "name": "embedded_metadata_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'done'"
+        },
         "license": {
           "name": "license",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "license_url": {
-          "name": "license_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "license_expires_at": {
-          "name": "license_expires_at",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "commercial_use": {
-          "name": "commercial_use",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "license_notes": {
-          "name": "license_notes",
           "type": "text",
           "primaryKey": false,
           "notNull": false

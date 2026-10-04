@@ -10,6 +10,7 @@ import { NotPermitted } from '@/components/shell/not-permitted'
 import { RoleSelect } from './role-select'
 import { UserActions } from './user-actions'
 import { AddPeople } from './add-people'
+import { PasswordResetButton } from './password-reset-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Users' }
@@ -121,6 +122,7 @@ export default async function UsersPage() {
                     />
                   </td>
                   <td className="px-4 py-3 text-right">
+                    <PasswordResetButton userId={row.id} email={row.email} disabled={row.banned} />
                     {/*
                     Nothing offered for your own account: suspending or
                     deleting yourself is a lockout with no way back through

@@ -38,6 +38,10 @@ export const models = pgTable(
     publicId: text('public_id').notNull(),
 
     notes: text('notes'),
+    /** Existing records and explicit edits stay authoritative over file metadata. */
+    embeddedMetadataState: text('embedded_metadata_state', { enum: ['pending', 'done'] })
+      .notNull()
+      .default('done'),
     /** Licence name or identifier. Null means unknown, not unlicensed. */
     license: text('license'),
     /** Link to the licence terms or commercial subscription page. */
