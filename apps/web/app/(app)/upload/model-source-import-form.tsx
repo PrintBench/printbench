@@ -1,0 +1,226 @@
+'use client'
+
+import { useEffect, useState, useTransition } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import type { UploadTarget } from './actions'
+import {
+  pollMakerWorldImport,
+  startModelSourceImport,
+  type MakerWorldImportStatus,
+} from './source-actions'
+import { readMakerWorldCookieStatus } from '../settings/makerworld-actions'
+import { readThingiverseTokenStatus } from '../settings/thingiverse-actions'
+
+export function ModelSourceImportForm({ targets }: { targets: UploadTarget[] }) {
+  const router = useRouter()
+  const [libraryId, setLibraryId] = useState(targets[0]?.id ?? '')
+  const [url, setUrl] = useState('')
+  const [saved, setSaved] = useState<boolean | null>(null)
+  const [thingiverseSaved, setThingiverseSaved] = useState<boolean | null>(null)
+  const [cookieMessage, setCookieMessage] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [importId, setImportId] = useState<string | null>(null)
+  const [status, setStatus] = useState<MakerWorldImportStatus | null>(null)
+  const [pending, startTransition] = useTransition()
+  const [pollAttempt, setPollAttempt] = useState(0)
+  const [pollError, setPollError] = useState<string | null>(null)
+  const active = status?.state === 'queued' || status?.state === 'importing'
+
+  useEffect(() => {
+    let cancelled = false
+    void readMakerWorldCookieStatus()
+      .then((result) => {
+        if (cancelled) return
+        if (result.ok) setSaved(result.saved)
+        else setCookieMessage(result.error)
+      })
+      .catch(() => {
+        if (!cancelled) setCookieMessage('Could not check your MakerWorld connection.')
+      })
+    void readThingiverseTokenStatus()
+      .then((result) => {
+        if (cancelled) return
+        if (result.ok) setThingiverseSaved(result.saved)
+      })
+      .catch(() => {
+        // A connection check does not prevent importing from another source.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!importId || !active) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    async function poll() {
+      try {
+        const result = await pollMakerWorldImport(importId!)
+        if (cancelled) return
+        if (!result.ok) {
+          setPollError(result.error)
+          return
+        }
+        setPollError(null)
+        setStatus(result.status)
+        if (result.status.state === 'complete') router.refresh()
+        else if (result.status.state !== 'failed') timer = setTimeout(() => void poll(), 3000)
+      } catch {
+        if (!cancelled) setPollError('Connection interrupted. The import may still be running.')
+      }
+    }
+    timer = setTimeout(() => void poll(), 1000)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [importId, active, pollAttempt, router])
+
+  return (
+    <section
+      aria-labelledby="model-sources-heading"
+      className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
+    >
+      <div>
+        <h2 id="model-sources-heading" className="text-lg font-semibold">
+          Import from model sites
+        </h2>
+        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+          Paste a MakerWorld, Printables, or Thingiverse model URL to bring its files and details
+          into your library. The source is detected from the URL.
+        </p>
+      </div>
+      {targets.length === 0 ? (
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          <Link href="/admin/libraries/new" className="underline">
+            Create a writable library
+          </Link>{' '}
+          to import models.
+        </p>
+      ) : (
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            setError(null)
+            startTransition(async () => {
+              try {
+                const result = await startModelSourceImport({ libraryId, url })
+                if (!result.ok) {
+                  setError(result.error)
+                  return
+                }
+                setImportId(result.id)
+                setStatus({ state: 'queued', publicId: null, error: null })
+                setPollError(null)
+              } catch {
+                setError('Could not start the import. Please try again.')
+              }
+            })
+          }}
+        >
+          <label className="block space-y-1 text-sm">
+            <span>Import to library</span>
+            <select
+              required
+              value={libraryId}
+              onChange={(event) => setLibraryId(event.target.value)}
+              disabled={pending || active}
+              className="h-10 w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3"
+            >
+              {targets.map((target) => (
+                <option key={target.id} value={target.id}>
+                  {target.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1 text-sm">
+            <span>Model page URL</span>
+            <Input
+              type="url"
+              required
+              placeholder="Paste a MakerWorld, Printables, or Thingiverse URL"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              disabled={pending || active}
+            />
+          </label>
+          <Button type="submit" disabled={pending || active}>
+            {pending ? 'Starting import…' : active ? 'Import in progress…' : 'Import model'}
+          </Button>
+        </form>
+      )}
+      <p className="text-sm text-[var(--color-ink-muted)]">
+        MakerWorld connection:{' '}
+        {saved === null ? 'Status unavailable' : saved ? 'Cookie saved' : 'Not connected'}.{' '}
+        <Link href="/settings#makerworld" className="underline">
+          {saved ? 'Manage in account settings' : 'Connect in account settings'}
+        </Link>
+      </p>
+      <p className="text-sm text-[var(--color-ink-muted)]">
+        Printables: public free models need no account connection.
+      </p>
+      <p className="text-sm text-[var(--color-ink-muted)]">
+        Thingiverse connection:{' '}
+        {thingiverseSaved === null
+          ? 'Status unavailable'
+          : thingiverseSaved
+            ? 'API token saved'
+            : 'Not connected'}
+        .{' '}
+        <Link href="/settings#thingiverse" className="underline">
+          {thingiverseSaved ? 'Manage in account settings' : 'Connect in account settings'}
+        </Link>
+      </p>
+      {cookieMessage && (
+        <p role="status" className="text-sm">
+          {cookieMessage}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-[var(--color-danger)]">
+          {error}
+        </p>
+      )}
+      <div role="status" aria-live="polite" className="text-sm">
+        {status?.state === 'queued' && <p>Queued. The import will start in the background.</p>}
+        {status?.state === 'importing' && <p>Importing model files and details…</p>}
+        {status?.state === 'complete' && (
+          <p>
+            Import complete.{' '}
+            {status.publicId && (
+              <Link className="underline" href={`/models/${encodeURIComponent(status.publicId)}`}>
+                Open model
+              </Link>
+            )}
+          </p>
+        )}
+        {status?.state === 'failed' && (
+          <p className="text-[var(--color-danger)]">
+            {status.error || 'The import failed. Please try again.'}
+          </p>
+        )}
+      </div>
+      {pollError && (
+        <div role="alert" className="text-sm">
+          <p>{pollError}</p>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setPollError(null)
+              setPollAttempt((value) => value + 1)
+            }}
+          >
+            Check again
+          </Button>
+        </div>
+      )}
+    </section>
+  )
+}

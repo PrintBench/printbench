@@ -18,10 +18,10 @@
     "@tus/server": "^2.4.5",
     "archiver": "^8.0.0",
     "chokidar": "^5.0.0",
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",
-    "tsx": "^4.23.13"
+    "tsx": "^4.23.15"
   }
 }

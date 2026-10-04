@@ -12,7 +12,7 @@ import {
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
-import { JOB, getQueue } from '@pb/jobs'
+import { JOB, getStartedQueue } from '@pb/jobs'
 
 /**
  * Moving a model to another library.
@@ -146,7 +146,9 @@ export async function moveToLibrary(
       { destinationPath },
     )
 
-    await getQueue().send(
+    // The web process only sends jobs; start its queue before the first move.
+    const queue = await getStartedQueue()
+    await queue.send(
       JOB.modelMove,
       {
         modelId: found.model.id,

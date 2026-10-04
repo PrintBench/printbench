@@ -43,6 +43,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/apps/worker ./apps/worker
 COPY --from=build /app/packages ./packages
 COPY --from=build /app/package.json ./package.json
+# Local operators need the same recovery command when the last admin is locked out.
+COPY --from=build /app/scripts/issue-password-reset.mts ./scripts/issue-password-reset.mts
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \

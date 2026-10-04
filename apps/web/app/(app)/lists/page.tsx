@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
-import { ModelCard } from '@/components/model/model-card'
+import { ModelCard, formatDimensions } from '@/components/model/model-card'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Liked' }
@@ -57,6 +57,8 @@ export default async function LikedPage() {
               previewExtension={model.previewExtension}
               previewImageFileId={model.previewImageFileId}
               thumbFileId={model.thumbFileId}
+              thumbKey={model.thumbKey}
+              dimensions={formatDimensions(model.bboxX ?? 0, model.bboxY ?? 0, model.bboxZ ?? 0)}
             />
           ))}
         </div>

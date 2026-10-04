@@ -16,12 +16,12 @@
     "build": "tsc --build"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "pg": "^8.23.0"
   },
   "devDependencies": {
     "@types/pg": "^8.15.5",
-    "drizzle-kit": "^0.31.10",
-    "tsx": "^4.23.13"
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15"
   }
 }

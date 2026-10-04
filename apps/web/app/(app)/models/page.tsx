@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Boxes, ChevronLeft, ChevronRight, HardDrive } from 'lucide-react'
 import { sql } from 'drizzle-orm'
 import { getDb } from '@pb/db'
+import { modelFormatSql, modelGeometrySql, modelThumbnailSql } from '@pb/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
@@ -24,6 +25,7 @@ type ModelRow = {
   preview_extension: string | null
   preview_image_file_id: string | null
   thumb_file_id: string | null
+  thumb_key: string | null
   bbox_x: string | null
   bbox_y: string | null
   bbox_z: string | null
@@ -50,21 +52,15 @@ export default async function ModelsPage({
   const result = await db.execute<ModelRow>(sql`
     SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name,
-           f.extension AS preview_extension,
+           ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
            CASE WHEN f.category = 'image' THEN f.id END AS preview_image_file_id,
-           -- The preview file if it has a rendered thumbnail; otherwise any
-           -- mesh in the model that does. A model whose chosen preview is an
-           -- image still gets a render from one of its meshes.
-           coalesce(
-             CASE WHEN f.thumb_state = 'ok' THEN f.id END,
-             (SELECT f2.id FROM model_files f2
-               WHERE f2.model_id = m.id AND f2.thumb_state = 'ok' AND f2.missing_at IS NULL
-               ORDER BY f2.size DESC LIMIT 1)
-           ) AS thumb_file_id,
-           f.bbox_x, f.bbox_y, f.bbox_z
+           thumb.id AS thumb_file_id, thumb.thumb_key,
+           geometry.bbox_x, geometry.bbox_y, geometry.bbox_z
     FROM models m
     JOIN libraries l ON l.id = m.library_id
     LEFT JOIN model_files f ON f.id = m.preview_file_id
+    LEFT JOIN LATERAL (${modelGeometrySql(sql`m.id`, sql`m.preview_file_id`)}) geometry ON true
+    LEFT JOIN LATERAL (${modelThumbnailSql(sql`m.id`, sql`m.preview_file_id`)}) thumb ON true
     WHERE m.missing_at IS NULL
       ${afterName && afterId ? sql`AND (m.name, m.id) > (${afterName}, ${afterId}::uuid)` : sql``}
     ORDER BY m.name ASC, m.id ASC
@@ -132,6 +128,7 @@ export default async function ModelsPage({
                 isPackage={row.is_package}
                 previewImageFileId={row.preview_image_file_id}
                 thumbFileId={row.thumb_file_id}
+                thumbKey={row.thumb_key}
                 dimensions={formatDimensions(
                   Number(row.bbox_x ?? 0),
                   Number(row.bbox_y ?? 0),

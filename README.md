@@ -120,6 +120,16 @@ web shell is replaceable without touching the app.
   is preserved, because that structure is what groups files into models. A
   `.zip` is extracted server-side rather than stored whole, with a zip-slip
   guard on every entry, so a downloaded pack can be dropped in as one file.
+- **New 3MF files supply embedded metadata.** Titles, designers, descriptions,
+  licenses, source-file dates and covers are read by the worker, with existing
+  edits and sidecars taking precedence. Recognized MakerWorld project IDs also
+  resolve public tags and details automatically, with no cookie required.
+  Model cards show the printable format independently of artwork, and the detail
+  preview switches between the thumbnail and interactive 3D model.
+- **MakerWorld links import files and details.** Save your own account cookie
+  in Account settings → MakerWorld, then paste a model URL on Upload. The worker
+  imports its selected print profile with metadata and a source link. See [Model imports](docs/model-imports.md) for
+  session requirements, limits and the unofficial API caveat.
 - **S3 is a full backend, not just a source.** A library can live on local
   disk, a NAS mount or an S3-compatible bucket, and read _and_ write the same
   either way — uploads, zip extraction, sidecars and deletion all go through
@@ -256,6 +266,29 @@ A model can be shared by link. The token is separate from the internal id, so
 revoking it actually revokes something, and a shared link grants exactly one
 model — not the library, not search. Sharing is off instance-wide by default;
 turning it off closes every existing link at once.
+
+## Account passwords and recovery
+
+Every signed-in user can change their password in **Account settings → Password**.
+The current password is required, and other sessions are signed out after a change.
+
+For forgotten passwords, an admin can open **Users**, use the key button beside
+an account, and create a private reset link. The owner opens the link and chooses
+a password; no email delivery is required. Links expire after one hour, work once,
+and replace any earlier link for that account. Resetting signs out all sessions.
+Changing the password another way also invalidates an outstanding reset link.
+
+If the last admin cannot sign in, a trusted server operator can issue a link from
+the application directory with the normal runtime environment loaded:
+
+```sh
+npm run auth:reset -- --email your@email.example
+```
+
+`APP_URL` (or `BETTER_AUTH_URL`) must match the address users visit. The command
+prints a private reset link, never a password. Keep the link out of logs and chats,
+and give it only to the account owner. The command requires server and database
+access; the public **Forgot password?** page cannot issue reset links.
 
 ## Backup and restore
 

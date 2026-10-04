@@ -28,6 +28,11 @@ import { basename, slugify } from '../library/paths'
 import { refreshModelSearchVectors } from '../search/refresh'
 import { readPackageSidecar, readSidecar } from '../sidecar/sidecar'
 import type { LibraryLocation, StorageAdapter } from '../storage/types'
+import {
+  assertLibraryScanLock,
+  withLibraryScanLock,
+  type LibraryScanLock,
+} from './library-scan-lock'
 
 /**
  * Refuse to proceed if a scan would mark more than this share of a library's
@@ -95,10 +100,23 @@ export interface ScanDeps {
   library: LibraryLocation
 }
 
-export async function scanLibrary(
+export async function scanLibrary(deps: ScanDeps, options: ScanOptions = {}): Promise<ScanOutcome> {
+  return withLibraryScanLock(
+    deps.db,
+    deps.library.id,
+    (lease) => scanLibraryUnderLock(deps, options, lease),
+    options.signal,
+  )
+}
+
+/** The importer reuses its publication lock instead of waiting on itself. */
+export async function scanLibraryUnderLock(
   { db, storage, library }: ScanDeps,
-  options: ScanOptions = {},
+  options: ScanOptions,
+  lease: LibraryScanLock,
+  sourceImport?: { id: string; modelPath: string },
 ): Promise<ScanOutcome> {
+  assertLibraryScanLock(lease, db, library.id)
   const mode = options.mode ?? 'deep'
   const startedAt = new Date()
 
@@ -227,7 +245,13 @@ export async function scanLibrary(
     for (const model of grouped.models) {
       if (excluded.has(model.path)) continue
 
-      const result = await upsertModel(db, library.id, model, startedAt)
+      const result = await upsertModel(
+        db,
+        library.id,
+        model,
+        startedAt,
+        sourceImport?.modelPath === model.path ? sourceImport.id : undefined,
+      )
       touchedModelIds.push(result.modelId)
       if (result.created) {
         outcome.modelsCreated++
@@ -338,6 +362,24 @@ async function upsertModel(
   libraryId: string,
   model: GroupedModel,
   seenAt: Date,
+  sourceImportId?: string,
+): Promise<UpsertResult> {
+  if (sourceImportId) {
+    // Files and their source reservation become visible together. A cancelled
+    // import cannot expose an unreserved model to an already delivered analyzer.
+    return db.transaction((transaction) =>
+      upsertModelRows(transaction as unknown as Database, libraryId, model, seenAt, sourceImportId),
+    )
+  }
+  return upsertModelRows(db, libraryId, model, seenAt)
+}
+
+async function upsertModelRows(
+  db: Database,
+  libraryId: string,
+  model: GroupedModel,
+  seenAt: Date,
+  sourceImportId?: string,
 ): Promise<UpsertResult> {
   const existing = await db
     .select({ id: schema.models.id, name: schema.models.name })
@@ -350,6 +392,8 @@ async function upsertModel(
 
   if (existing[0]) {
     modelId = existing[0].id
+    if (sourceImportId)
+      await db.execute(sql`SELECT id FROM models WHERE id = ${modelId} FOR UPDATE`)
     // Only touch bookkeeping columns: the user may have renamed this model or
     // written notes, and a rescan must never overwrite their edits.
     await db
@@ -368,6 +412,7 @@ async function upsertModel(
         libraryId,
         path: model.path,
         name: model.name,
+        embeddedMetadataState: 'pending',
         slug: slugify(model.name) || 'model',
         publicId: nanoid(12),
         isFileModel: model.isFileModel,
@@ -377,6 +422,21 @@ async function upsertModel(
       .returning({ id: schema.models.id })
     modelId = inserted[0]!.id
     created = true
+  }
+
+  if (sourceImportId) {
+    const reserved = await db
+      .update(schema.modelImports)
+      .set({ modelId })
+      .where(
+        and(
+          eq(schema.modelImports.id, sourceImportId),
+          eq(schema.modelImports.libraryId, libraryId),
+          eq(schema.modelImports.state, 'importing'),
+        ),
+      )
+      .returning({ id: schema.modelImports.id })
+    if (!reserved.length) throw new Error('The source import no longer owns its model reservation')
   }
 
   const { filesCreated } = await upsertFiles(db, modelId, model, seenAt)
@@ -773,6 +833,12 @@ async function restoreFromSidecar(
     return false
   }
   if (!data) return false
+
+  // A sidecar records a curator's decisions, including deliberately empty fields.
+  await db
+    .update(schema.models)
+    .set({ embeddedMetadataState: 'done' })
+    .where(eq(schema.models.id, modelId))
 
   const updates: string[] = []
   if (data.name) updates.push('name')

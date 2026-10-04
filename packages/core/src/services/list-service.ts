@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import type { Database } from '@pb/db'
 import { slugify } from '../library/paths'
+import { modelFormatSql, modelGeometrySql, modelThumbnailSql } from './model-format'
 
 /**
  * Lists, and the "liked" list in particular.
@@ -120,9 +121,14 @@ export interface LikedModel {
   totalSize: number
   libraryName: string
   isPackage: boolean
+  /** Representative live model format, independent of the thumbnail file. */
   previewExtension: string | null
   previewImageFileId: string | null
   thumbFileId: string | null
+  thumbKey: string | null
+  bboxX: number | null
+  bboxY: number | null
+  bboxZ: number | null
   addedAt: Date
 }
 
@@ -145,20 +151,25 @@ export async function listLiked(
     preview_extension: string | null
     preview_image_file_id: string | null
     thumb_file_id: string | null
+    thumb_key: string | null
+    bbox_x: string | null
+    bbox_y: string | null
+    bbox_z: string | null
     added_at: string
   }>(sql`
     SELECT m.id, m.public_id, m.name, m.path, m.file_count, m.total_size, m.is_package,
            l.name AS library_name, li.created_at AS added_at,
-           selected.extension AS preview_extension,
+           ${modelFormatSql(sql`m.id`, sql`m.preview_file_id`)} AS preview_extension,
+           geometry.bbox_x, geometry.bbox_y, geometry.bbox_z,
            CASE WHEN selected.category = 'image' THEN selected.id END AS preview_image_file_id,
-           (SELECT f.id FROM model_files f
-             WHERE f.model_id = m.id AND f.thumb_state = 'ok' AND f.missing_at IS NULL
-             ORDER BY f.size DESC LIMIT 1) AS thumb_file_id
+           thumb.id AS thumb_file_id, thumb.thumb_key
     FROM list_items li
     JOIN lists lst ON lst.id = li.list_id
     JOIN models m ON m.id = li.model_id
     JOIN libraries l ON l.id = m.library_id
     LEFT JOIN model_files selected ON selected.id = m.preview_file_id
+    LEFT JOIN LATERAL (${modelGeometrySql(sql`m.id`, sql`m.preview_file_id`)}) geometry ON true
+    LEFT JOIN LATERAL (${modelThumbnailSql(sql`m.id`, sql`m.preview_file_id`)}) thumb ON true
     WHERE lst.user_id = ${userId} AND lst.kind = 'liked' AND m.missing_at IS NULL
     -- Most recently liked first: the reason you liked it is usually recent.
     ORDER BY li.created_at DESC
@@ -176,6 +187,10 @@ export async function listLiked(
     previewExtension: row.preview_extension,
     previewImageFileId: row.preview_image_file_id,
     thumbFileId: row.thumb_file_id,
+    thumbKey: row.thumb_key,
+    bboxX: row.bbox_x === null ? null : Number(row.bbox_x),
+    bboxY: row.bbox_y === null ? null : Number(row.bbox_y),
+    bboxZ: row.bbox_z === null ? null : Number(row.bbox_z),
     addedAt: new Date(row.added_at),
   }))
 }

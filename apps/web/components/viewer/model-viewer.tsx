@@ -35,8 +35,12 @@ export interface ModelViewerProps {
   filename: string
   /** Shown before load and as the fallback for a file too large to auto-load. */
   thumbnailFileId?: string | null
+  /** Content version for immutable thumbnail URLs after regeneration. */
+  thumbnailKey?: string | null
   /** From settings. Falls back to the built-in limit when not supplied. */
   maxBytes?: number
+  /** Pause rendering while another preview (such as artwork) is displayed. */
+  active?: boolean
   /**
    * Where to fetch bytes and thumbnails from.
    *
@@ -55,7 +59,9 @@ export function ModelViewer({
   fileSize,
   filename,
   thumbnailFileId,
+  thumbnailKey,
   maxBytes = AUTO_LOAD_LIMIT,
+  active = true,
   urlFor = defaultUrlFor,
   className,
 }: ModelViewerProps) {
@@ -63,6 +69,18 @@ export function ModelViewer({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   const resetViewRef = useRef<(() => void) | null>(null)
+  const activeRef = useRef(active)
+  const resumeRef = useRef<(() => void) | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    activeRef.current = active
+    if (active) resumeRef.current?.()
+    else if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+  }, [active])
 
   const [phase, setPhase] = useState<Phase>('idle')
   const [progress, setProgress] = useState(0)
@@ -266,15 +284,22 @@ export function ModelViewer({
 
     let running = true
     const tick = () => {
-      if (!running) return
+      animationFrameRef.current = null
+      if (!running || !activeRef.current) return
       controls.update()
       renderer.render(scene, camera)
-      requestAnimationFrame(tick)
+      animationFrameRef.current = requestAnimationFrame(tick)
+    }
+    resumeRef.current = () => {
+      if (animationFrameRef.current === null) tick()
     }
     tick()
 
     cleanupRef.current = () => {
       running = false
+      resumeRef.current = null
+      if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
       observer.disconnect()
       controls.dispose()
       geometry.dispose()
@@ -296,8 +321,8 @@ export function ModelViewer({
 
   // Auto-start once visible, unless the file is large enough to need a decision.
   useEffect(() => {
-    if (visible && phase === 'idle' && !tooLarge) void start()
-  }, [visible, phase, tooLarge, start])
+    if (active && visible && phase === 'idle' && !tooLarge) void start()
+  }, [active, visible, phase, tooLarge, start])
 
   useEffect(() => () => cleanupRef.current?.(), [])
 
@@ -340,7 +365,12 @@ export function ModelViewer({
           {thumbnailFileId && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={urlFor(thumbnailFileId, 'thumb')}
+              src={
+                urlFor(thumbnailFileId, 'thumb') +
+                (thumbnailKey
+                  ? `${urlFor(thumbnailFileId, 'thumb').includes('?') ? '&' : '?'}v=${encodeURIComponent(thumbnailKey)}`
+                  : '')
+              }
               alt=""
               aria-hidden
               className="absolute inset-0 size-full object-contain p-6 opacity-30"
