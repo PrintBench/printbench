@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { Box, FileStack, Package } from 'lucide-react'
+import { FileStack, Package } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { CardPreview } from './card-preview'
 
 export function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
@@ -89,9 +90,8 @@ export function ModelCard({
             className="size-full object-contain transition-transform duration-200 group-hover:scale-[1.03]"
           />
         ) : (
-          <Box className="size-8 text-white/70" strokeWidth={1.5} />
+          <CardPreview publicId={publicId} hue={hue} />
         )}
-
         {previewExtension && (
           <span className="absolute bottom-2 right-2 rounded bg-black/35 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/90 backdrop-blur-sm">
             {previewExtension}
