@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { ChevronsUpDown, LogOut, Settings } from 'lucide-react'
-import { can, type PolicyUser } from '@pb/core/policy'
+import type { PolicyUser } from '@pb/core/policy'
 import { signOut } from '@/lib/auth-client'
 import { ThemeToggle } from './theme-toggle'
 
@@ -51,17 +51,15 @@ export function UserMenu({ user }: { user: PolicyUser & { name: string; email: s
             <p className="truncate text-xs text-[var(--color-ink-faint)]">{user.email}</p>
           </div>
           <DropdownMenu.Separator className="my-1.5 h-px bg-[var(--color-border)]" />
-          {can(user, 'file:upload') && (
-            <DropdownMenu.Item asChild>
-              <Link
-                href="/settings"
-                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-ink-muted)] outline-none data-[highlighted]:bg-[var(--color-surface-2)] data-[highlighted]:text-[var(--color-ink)]"
-              >
-                <Settings className="size-4" />
-                Account settings
-              </Link>
-            </DropdownMenu.Item>
-          )}
+          <DropdownMenu.Item asChild>
+            <Link
+              href="/settings"
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-ink-muted)] outline-none data-[highlighted]:bg-[var(--color-surface-2)] data-[highlighted]:text-[var(--color-ink)]"
+            >
+              <Settings className="size-4" />
+              Account settings
+            </Link>
+          </DropdownMenu.Item>
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-sm text-[var(--color-ink-muted)]">Theme</span>
             <ThemeToggle />

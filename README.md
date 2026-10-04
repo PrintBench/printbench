@@ -267,6 +267,29 @@ revoking it actually revokes something, and a shared link grants exactly one
 model — not the library, not search. Sharing is off instance-wide by default;
 turning it off closes every existing link at once.
 
+## Account passwords and recovery
+
+Every signed-in user can change their password in **Account settings → Password**.
+The current password is required, and other sessions are signed out after a change.
+
+For forgotten passwords, an admin can open **Users**, use the key button beside
+an account, and create a private reset link. The owner opens the link and chooses
+a password; no email delivery is required. Links expire after one hour, work once,
+and replace any earlier link for that account. Resetting signs out all sessions.
+Changing the password another way also invalidates an outstanding reset link.
+
+If the last admin cannot sign in, a trusted server operator can issue a link from
+the application directory with the normal runtime environment loaded:
+
+```sh
+npm run auth:reset -- --email your@email.example
+```
+
+`APP_URL` (or `BETTER_AUTH_URL`) must match the address users visit. The command
+prints a private reset link, never a password. Keep the link out of logs and chats,
+and give it only to the account owner. The command requires server and database
+access; the public **Forgot password?** page cannot issue reset links.
+
 ## Backup and restore
 
 See [docs/deployment.md](docs/deployment.md). In short: your files are never

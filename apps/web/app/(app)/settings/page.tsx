@@ -1,5 +1,7 @@
+import { requireUser } from '@pb/auth'
+import { can } from '@pb/core/policy'
 import { PageHeader } from '@/components/shell/page-header'
-import { NotPermitted } from '@/components/shell/not-permitted'
+import { PasswordForm } from './password-form'
 import { readMakerWorldCookieStatus } from './makerworld-actions'
 import { MakerWorldConnectionForm } from './makerworld-connection-form'
 import { readThingiverseTokenStatus } from './thingiverse-actions'
@@ -9,37 +11,40 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Account settings' }
 
 export default async function AccountSettingsPage() {
-  const [result, thingiverse] = await Promise.all([
-    readMakerWorldCookieStatus(),
-    readThingiverseTokenStatus(),
-  ])
-  if (
-    (!result.ok && result.error === 'Not permitted.') ||
-    (!thingiverse.ok && thingiverse.error === 'Not permitted.')
-  ) {
-    return <NotPermitted what="model source account settings" />
-  }
+  const user = await requireUser()
+  const canImport = can(
+    { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
+    'file:upload',
+  )
+  const connections = canImport
+    ? await Promise.all([readMakerWorldCookieStatus(), readThingiverseTokenStatus()])
+    : null
 
   return (
     <>
       <PageHeader
         title="Account settings"
-        description="Manage connections for your own PrintBench account."
+        description="Manage your PrintBench account password and model source connections."
       />
       <div className="max-w-3xl space-y-6">
-        {result.ok ? (
-          <MakerWorldConnectionForm initialSaved={result.saved} />
-        ) : (
-          <p role="alert" className="text-sm text-[var(--color-danger)]">
-            {result.error}
-          </p>
-        )}
-        {thingiverse.ok ? (
-          <ThingiverseConnectionForm initialSaved={thingiverse.saved} />
-        ) : (
-          <p role="alert" className="text-sm text-[var(--color-danger)]">
-            {thingiverse.error}
-          </p>
+        <PasswordForm email={user.email} />
+        {connections && (
+          <>
+            {connections[0].ok ? (
+              <MakerWorldConnectionForm initialSaved={connections[0].saved} />
+            ) : (
+              <p role="alert" className="text-sm text-[var(--color-danger)]">
+                {connections[0].error}
+              </p>
+            )}
+            {connections[1].ok ? (
+              <ThingiverseConnectionForm initialSaved={connections[1].saved} />
+            ) : (
+              <p role="alert" className="text-sm text-[var(--color-danger)]">
+                {connections[1].error}
+              </p>
+            )}
+          </>
         )}
       </div>
     </>
