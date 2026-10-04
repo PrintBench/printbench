@@ -23,5 +23,3 @@ Delete what does not apply:
 - New domain logic went in packages/, not a route handler
 - Touches scan safety guards, path confinement, signed links or share tokens
 -->
-
-- [ ] No code was copied out of `reference/`.
