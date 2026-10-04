@@ -54,6 +54,16 @@ export interface UpdateResult {
 const MAX_NAME = 225
 const MAX_NOTES = 20_000
 const MAX_TAGS = 200
+const MAX_LINKS = 50
+const MAX_LINK_TITLE = 300
+const MAX_LINK_URL = 2000
+
+const SINGLETON_LINK_TITLES = new Set([
+  'Original model page',
+  'Assembly video',
+  'Printing instructions',
+  'Designer page',
+])
 
 export async function updateModel(
   db: Database,
@@ -71,6 +81,54 @@ export async function updateModel(
   if (!row) return { ok: false, error: 'That model no longer exists.', sidecarWritten: false }
 
   const updates: Partial<typeof schema.models.$inferInsert> = { updatedAt: new Date() }
+
+  if (patch.links !== undefined) {
+    const links = patch.links
+      .map((link) => ({
+        title: link.title?.trim() || null,
+        url: link.url.trim(),
+      }))
+      .filter((link) => link.url !== '')
+
+    if (links.length > MAX_LINKS) {
+      return {
+        ok: false,
+        error: `A model can have at most ${MAX_LINKS} links.`,
+        sidecarWritten: false,
+      }
+    }
+
+    const singletonTitles = new Set<string>()
+
+    for (const link of links) {
+      if (link.url.length > MAX_LINK_URL) {
+        return {
+          ok: false,
+          error: `Link URLs can be at most ${MAX_LINK_URL} characters.`,
+          sidecarWritten: false,
+        }
+      }
+
+      if (link.title !== null && link.title.length > MAX_LINK_TITLE) {
+        return {
+          ok: false,
+          error: `Link titles can be at most ${MAX_LINK_TITLE} characters.`,
+          sidecarWritten: false,
+        }
+      }
+
+      if (link.title !== null && SINGLETON_LINK_TITLES.has(link.title)) {
+        if (singletonTitles.has(link.title)) {
+          return {
+            ok: false,
+            error: `Only one "${link.title}" link is allowed.`,
+            sidecarWritten: false,
+          }
+        }
+        singletonTitles.add(link.title)
+      }
+    }
+  }
 
   if (patch.name !== undefined) {
     const name = patch.name.trim()

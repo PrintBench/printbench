@@ -336,11 +336,17 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
                             )
                           }}
                         >
-                          {LINK_TYPES.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
+                          {LINK_TYPES.map((type) => {
+                            const usedByAnotherLink = links.some(
+                              (item, itemIndex) => itemIndex !== index && item.title === type,
+                            )
+
+                            return (
+                              <option key={type} value={type} disabled={usedByAnotherLink}>
+                                {type}
+                              </option>
+                            )
+                          })}
                           <option value="Other">Other</option>
                         </Select>
 
@@ -350,6 +356,7 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
                             aria-label={`Link ${index + 1} title`}
                             value={link.title}
                             placeholder="Link title"
+                            maxLength={300}
                             onChange={(event) => {
                               const value = event.target.value
                               setLinks((current) =>
@@ -367,6 +374,7 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
                           aria-label={`Link ${index + 1} URL`}
                           value={link.url}
                           placeholder="https://..."
+                          maxLength={2000}
                           onChange={(event) => {
                             const value = event.target.value
                             setLinks((current) =>
@@ -400,6 +408,7 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
                 type="button"
                 variant="secondary"
                 size="sm"
+                disabled={links.length >= 50}
                 onClick={() => setLinks((current) => [...current, { title: '', url: '' }])}
               >
                 <Plus />

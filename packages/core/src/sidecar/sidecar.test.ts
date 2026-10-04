@@ -282,6 +282,81 @@ describeDb('sidecar round trip', () => {
     ])
   })
 
+  it('rejects more than 50 model links before changing existing links', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    await db.execute(sql`
+      INSERT INTO model_links (model_id, url, title, host, position)
+      VALUES (${id}, 'https://example.com/existing', 'Existing', 'example.com', 0)
+    `)
+
+    const result = await updateModel(db, id, {
+      links: Array.from({ length: 51 }, (_, index) => ({
+        title: `Link ${index}`,
+        url: `https://example.com/${index}`,
+      })),
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/at most 50 links/i)
+    expect(result.sidecarWritten).toBe(false)
+
+    const links = await db.execute<{ url: string }>(sql`
+      SELECT url FROM model_links WHERE model_id = ${id}
+    `)
+    expect(links.rows.map((link) => link.url)).toEqual(['https://example.com/existing'])
+  })
+
+  it('rejects model link URLs longer than the sidecar limit', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    const result = await updateModel(db, id, {
+      links: [{ title: 'Other', url: `https://example.com/${'x'.repeat(2000)}` }],
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/2000 characters/i)
+    expect(result.sidecarWritten).toBe(false)
+  })
+
+  it('rejects model link titles longer than the sidecar limit', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    const result = await updateModel(db, id, {
+      links: [{ title: 'x'.repeat(301), url: 'https://example.com/model' }],
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/300 characters/i)
+    expect(result.sidecarWritten).toBe(false)
+  })
+
+  it('rejects duplicate singleton model link types', async () => {
+    await scan()
+    const id = await modelId('Red Dragon')
+
+    for (const title of [
+      'Original model page',
+      'Assembly video',
+      'Printing instructions',
+      'Designer page',
+    ]) {
+      const result = await updateModel(db, id, {
+        links: [
+          { title, url: 'https://example.com/one' },
+          { title, url: 'https://example.com/two' },
+        ],
+      })
+
+      expect(result.ok).toBe(false)
+      expect(result.error).toBe(`Only one "${title}" link is allowed.`)
+      expect(result.sidecarWritten).toBe(false)
+    }
+  })
+
   it('rejects an impossible licence expiry date when editing metadata', async () => {
     await scan()
     const id = await modelId('Red Dragon')
