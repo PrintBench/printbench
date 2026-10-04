@@ -4,22 +4,6 @@ Thanks for taking an interest. This file covers the things that are specific to
 this repository — the general advice about being nice and writing clear commit
 messages applies here too, but you already know it.
 
-## The one firm rule: `reference/`
-
-`reference/manyfold` is a vendored copy of [ManyFold](https://manyfold.app),
-kept only as a **domain reference** for what a print library needs to model.
-
-ManyFold is AGPL-3.0, and its `AGENTS.md` asks that AI agents not contribute to
-that project. Neither of those binds this codebase, but both mean one rule that
-is not negotiable:
-
-> **No code is copied out of `reference/`.** Read it to understand the problem,
-> then solve the problem yourself.
-
-`reference/` is gitignored, dockerignored, excluded from the TypeScript build,
-never linted and never formatted. Nothing imports from it. If you find yourself
-wanting to relax any of that, open an issue first.
-
 ## Getting set up
 
 ```bash
