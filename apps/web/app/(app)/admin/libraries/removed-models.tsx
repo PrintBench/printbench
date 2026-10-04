@@ -37,9 +37,8 @@ export function RemovedModels({ removed }: { removed: RemovedModel[] }) {
       <CardContent className="p-4">
         <h2 className="text-sm font-semibold">Removed models</h2>
         <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-          Forgotten, but still on disk. Restoring brings one back at the next scan of its library —
-          rebuilt from the files and its sidecar, so notes and tags return only if they were written
-          to one.
+          Forgotten, but still on disk. Restoring rebuilds a model at the next library scan using
+          its files and sidecar. Notes and tags return only if they were written to a sidecar.
         </p>
 
         {error && <p className="mt-2 text-xs text-[var(--color-danger)]">{error}</p>}

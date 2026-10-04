@@ -68,7 +68,7 @@ export function QueueButton({
           size="sm"
           aria-label={
             openCount > 0
-              ? `Print queue — ${openCount} open for this model`
+              ? `Print queue: ${openCount} open for this model`
               : 'Add this model to the print queue'
           }
         >

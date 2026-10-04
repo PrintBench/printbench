@@ -48,7 +48,7 @@ export function ScanButton({
           <div className="flex flex-col items-end gap-2 rounded-[var(--radius-control)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3">
             <p className="max-w-xs text-right text-xs text-[var(--color-ink)]">
               Only confirm if you really did delete those models. If a drive or network share is
-              unmounted, fix that first — confirming will mark everything on it as missing.
+              unmounted, fix that first. Confirming will mark everything on it as missing.
             </p>
             <div className="flex gap-2">
               <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>

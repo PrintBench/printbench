@@ -102,8 +102,8 @@ function InviteForm({ origin, onDone }: { origin: string; onDone: () => void }) 
     <Card>
       <CardContent className="space-y-4 p-5">
         <p className="text-sm text-[var(--color-ink-muted)]">
-          Creates a link that lets one person set up their own account. Nothing is emailed — copy
-          the link and send it however you like. It expires in 14 days and works once.
+          Creates a link that lets one person set up their own account. Nothing is emailed. Copy the
+          link and send it however you like. It expires in 14 days and works once.
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -176,7 +176,7 @@ function AddUserForm({ onDone }: { onDone: () => void }) {
       <CardContent className="space-y-4 p-5">
         <p className="text-sm text-[var(--color-ink-muted)]">
           Sets up an account with a password you choose and pass on. An invitation link is usually
-          better — it lets them pick a password you never see.
+          better because it lets them pick a password you never see.
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">

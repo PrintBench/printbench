@@ -63,7 +63,7 @@ export function ShareButton({
       setTimeout(() => setCopied(false), 2000)
     } catch {
       // Clipboard access can be refused; the input below is selectable anyway.
-      setError('Could not copy — select the link and copy it by hand.')
+      setError('Could not copy. Select the link and copy it by hand.')
     }
   }
 

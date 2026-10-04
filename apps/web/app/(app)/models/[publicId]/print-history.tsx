@@ -191,7 +191,7 @@ export function PrintHistory({ publicId, prints, stats, files, suggestions, canL
           <CardContent className="p-6 text-center text-sm text-[var(--color-ink-muted)]">
             Never printed.
             {canLog &&
-              ' Log one once it comes off the plate — settings that worked are worth keeping.'}
+              ' Log one once it comes off the plate. Settings that worked are worth keeping.'}
           </CardContent>
         </Card>
       ) : (
@@ -283,7 +283,7 @@ function PrintRow({
     print.wallCount != null && `${print.wallCount} walls`,
     print.supports != null && (print.supports ? 'supports' : 'no supports'),
     print.adhesion && BED_ADHESION_LABELS[print.adhesion].toLowerCase(),
-    print.nozzleTempC != null && `${print.nozzleTempC}/${print.bedTempC ?? '—'} °C`,
+    print.nozzleTempC != null && `${print.nozzleTempC}/${print.bedTempC ?? '-'} °C`,
     print.colorName,
     print.filamentCost != null && `costs ${print.filamentCost.toFixed(2)}`,
     print.slicerProfile,
@@ -530,7 +530,7 @@ function PrintForm({
         <Field label="Outcome" htmlFor="print-status">
           <Select value={status} onChange={(e) => setStatus(e.target.value as PrintStatus)}>
             <option value="success">Success</option>
-            <option value="partial">Partial — usable, with problems</option>
+            <option value="partial">Partial (usable, with problems)</option>
             <option value="failed">Failed</option>
             <option value="in_progress">Still printing</option>
           </Select>

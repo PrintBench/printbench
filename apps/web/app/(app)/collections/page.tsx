@@ -24,7 +24,7 @@ export default async function CollectionsPage() {
     <>
       <PageHeader
         title="Collections"
-        description="Group models however you like — a Kickstarter wave, a campaign, things to print next. A model can be in as many as you want."
+        description="Group models however you like: a Kickstarter wave, a campaign, or things to print next. A model can be in as many as you want."
       />
 
       {collections.length === 0 && !canEdit ? (

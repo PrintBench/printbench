@@ -105,7 +105,7 @@ export default async function LibrariesPage() {
         <EmptyState
           icon={<HardDrive />}
           title="No libraries yet"
-          description="Point PrintBench at a folder of STL and 3MF files. It indexes them where they already live — nothing is moved, renamed or deleted."
+          description="Point PrintBench at a folder of STL and 3MF files. It indexes them where they already live. Nothing is moved, renamed or deleted."
           action={
             <Button asChild>
               <Link href="/admin/libraries/new">

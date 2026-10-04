@@ -247,7 +247,7 @@ export default async function DashboardPage() {
           title="No libraries yet"
           description={
             canManage
-              ? 'Point PrintBench at a folder of STL and 3MF files and it will index them in place — your files are never moved or renamed.'
+              ? 'Point PrintBench at a folder of STL and 3MF files and it will index them in place. Your files are never moved or renamed.'
               : 'An admin needs to add a library before anything appears here.'
           }
           action={

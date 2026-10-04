@@ -52,7 +52,7 @@ export function FacetPanel({
     {
       key: 'missingPreview',
       label: 'No preview',
-      hint: 'No thumbnail could be rendered — often a damaged file',
+      hint: 'No thumbnail could be rendered. The file may be damaged.',
       active: params.missingPreview,
     },
   ]

@@ -88,7 +88,7 @@ function FileRow({ file, depth }: { file: TreeFile; depth: number }) {
       style={{ paddingLeft: `${16 + depth * 20}px` }}
     >
       <span className="w-10 shrink-0 rounded bg-[var(--color-surface-2)] px-1.5 py-0.5 text-center text-[10px] font-medium uppercase text-[var(--color-ink-faint)]">
-        {file.extension || '—'}
+        {file.extension || 'Unknown'}
       </span>
 
       <span className="min-w-0 flex-1 basis-40 truncate text-sm" title={file.filename}>
