@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CheckCircle2,
@@ -12,7 +12,8 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react'
-import type { GcodeMetadata, PrintStatus } from '@pb/core'
+import Link from 'next/link'
+import type { FilamentUsage, Spool, GcodeMetadata, PrintStatus } from '@pb/core'
 /*
  * Values come from the leaf export, not the package barrel. This is a client
  * component, and importing a runtime value from '@pb/core' pulls fs, pg and the
@@ -50,6 +51,8 @@ import {
  */
 
 export interface PrintRunView {
+  filamentUsage: FilamentUsage[]
+  filamentCostManual: boolean
   id: string
   filename: string | null
   userName: string | null
@@ -92,6 +95,7 @@ export interface PrintStatsView {
 }
 
 interface Props {
+  spools: Spool[]
   publicId: string
   prints: PrintRunView[]
   stats: PrintStatsView
@@ -110,7 +114,15 @@ const STATUS_META: Record<
   in_progress: { label: 'Printing', icon: Loader2, class: 'text-[var(--color-accent)]' },
 }
 
-export function PrintHistory({ publicId, prints, stats, files, suggestions, canLog }: Props) {
+export function PrintHistory({
+  publicId,
+  prints,
+  stats,
+  files,
+  suggestions,
+  canLog,
+  spools,
+}: Props) {
   const router = useRouter()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<PrintRunView | null>(null)
@@ -175,6 +187,7 @@ export function PrintHistory({ publicId, prints, stats, files, suggestions, canL
               key={editing?.id ?? 'new'}
               publicId={publicId}
               initial={editing}
+              spools={spools}
               files={files}
               suggestions={suggestions}
               pending={pending}
@@ -323,6 +336,23 @@ function PrintRow({
         {detail.length > 0 && (
           <p className="mt-0.5 text-xs text-[var(--color-ink-faint)]">{detail.join(' · ')}</p>
         )}
+        {print.filamentUsage.length > 0 && (
+          <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {print.filamentUsage.map((row) => (
+              <li key={row.spoolId}>
+                <Link
+                  href={`/filaments/${row.spoolId}`}
+                  className="text-[var(--color-accent)] hover:underline"
+                >
+                  {[row.snapshot.spoolLabel, row.snapshot.name, row.snapshot.colorName]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  : {row.grams} g
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
         {print.filename && (
           <p className="mt-0.5 truncate font-mono text-xs text-[var(--color-ink-faint)]">
             {print.filename}
@@ -374,6 +404,7 @@ function Rating({ value }: { value: number }) {
 function PrintForm({
   publicId,
   initial,
+  spools,
   files,
   suggestions,
   pending,
@@ -383,6 +414,7 @@ function PrintForm({
 }: {
   publicId: string
   initial: PrintRunView | null
+  spools: Spool[]
   files: { id: string; filename: string }[]
   suggestions: { materials: string[]; printers: string[]; filamentBrands: string[] }
   pending: boolean
@@ -390,6 +422,26 @@ function PrintForm({
   onCancel: () => void
   onSubmit: (input: PrintFormInput) => void
 }) {
+  const [recordingKey] = useState(() => crypto.randomUUID())
+  const [usageRows, setUsageRows] = useState(() =>
+    (initial?.filamentUsage ?? []).map((row) => ({
+      spoolId: row.spoolId,
+      grams: String(row.grams),
+    })),
+  )
+  const [manualCost, setManualCost] = useState(initial?.filamentCostManual ?? false)
+  const usageTotal = usageRows.reduce((total, row) => total + (Number(row.grams) || 0), 0)
+  const rates = usageRows.map((row) => {
+    const old = initial?.filamentUsage.find((u) => u.spoolId === row.spoolId)
+    if (old) return old.costPerGram
+    const spool = spools.find((s) => s.id === row.spoolId)
+    return spool?.purchaseCost == null ? null : spool.purchaseCost / spool.nominalWeightG
+  })
+  const automaticCost = rates.every((rate) => rate !== null)
+    ? usageRows
+        .reduce((total, row, index) => total + (Number(row.grams) || 0) * rates[index]!, 0)
+        .toFixed(2)
+    : ''
   const [status, setStatus] = useState<PrintStatus>(initial?.status ?? 'success')
   const [modelFileId, setModelFileId] = useState(initial?.filename ? findFile(files, initial) : '')
   const [printerName, setPrinterName] = useState(
@@ -445,14 +497,16 @@ function PrintForm({
 
   function applySettings(parsed: GcodeMetadata) {
     fill(printerName, opening.current.printerName, setPrinterName, parsed.printerName)
-    fill(material, opening.current.material, setMaterial, parsed.material)
-    fill(colorHex, '', setColorHex, parsed.colorHex)
+    if (!usageRows.length) {
+      fill(material, opening.current.material, setMaterial, parsed.material)
+      fill(colorHex, '', setColorHex, parsed.colorHex)
+      fill(filamentBrand, '', setFilamentBrand, parsed.filamentBrand)
+      fill(cost, '', setCost, parsed.filamentCost)
+    }
     fill(layerHeight, '', setLayerHeight, parsed.layerHeightMm)
     fill(nozzle, '', setNozzle, parsed.nozzleMm)
     fill(duration, '', setDuration, parsed.durationMin)
     fill(filament, '', setFilament, parsed.filamentUsedG)
-    fill(filamentBrand, '', setFilamentBrand, parsed.filamentBrand)
-    fill(cost, '', setCost, parsed.filamentCost)
     fill(infill, '', setInfill, parsed.infillPercent)
     fill(walls, '', setWalls, parsed.wallCount)
     fill(nozzleTemp, '', setNozzleTemp, parsed.nozzleTempC)
@@ -466,6 +520,14 @@ function PrintForm({
     if (supports === '' && parsed.supports != null) setSupports(parsed.supports ? 'yes' : 'no')
   }
 
+  // Read the current fields when an asynchronous metadata request completes.
+  // A spool selection or typed setting made while it was loading takes precedence.
+  const latestSettings = useRef(applySettings)
+  const settingsRequest = useRef(0)
+  useEffect(() => {
+    latestSettings.current = applySettings
+  })
+
   /**
    * Picking a sliced file offers to fill the form in from it.
    *
@@ -477,6 +539,8 @@ function PrintForm({
   function chooseFile(id: string) {
     setModelFileId(id)
     setFilledFrom(null)
+    setReading(false)
+    const request = ++settingsRequest.current
 
     const file = files.find((entry) => entry.id === id)
     if (!file || !isGcodeName(file.filename)) return
@@ -484,16 +548,21 @@ function PrintForm({
     setReading(true)
     void readSlicerSettings(publicId, id)
       .then((result) => {
-        if (!result.ok) return
-        applySettings(result.settings)
+        if (!result.ok || request !== settingsRequest.current) return
+        latestSettings.current(result.settings)
         setFilledFrom(result.filename)
       })
-      .finally(() => setReading(false))
+      .finally(() => {
+        if (request === settingsRequest.current) setReading(false)
+      })
   }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     onSubmit({
+      recordingKey,
+      filamentUsage: usageRows.map((row) => ({ spoolId: row.spoolId, grams: Number(row.grams) })),
+      filamentCostManual: usageRows.length ? manualCost : cost !== '',
       modelFileId: modelFileId || null,
       printerName: printerName || null,
       material: material || null,
@@ -503,7 +572,7 @@ function PrintForm({
       nozzleType: nozzleType || null,
       filamentBrand: filamentBrand || null,
       colorName: colorName || null,
-      filamentCost: numberOrNull(cost),
+      filamentCost: usageRows.length && !manualCost ? null : numberOrNull(cost),
       infillPercent: numberOrNull(infill),
       wallCount: numberOrNull(walls),
       supports: supports === '' ? null : supports === 'yes',
@@ -518,7 +587,7 @@ function PrintForm({
       finishedAt: finishedAt ? new Date(finishedAt).toISOString() : null,
       // Left blank, the duration is derived from the two timestamps server-side.
       durationMin: numberOrNull(duration),
-      filamentUsedG: numberOrNull(filament),
+      filamentUsedG: usageRows.length ? usageTotal : numberOrNull(filament),
       rating,
       notes: notes || null,
     })
@@ -526,6 +595,117 @@ function PrintForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-3 rounded-[var(--radius-control)] border border-[var(--color-border)] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium">Spools used</h3>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={pending || !spools.some((s) => !s.archived)}
+            onClick={() => setUsageRows([...usageRows, { spoolId: '', grams: '' }])}
+          >
+            Add spool
+          </Button>
+        </div>
+        <p className="text-xs text-[var(--color-ink-muted)]">
+          Optional. Finished prints deduct recorded grams, including failed prints. Still-printing
+          amounts are estimates.
+        </p>
+        {usageRows.map((row, index) => (
+          <div key={index} className="grid items-end gap-2 sm:grid-cols-[1fr_8rem_auto]">
+            <Field label={`Spool ${index + 1}`} htmlFor={`usage-spool-${index}`}>
+              <Select
+                id={`usage-spool-${index}`}
+                required
+                value={row.spoolId}
+                onChange={(e) => {
+                  const id = e.target.value
+                  setUsageRows(usageRows.map((r, i) => (i === index ? { ...r, spoolId: id } : r)))
+                  const chosen = spools.find((s) => s.id === id)
+                  if (chosen && usageRows.length === 1) {
+                    setMaterial(chosen.filament.material)
+                    setFilamentBrand(chosen.filament.brand ?? '')
+                    setColorName(chosen.filament.colorName ?? '')
+                    setColorHex(chosen.filament.colorHex ?? '')
+                    if (!nozzleTemp) setNozzleTemp(chosen.filament.nozzleTempC?.toString() ?? '')
+                    if (!bedTemp) setBedTemp(chosen.filament.bedTempC?.toString() ?? '')
+                  }
+                }}
+              >
+                <option value="">Choose spool…</option>
+                {spools
+                  .filter(
+                    (s) => !s.archived || initial?.filamentUsage.some((u) => u.spoolId === s.id),
+                  )
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {[s.label, s.filament.brand, s.filament.name, s.filament.colorName]
+                        .filter(Boolean)
+                        .join(' · ')}{' '}
+                      ({s.remainingG} g){s.archived ? ' · archived' : ''}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+            <Field label="Used (g)" htmlFor={`usage-grams-${index}`}>
+              <Input
+                id={`usage-grams-${index}`}
+                type="number"
+                required
+                min="0"
+                step="0.01"
+                value={row.grams}
+                onChange={(e) =>
+                  setUsageRows(
+                    usageRows.map((r, i) => (i === index ? { ...r, grams: e.target.value } : r)),
+                  )
+                }
+              />
+            </Field>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setUsageRows(usageRows.filter((_, i) => i !== index))}
+              aria-label={`Remove spool ${index + 1}`}
+            >
+              Remove
+            </Button>
+          </div>
+        ))}
+        {usageRows.length > 0 && (
+          <>
+            <p className="text-sm">
+              Total: {usageTotal} g · Estimated cost: {automaticCost || 'unknown'}
+            </p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={manualCost}
+                onChange={(e) => setManualCost(e.target.checked)}
+              />
+              Override total cost
+            </label>
+            {manualCost && (
+              <Field label="Total print cost" htmlFor="spool-print-cost">
+                <Input
+                  id="spool-print-cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                />
+              </Field>
+            )}
+          </>
+        )}
+        {!spools.length && (
+          <Link href="/filaments" className="text-sm text-[var(--color-accent)]">
+            Add your first spool in Filaments
+          </Link>
+        )}
+      </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Outcome" htmlFor="print-status">
           <Select value={status} onChange={(e) => setStatus(e.target.value as PrintStatus)}>
@@ -684,7 +864,8 @@ function PrintForm({
             type="number"
             step="0.1"
             min="0"
-            value={filament}
+            disabled={usageRows.length > 0}
+            value={usageRows.length ? String(usageTotal) : filament}
             onChange={(e) => setFilament(e.target.value)}
           />
         </Field>
@@ -761,7 +942,8 @@ function PrintForm({
               type="number"
               step="0.01"
               min="0"
-              value={cost}
+              disabled={usageRows.length > 0 && !manualCost}
+              value={usageRows.length && !manualCost ? automaticCost : cost}
               onChange={(e) => setCost(e.target.value)}
             />
           </Field>
