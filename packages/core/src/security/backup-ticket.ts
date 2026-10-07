@@ -13,6 +13,9 @@ import { signToken } from './signed-token'
 export const BACKUP_FIRST_RUN_SUBJECT = 'first-run'
 export const backupUserSubject = (userId: string) => `user:${userId}`
 
+/** Carries a restore ticket, URL-encoded. Lower case, as Node reports header names. */
+export const BACKUP_TICKET_HEADER = 'x-printbench-backup-ticket'
+
 /** An export is submitted the moment the ticket is issued. */
 const EXPORT_TTL_MS = 5 * 60 * 1000
 /** A restore covers a large upload, the restore itself and the polling after. */

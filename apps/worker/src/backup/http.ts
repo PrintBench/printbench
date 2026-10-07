@@ -6,6 +6,7 @@ import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import {
   BACKUP_FIRST_RUN_SUBJECT,
+  BACKUP_TICKET_HEADER,
   SYSTEM_ACTOR,
   recordAudit,
   verifyToken,
@@ -33,6 +34,7 @@ import {
  *
  * The worker has no sessions. The web tier decides who may do this and hands
  * over a signed, short-lived token naming them; every route here verifies it.
+ * The restore ticket arrives in a header; the export's arrives in its form body.
  * A restore is three calls — upload, apply, then status polled until it is
  * done — because the database the browser's session lives in is replaced
  * half-way through, and a single long request could not report what happened.
@@ -199,12 +201,8 @@ export function createBackupHandler(options: BackupHttpOptions) {
     }
   }
 
-  async function handleUpload(
-    request: IncomingMessage,
-    response: ServerResponse,
-    query: URLSearchParams,
-  ): Promise<void> {
-    const auth = await authorize('backup-restore', query)
+  async function handleUpload(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const auth = await authorize('backup-restore', ticketFrom(request))
     if (!auth.ok) return json(response, auth.status, { error: auth.error })
     if (state.status === 'restoring') {
       return json(response, 409, { error: 'A restore is already in progress.' })
@@ -234,12 +232,8 @@ export function createBackupHandler(options: BackupHttpOptions) {
     }
   }
 
-  async function handleApply(
-    request: IncomingMessage,
-    response: ServerResponse,
-    query: URLSearchParams,
-  ): Promise<void> {
-    const auth = await authorize('backup-restore', query)
+  async function handleApply(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const auth = await authorize('backup-restore', ticketFrom(request))
     if (!auth.ok) return json(response, auth.status, { error: auth.error })
     if (state.status === 'restoring') {
       return json(response, 409, { error: 'A restore is already in progress.' })
@@ -369,13 +363,13 @@ export function createBackupHandler(options: BackupHttpOptions) {
       try {
         if (route === 'POST /api/backup/export') return await handleExport(request, response)
         if (route === 'POST /api/backup/restore/upload') {
-          return await handleUpload(request, response, url.searchParams)
+          return await handleUpload(request, response)
         }
         if (route === 'POST /api/backup/restore/apply') {
-          return await handleApply(request, response, url.searchParams)
+          return await handleApply(request, response)
         }
         if (route === 'GET /api/backup/restore/status') {
-          const auth = await authorize('backup-restore', url.searchParams, { live: false })
+          const auth = await authorize('backup-restore', ticketFrom(request), { live: false })
           if (!auth.ok) return json(response, auth.status, { error: auth.error })
           return json(response, 200, state)
         }
@@ -387,6 +381,17 @@ export function createBackupHandler(options: BackupHttpOptions) {
       }
     },
   }
+}
+
+/**
+ * The restore ticket, from its header.
+ *
+ * A header rather than the query string because the ticket is good for hours
+ * and URLs are what proxies write to their access logs.
+ */
+function ticketFrom(request: IncomingMessage): URLSearchParams {
+  const header = request.headers[BACKUP_TICKET_HEADER]
+  return new URLSearchParams(typeof header === 'string' ? header : '')
 }
 
 function describeFailure(error: unknown, restored: boolean): string {

@@ -37,6 +37,8 @@ const PHASES: Record<string, string> = {
 }
 
 const CONFIRM_WORD = 'RESTORE'
+// Matches BACKUP_TICKET_HEADER in @pb/core, which is server code this file cannot import.
+const TICKET_HEADER = 'x-printbench-backup-ticket'
 
 /**
  * Restoring is three steps on purpose: upload, look at what the file holds,
@@ -60,8 +62,9 @@ export function RestorePanel({
   const [confirm, setConfirm] = useState('')
   const [submitting, setSubmitting] = useState(false)
   // One ticket covers the upload, the restore and the polling after it — by
-  // which point the session that could have issued another one is gone.
-  const query = useRef('')
+  // which point the session that could have issued another one is gone. Sent
+  // as a header, so it stays out of URLs and the access logs that record them.
+  const ticket = useRef('')
   const input = useRef<HTMLInputElement>(null)
 
   const restoring = step.name === 'restoring'
@@ -71,8 +74,9 @@ export function RestorePanel({
 
     async function poll() {
       try {
-        const response = await fetch(`/api/backup/restore/status?${query.current}`, {
+        const response = await fetch('/api/backup/restore/status', {
           cache: 'no-store',
+          headers: { [TICKET_HEADER]: ticket.current },
         })
         const state = (await response.json()) as { status: string; phase?: string; error?: string }
         if (stopped) return
@@ -97,13 +101,14 @@ export function RestorePanel({
     setError(null)
     const issued = await getTicket()
     if (!issued.ok) return setError(issued.error)
-    query.current = new URLSearchParams({ ...issued.ticket }).toString()
+    ticket.current = new URLSearchParams({ ...issued.ticket }).toString()
 
     setStep({ name: 'uploading', percent: 0 })
     // XMLHttpRequest, because fetch still cannot report upload progress and a
     // backup with uploads in it can take a while.
     const request = new XMLHttpRequest()
-    request.open('POST', `/api/backup/restore/upload?${query.current}`)
+    request.open('POST', '/api/backup/restore/upload')
+    request.setRequestHeader(TICKET_HEADER, ticket.current)
     request.setRequestHeader('content-type', 'application/octet-stream')
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -132,9 +137,9 @@ export function RestorePanel({
     setError(null)
     setSubmitting(true)
     try {
-      const response = await fetch(`/api/backup/restore/apply?${query.current}`, {
+      const response = await fetch('/api/backup/restore/apply', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', [TICKET_HEADER]: ticket.current },
         body: JSON.stringify({ id, passphrase }),
       })
       if (response.status === 202) return setStep({ name: 'restoring' })
