@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ShieldCheck } from 'lucide-react'
 import { needsFirstRunSetup } from '@/lib/setup'
@@ -24,6 +25,16 @@ export default async function SetupPage() {
         </p>
       </div>
       <SetupForm />
+
+      <p className="mt-6 text-sm text-[var(--color-ink-muted)]">
+        Moving from another PrintBench?{' '}
+        <Link
+          href="/setup/restore"
+          className="font-medium text-[var(--color-accent)] hover:underline"
+        >
+          Restore from a backup
+        </Link>
+      </p>
     </>
   )
 }
