@@ -1,6 +1,7 @@
 export * from './config/env'
 export * from './policy/policy'
 export * from './security/signed-token'
+export * from './security/backup-ticket'
 export * from './security/secret-box'
 export * from './search/refresh'
 export * from './search/search-service'

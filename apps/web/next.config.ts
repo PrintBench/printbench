@@ -40,6 +40,7 @@ const config: NextConfig = {
       // hands back, so both the collection and its children are forwarded.
       { source: '/api/upload', destination: `${worker}/api/upload` },
       { source: '/api/upload/:path*', destination: `${worker}/api/upload/:path*` },
+      { source: '/api/backup/:path*', destination: `${worker}/api/backup/:path*` },
     ]
   },
 }

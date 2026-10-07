@@ -23,6 +23,7 @@ import { handleMaintArchive, handleMaintReconcile } from './jobs/maintenance'
 import { handleScheduleSweep } from './jobs/schedule'
 import { handleZipRequest } from './http/zip'
 import { handleUploadRequest } from './http/upload'
+import { createBackupHandler } from './backup/http'
 import { activeWatchCount, startWatchReconciler } from './watch/watcher'
 
 // Must run before anything reads DATABASE_URL.
@@ -64,6 +65,18 @@ const { pool, db } = createDb()
  */
 const queue = getQueue()
 
+/*
+ * Backup and restore. A restore replaces the database underneath everything
+ * else in this process, so it gets to stop the job handlers and the watchers
+ * first and start them again afterwards.
+ */
+const backup = createBackupHandler({
+  directory: path.resolve(process.env.DATA_DIR ?? './data', 'backups'),
+  appVersion: appVersion(),
+  pause: pauseWork,
+  resume: resumeWork,
+})
+
 const server = createServer((req, res) => {
   // Named pathname, not path: `path` is the node module imported above.
   const pathname = (req.url ?? '').split('?')[0] ?? ''
@@ -92,9 +105,20 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (pathname.startsWith('/api/backup/')) {
+    void backup.handle(req, res)
+    return
+  }
+
   // Resumable uploads. tus owns everything under this prefix, including the
   // per-upload URLs it hands back.
   if (pathname.startsWith('/api/upload')) {
+    if (backup.isRestoring()) {
+      // An upload landing now would be indexed into a database about to vanish.
+      res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '60' })
+      res.end('A restore is in progress')
+      return
+    }
     handleUploadRequest(req, res, STAGING_DIR)
     return
   }
@@ -103,10 +127,8 @@ const server = createServer((req, res) => {
   res.end(JSON.stringify({ error: 'not found' }))
 })
 
-async function main(): Promise<void> {
-  await db.execute(sql`select 1`)
-  console.log('[worker] database reachable')
-
+/** Registers every job handler and schedule. Run at boot and again after a restore. */
+async function startWork(): Promise<void> {
   await queue.start()
   console.log('[worker] job queue ready')
 
@@ -168,6 +190,30 @@ async function main(): Promise<void> {
    */
   stopWatching = startWatchReconciler()
   console.log('[worker] watch reconciler started, sweeping every 60s')
+}
+
+/** Stops handlers and watchers, waiting for running jobs to finish. */
+async function pauseWork(): Promise<void> {
+  await stopWatching?.()
+  stopWatching = undefined
+  await queue.stop()
+  console.log('[worker] job handlers paused')
+}
+
+async function resumeWork({ restored }: { restored: boolean }): Promise<void> {
+  if (restored) {
+    // Whatever was queued names files and libraries from the old database.
+    await queue.start()
+    await queue.discardPending()
+  }
+  await startWork()
+}
+
+async function main(): Promise<void> {
+  await db.execute(sql`select 1`)
+  console.log('[worker] database reachable')
+
+  await startWork()
 
   await new Promise<void>((resolve) => server.listen(PORT, resolve))
   console.log(`[worker] listening on :${PORT}`)

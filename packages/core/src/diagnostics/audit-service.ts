@@ -82,6 +82,10 @@ export const AUDIT_ACTIONS = {
 
   'maintenance.pruned': 'Removed long-missing models',
   'diagnostics.exported': 'Exported diagnostics',
+
+  'backup.exported': 'Downloaded a backup',
+  'backup.restored': 'Restored this instance from a backup',
+  'backup.restore_failed': 'Restore from a backup failed',
 } as const
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS
@@ -102,6 +106,7 @@ export const AUDIT_CATEGORIES = {
   health: 'Health',
   maintenance: 'Maintenance',
   diagnostics: 'Diagnostics',
+  backup: 'Backups',
 } as const
 
 export type AuditCategory = keyof typeof AUDIT_CATEGORIES

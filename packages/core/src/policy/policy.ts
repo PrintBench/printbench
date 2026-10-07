@@ -47,6 +47,7 @@ export type Action =
   | 'user:manage'
   | 'settings:manage'
   | 'diagnostics:view'
+  | 'instance:backup'
 
 /** Minimum role for each action. Absent = admin only, by deliberate default. */
 const MINIMUM: Record<Action, Role> = {
@@ -81,6 +82,9 @@ const MINIMUM: Record<Action, Role> = {
   // Audit trail, logs and the debug report expose who did what and how the
   // instance is run, so they are for whoever runs it.
   'diagnostics:view': ROLES.admin,
+  // A backup holds every account and credential, and a restore replaces the
+  // whole instance.
+  'instance:backup': ROLES.admin,
 }
 
 export interface PolicyUser {
