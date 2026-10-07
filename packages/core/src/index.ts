@@ -54,3 +54,7 @@ export { downloadSourceFile } from './import/source-network'
 
 export * from './import/makerworld-auth'
 export * from './import/makerworld-auth-service'
+
+export * from './services/filament-service'
+
+export * from './services/filament-backup'

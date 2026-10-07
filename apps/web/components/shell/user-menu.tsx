@@ -76,6 +76,10 @@ export function UserMenu({ user }: { user: PolicyUser & { name: string; email: s
             <LogOut className="size-4" />
             Sign out
           </DropdownMenu.Item>
+          <DropdownMenu.Separator className="my-1.5 h-px bg-[var(--color-border)]" />
+          <p className="select-text px-2 py-1.5 text-xs text-[var(--color-ink-faint)]">
+            PrintBench v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </p>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
