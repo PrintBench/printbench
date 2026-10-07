@@ -75,6 +75,13 @@ services:
         target: /libraries
         read_only: ${LIBRARY_READ_ONLY:-true}
 
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '--max-time', '5', 'http://127.0.0.1:3001/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
   nginx:
     build: { context: ., dockerfile: docker/nginx.Dockerfile }
     restart: unless-stopped
@@ -87,6 +94,13 @@ services:
         source: ${LIBRARY_PATH:-./libraries}
         target: /libraries
         read_only: true
+    healthcheck:
+      # Check the proxy and the web/database readiness endpoint together.
+      test: ['CMD', 'wget', '-q', '-T', '5', '-O', '/dev/null', 'http://127.0.0.1/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
 volumes:
   pgdata:
