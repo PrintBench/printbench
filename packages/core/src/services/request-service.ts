@@ -428,7 +428,8 @@ async function isUntouchedRun(db: Database, printRunId: string): Promise<boolean
   const rows = await db.execute<{ untouched: boolean }>(sql`
     SELECT (rating IS NULL AND filament_used_g IS NULL AND duration_min IS NULL
             AND printer_name IS NULL AND layer_height_mm IS NULL AND nozzle_mm IS NULL
-            AND photo_key IS NULL AND started_at IS NULL AND status = 'success') AS untouched
+            AND photo_key IS NULL AND started_at IS NULL AND status = 'success'
+            AND NOT EXISTS (SELECT 1 FROM print_filament_usage WHERE print_run_id = print_runs.id)) AS untouched
     FROM print_runs WHERE id = ${printRunId} LIMIT 1`)
 
   // Already gone — deleted from the model page. Nothing to withdraw.

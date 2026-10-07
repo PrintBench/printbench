@@ -1,4 +1,11 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
+import {
+  getPrintUsage,
+  reconcilePrintUsage,
+  type FilamentDb,
+  type FilamentUsage,
+  type FilamentUsageInput,
+} from './filament-service'
 import type { Database } from '@pb/db'
 import { schema } from '@pb/db'
 import { BED_ADHESIONS, NOZZLE_TYPES, type BedAdhesion, type NozzleType } from './print-fields'
@@ -23,6 +30,9 @@ export type PrintStatus = 'in_progress' | 'success' | 'partial' | 'failed'
 
 export interface PrintEntry {
   modelId: string
+  recordingKey?: string
+  filamentUsage?: FilamentUsageInput[]
+  filamentCostManual?: boolean
   modelFileId?: string | null
   userId?: string | null
   printerName?: string | null
@@ -54,6 +64,8 @@ export interface PrintEntry {
 }
 
 export interface PrintRun {
+  filamentUsage: FilamentUsage[]
+  filamentCostManual: boolean
   id: string
   modelId: string
   modelName: string
@@ -164,7 +176,7 @@ function validate(entry: PrintEntry): PrintEntry {
   return entry
 }
 
-export async function logPrint(db: Database, entry: PrintEntry): Promise<{ id: string }> {
+async function logPrintBase(db: FilamentDb, entry: PrintEntry): Promise<{ id: string }> {
   const clean = validate(entry)
 
   /*
@@ -181,6 +193,8 @@ export async function logPrint(db: Database, entry: PrintEntry): Promise<{ id: s
     .insert(schema.printRuns)
     .values({
       modelId: clean.modelId,
+      recordingKey: clean.recordingKey ?? null,
+      filamentCostManual: clean.filamentCostManual ?? false,
       modelFileId: clean.modelFileId ?? null,
       userId: clean.userId ?? null,
       printerName: clean.printerName?.trim() || null,
@@ -215,7 +229,10 @@ export async function logPrint(db: Database, entry: PrintEntry): Promise<{ id: s
 }
 
 /** Everything about a print that can be edited after the fact. */
-type EditableField = Exclude<keyof PrintEntry, 'modelId' | 'userId'>
+type EditableField = Exclude<
+  keyof PrintEntry,
+  'modelId' | 'userId' | 'filamentUsage' | 'recordingKey'
+>
 
 /**
  * How each editable field reaches its column.
@@ -241,6 +258,7 @@ const EDITABLE: Record<EditableField, (entry: Partial<PrintEntry>) => unknown> =
   nozzleType: (e) => e.nozzleType ?? null,
   filamentBrand: (e) => e.filamentBrand?.trim() || null,
   colorName: (e) => e.colorName?.trim() || null,
+  filamentCostManual: (e) => e.filamentCostManual ?? false,
   filamentCost: (e) => numericOrNull(e.filamentCost),
   infillPercent: (e) => e.infillPercent ?? null,
   wallCount: (e) => e.wallCount ?? null,
@@ -264,8 +282,8 @@ function numericOrNull(value: number | null | undefined): string | null {
   return value != null ? String(value) : null
 }
 
-export async function updatePrint(
-  db: Database,
+async function updatePrintBase(
+  db: FilamentDb,
   printId: string,
   entry: Partial<PrintEntry>,
 ): Promise<void> {
@@ -281,8 +299,118 @@ export async function updatePrint(
   await db.update(schema.printRuns).set(updates).where(eq(schema.printRuns.id, printId))
 }
 
-export async function deletePrint(db: Database, printId: string): Promise<void> {
-  await db.delete(schema.printRuns).where(eq(schema.printRuns.id, printId))
+function usageSummary(
+  entry: Partial<PrintEntry>,
+  usage: FilamentUsage[],
+  manual: boolean,
+): Partial<PrintEntry> {
+  if (!usage.length) return entry
+  const grams = usage.reduce((total, row) => total + row.grams, 0)
+  const cost = usage.every((row) => row.costPerGram !== null)
+    ? Math.round(usage.reduce((total, row) => total + row.grams * row.costPerGram!, 0) * 100) / 100
+    : null
+  const single = usage.length === 1 ? usage[0]!.snapshot : null
+  return {
+    ...entry,
+    filamentUsedG: Math.round(grams * 100) / 100,
+    ...(manual ? {} : { filamentCost: cost }),
+    filamentCostManual: manual,
+    ...(single
+      ? {
+          material: single.material,
+          filamentBrand: single.brand,
+          colorName: single.colorName,
+          colorHex: single.colorHex,
+        }
+      : {}),
+    nozzleTempC: entry.nozzleTempC ?? single?.nozzleTempC ?? undefined,
+    bedTempC: entry.bedTempC ?? single?.bedTempC ?? undefined,
+  }
+}
+
+export async function logPrint(db: Database, entry: PrintEntry): Promise<{ id: string }> {
+  if (
+    entry.recordingKey &&
+    (typeof entry.recordingKey !== 'string' || entry.recordingKey.length > 128)
+  )
+    throw new PrintValidationError('Invalid print submission key.')
+  const recordingKey = entry.recordingKey
+    ? `${entry.modelId}:${entry.userId ?? 'anonymous'}:${entry.recordingKey}`
+    : undefined
+  return db.transaction(async (tx) => {
+    // Serialise retries of one submission, including the first insert.
+    if (recordingKey) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${recordingKey}, 0))`)
+      const [existing] = await tx
+        .select({ id: schema.printRuns.id })
+        .from(schema.printRuns)
+        .where(eq(schema.printRuns.recordingKey, recordingKey))
+      if (existing) return existing
+    }
+    const result = await logPrintBase(tx, { ...entry, recordingKey })
+    if (entry.filamentUsage !== undefined) {
+      const usage = await reconcilePrintUsage(
+        tx,
+        result.id,
+        entry.filamentUsage,
+        'in_progress',
+        entry.status ?? 'success',
+        entry.userId ?? undefined,
+      )
+      await updatePrintBase(
+        tx,
+        result.id,
+        usageSummary(entry, usage, entry.filamentCostManual ?? entry.filamentCost != null),
+      )
+    }
+    return result
+  })
+}
+export async function updatePrint(
+  db: Database,
+  printId: string,
+  entry: Partial<PrintEntry>,
+  actorId?: string,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [previous] = await tx
+      .select()
+      .from(schema.printRuns)
+      .where(eq(schema.printRuns.id, printId))
+      .for('update')
+    if (!previous) return
+    const usage = await reconcilePrintUsage(
+      tx,
+      printId,
+      entry.filamentUsage,
+      previous.status,
+      entry.status ?? previous.status,
+      actorId,
+    )
+    const manual =
+      entry.filamentCostManual ??
+      (entry.filamentCost !== undefined ? entry.filamentCost != null : previous.filamentCostManual)
+    const settings = usage.length
+      ? {
+          ...entry,
+          nozzleTempC: entry.nozzleTempC === undefined ? previous.nozzleTempC : entry.nozzleTempC,
+          bedTempC: entry.bedTempC === undefined ? previous.bedTempC : entry.bedTempC,
+        }
+      : entry
+    await updatePrintBase(tx, printId, usageSummary(settings, usage, manual))
+  })
+}
+export async function deletePrint(db: Database, printId: string, actorId?: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [previous] = await tx
+      .select()
+      .from(schema.printRuns)
+      .where(eq(schema.printRuns.id, printId))
+      .for('update')
+    if (!previous) return
+    await reconcilePrintUsage(tx, printId, [], previous.status, 'in_progress', actorId)
+    await tx.delete(schema.printRuns).where(eq(schema.printRuns.id, printId))
+  })
 }
 
 export async function listPrints(
@@ -328,6 +456,7 @@ export async function listPrints(
     filament_brand: string | null
     color_name: string | null
     filament_cost: string | null
+    filament_cost_manual: boolean
     infill_percent: number | null
     wall_count: number | null
     supports: boolean | null
@@ -349,7 +478,7 @@ export async function listPrints(
     SELECT p.id, p.model_id, m.name AS model_name, m.public_id AS model_public_id,
            p.model_file_id, f.filename, u.name AS user_name,
            p.printer_name, p.material, p.color_hex, p.layer_height_mm, p.nozzle_mm,
-           p.nozzle_type, p.filament_brand, p.color_name, p.filament_cost,
+           p.nozzle_type, p.filament_brand, p.color_name, p.filament_cost, p.filament_cost_manual,
            p.infill_percent, p.wall_count, p.supports, p.adhesion,
            p.nozzle_temp_c, p.bed_temp_c,
            p.slicer_name, p.slicer_version, p.slicer_profile,
@@ -365,7 +494,13 @@ export async function listPrints(
     LIMIT ${limit} OFFSET ${Math.max(options.offset ?? 0, 0)}
   `)
 
+  const usage = await getPrintUsage(
+    db,
+    rows.rows.map((row) => row.id),
+  )
   return rows.rows.map((row) => ({
+    filamentUsage: usage.get(row.id) ?? [],
+    filamentCostManual: row.filament_cost_manual,
     id: row.id,
     modelId: row.model_id,
     modelName: row.model_name,

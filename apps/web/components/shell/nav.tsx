@@ -73,6 +73,7 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { href: '/collections', label: 'Collections', icon: 'folder' },
       { href: '/tags', label: 'Tags', icon: 'tags' },
       { href: '/lists', label: 'Liked', icon: 'heart' },
+      { href: '/filaments', label: 'Filaments', icon: 'boxes', requires: 'filament:view' },
       { href: '/prints', label: 'Print history', icon: 'history' },
     ],
   },

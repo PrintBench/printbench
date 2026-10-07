@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
   uuid,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { bedAdhesion, nozzleType, printHostProtocol, printStatus } from './enums'
 import { user } from './auth'
@@ -38,6 +39,8 @@ export const printRuns = pgTable(
     filamentBrand: text('filament_brand'),
     colorName: text('color_name'),
     filamentCost: numeric('filament_cost', { precision: 10, scale: 2 }),
+    filamentCostManual: boolean('filament_cost_manual').notNull().default(false),
+    recordingKey: text('recording_key'),
 
     /* What the slicer was asked to do. Every one of these is nullable because
      * a print logged by hand legitimately does not know them, and a guessed
@@ -71,6 +74,7 @@ export const printRuns = pgTable(
   (t) => [
     index('print_runs_model_idx').on(t.modelId, t.startedAt),
     index('print_runs_user_idx').on(t.userId),
+    uniqueIndex('print_runs_recording_key_idx').on(t.recordingKey),
   ],
 )
 

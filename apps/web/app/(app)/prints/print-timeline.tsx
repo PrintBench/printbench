@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { CheckCircle2, CircleDashed, Loader2, XCircle } from 'lucide-react'
-import type { PrintStatus } from '@pb/core'
+import type { FilamentUsage, PrintStatus } from '@pb/core'
 import { NOZZLE_TYPE_LABELS, type NozzleType } from '@pb/core/prints'
 import { cn } from '@/lib/cn'
 
@@ -13,6 +13,7 @@ import { cn } from '@/lib/cn'
  */
 
 export interface TimelinePrint {
+  filamentUsage: FilamentUsage[]
   id: string
   modelName: string
   modelPublicId: string
@@ -62,7 +63,14 @@ export function PrintTimeline({ prints }: { prints: TimelinePrint[] }) {
 
         const settings = [
           print.printerName,
-          [print.filamentBrand, print.material].filter(Boolean).join(' '),
+          print.filamentUsage.length
+            ? print.filamentUsage
+                .map(
+                  (row) =>
+                    `${row.snapshot.name}${row.snapshot.colorName ? ' ' + row.snapshot.colorName : ''}: ${row.grams} g`,
+                )
+                .join(' · ')
+            : [print.filamentBrand, print.material].filter(Boolean).join(' '),
           print.layerHeightMm != null && `${print.layerHeightMm} mm layers`,
           nozzle && `${nozzle} nozzle`,
           print.infillPercent != null && `${print.infillPercent}% infill`,
