@@ -86,7 +86,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
             <option value="error">Errors only</option>
           </Select>
         </div>
-        <div className="w-36">
+        <div className="w-44">
           <Select name="source" defaultValue={source ?? ''} aria-label="Process">
             <option value="">Web and worker</option>
             <option value="web">Web</option>
