@@ -30,6 +30,7 @@ Postgres is the **only** thing it needs. No Redis, no message broker, no Elastic
 - **Fast search that forgives typos.** Filter by tag, creator, licence, format or "never printed". Searches are plain URLs you can bookmark and share.
 - **Preview in 3D** right in the browser.
 - **Organise your way** with tags (and tag merge), creators, nested collections and a private Liked list.
+- **Know your filament stock.** Manage individual spools, weigh remaining filament, and track multi-spool print consumption and costs.
 - **Keep a print log.** Record printer, material, settings, rating and notes, and see a success rate per model.
 - **A print queue for the household.** Paste a list of things people asked for, one per line, and PrintBench links the ones it recognises.
 - **Hand files to your slicer.** Open in Bambu Studio, Creality Print, OrcaSlicer, PrusaSlicer, Cura or Lychee, and send sliced files to OctoPrint, Moonraker or PrusaLink printers.

@@ -11,7 +11,8 @@
     "./requests": "./src/services/request-lines.ts",
     "./schedule": "./src/scan/schedule-presets.ts",
     "./health": "./src/health/problem-kinds.ts",
-    "./prints": "./src/services/print-fields.ts"
+    "./prints": "./src/services/print-fields.ts",
+    "./filaments": "./src/services/filament-fields.ts"
   },
   "scripts": {
     "build": "tsc --build",

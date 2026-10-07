@@ -14,6 +14,7 @@ import {
   isLiked,
   listCollections,
   listPrints,
+  listSpools,
   modelGeometrySql,
   openRequestsForModel,
   printStats,
@@ -224,15 +225,17 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const canQueue = can(policyUser, 'request:create')
 
-  const [prints, stats, suggestions, settings, memberships, liked, queued] = await Promise.all([
-    listPrints(db, { modelId: model.id, limit: 50 }),
-    printStats(db, model.id),
-    printSuggestions(db),
-    getSettings(db),
-    collectionsForModel(db, model.id),
-    user ? isLiked(db, user.id, model.id) : Promise.resolve(false),
-    canQueue ? openRequestsForModel(db, model.id) : Promise.resolve([]),
-  ])
+  const [prints, stats, suggestions, settings, memberships, liked, queued, spools] =
+    await Promise.all([
+      listPrints(db, { modelId: model.id, limit: 50 }),
+      printStats(db, model.id),
+      printSuggestions(db),
+      getSettings(db),
+      collectionsForModel(db, model.id),
+      user ? isLiked(db, user.id, model.id) : Promise.resolve(false),
+      canQueue ? openRequestsForModel(db, model.id) : Promise.resolve([]),
+      canLogPrints ? listSpools(db) : Promise.resolve([]),
+    ])
 
   const canCollect = can(policyUser, 'collection:edit')
   const allCollections = canCollect ? await listCollections(db) : []
@@ -537,6 +540,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 .filter((file) => !file.missing_at)
                 .map((file) => ({ id: file.id, filename: file.filename }))}
               suggestions={suggestions}
+              spools={spools}
               stats={{
                 ...stats,
                 lastPrintedAt: stats.lastPrintedAt?.toISOString() ?? null,

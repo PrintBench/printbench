@@ -22,6 +22,7 @@ import {
   type GcodeMetadata,
   type NozzleType,
   type PrintEntry,
+  type FilamentUsageInput,
   type PrintStatus,
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
@@ -31,6 +32,9 @@ type Result = { ok: true } | { ok: false; error: string }
 
 /** What the log-a-print form sends. Dates arrive as strings from the browser. */
 export interface PrintFormInput {
+  recordingKey?: string
+  filamentUsage?: FilamentUsageInput[]
+  filamentCostManual?: boolean
   modelFileId?: string | null
   printerName?: string | null
   material?: string | null
@@ -61,6 +65,9 @@ export interface PrintFormInput {
 
 function toEntry(input: PrintFormInput): Omit<PrintEntry, 'modelId'> {
   return {
+    recordingKey: input.recordingKey,
+    filamentUsage: input.filamentUsage,
+    filamentCostManual: input.filamentCostManual,
     modelFileId: input.modelFileId || null,
     printerName: input.printerName ?? null,
     material: input.material ?? null,
@@ -111,6 +118,7 @@ export async function recordPrint(publicId: string, input: PrintFormInput): Prom
 
     revalidatePath(`/models/${publicId}`)
     revalidatePath('/prints')
+    revalidatePath('/filaments', 'layout')
     revalidatePath('/')
     return { ok: true }
   } catch (error) {
@@ -138,10 +146,11 @@ export async function editPrint(
       return { ok: false, error: 'That print does not belong to this model.' }
     }
 
-    await updatePrint(getDb(), printId, toEntry(input))
+    await updatePrint(getDb(), printId, toEntry(input), user.id)
 
     revalidatePath(`/models/${publicId}`)
     revalidatePath('/prints')
+    revalidatePath('/filaments', 'layout')
     return { ok: true }
   } catch (error) {
     return { ok: false, error: describe(error, 'Could not save the change.') }
@@ -159,10 +168,11 @@ export async function removePrint(publicId: string, printId: string): Promise<Re
       return { ok: false, error: 'That print does not belong to this model.' }
     }
 
-    await deletePrint(getDb(), printId)
+    await deletePrint(getDb(), printId, user.id)
 
     revalidatePath(`/models/${publicId}`)
     revalidatePath('/prints')
+    revalidatePath('/filaments', 'layout')
     revalidatePath('/')
     return { ok: true }
   } catch (error) {

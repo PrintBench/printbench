@@ -21,6 +21,8 @@ export function roleAtLeast(role: Role | null | undefined, minimum: Role): boole
 
 export type Action =
   // Reading
+  | 'filament:view'
+  | 'filament:manage'
   | 'model:view'
   | 'file:download'
   // Curation — the day-to-day work
@@ -49,6 +51,8 @@ export type Action =
 
 /** Minimum role for each action. Absent = admin only, by deliberate default. */
 const MINIMUM: Record<Action, Role> = {
+  'filament:view': ROLES.viewer,
+  'filament:manage': ROLES.member,
   'model:view': ROLES.viewer,
   'file:download': ROLES.viewer,
   'list:manage': ROLES.viewer,

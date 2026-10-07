@@ -128,6 +128,7 @@ export default async function PrintsPage({
           <PrintTimeline
             prints={prints.map((print) => ({
               id: print.id,
+              filamentUsage: print.filamentUsage,
               modelName: print.modelName,
               modelPublicId: print.modelPublicId,
               filename: print.filename,
