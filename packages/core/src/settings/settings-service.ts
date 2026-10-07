@@ -32,6 +32,10 @@ export interface Settings {
   trackMetadataProblems: boolean
   /** Write .printbench.json into managed libraries as metadata changes. */
   writeSidecars: boolean
+  /** Days the audit trail is kept. Zero keeps it forever. */
+  auditRetentionDays: number
+  /** Days captured application logs are kept. */
+  logRetentionDays: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -42,6 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   viewerMaxBytes: 150 * 1024 * 1024,
   trackMetadataProblems: true,
   writeSidecars: true,
+  auditRetentionDays: 365,
+  logRetentionDays: 14,
 }
 
 export class SettingsValidationError extends Error {
@@ -85,6 +91,24 @@ export function validate<K extends keyof Settings>(key: K, value: unknown): Sett
       const days = Number(value)
       if (!Number.isFinite(days) || days < 1 || days > 365) {
         throw new SettingsValidationError('The grace period must be between 1 and 365 days.')
+      }
+      return Math.round(days) as Settings[K]
+    }
+
+    case 'auditRetentionDays': {
+      const days = Number(value)
+      if (!Number.isFinite(days) || days < 0 || days > 3650) {
+        throw new SettingsValidationError(
+          'Keep the audit trail for between 1 and 3650 days, or 0 to keep it forever.',
+        )
+      }
+      return Math.round(days) as Settings[K]
+    }
+
+    case 'logRetentionDays': {
+      const days = Number(value)
+      if (!Number.isFinite(days) || days < 1 || days > 90) {
+        throw new SettingsValidationError('Logs can be kept for between 1 and 90 days.')
       }
       return Math.round(days) as Settings[K]
     }

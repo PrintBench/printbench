@@ -14,6 +14,7 @@ import {
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Result = { ok: true; slug?: string } | { ok: false; error: string }
 
@@ -23,6 +24,16 @@ async function requireEditor() {
     { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
     'collection:edit',
   )
+  return user
+}
+
+async function collectionName(collectionId: string): Promise<string | undefined> {
+  const rows = await getDb()
+    .select({ name: schema.collections.name })
+    .from(schema.collections)
+    .where(eq(schema.collections.id, collectionId))
+    .limit(1)
+  return rows[0]?.name
 }
 
 export async function create(input: {
@@ -31,8 +42,9 @@ export async function create(input: {
   parentId?: string | null
 }): Promise<Result> {
   try {
-    await requireEditor()
+    const user = await requireEditor()
     const { slug } = await createCollection(getDb(), input)
+    await audit(user, 'collection.created', { type: 'collection', label: input.name.trim() })
     revalidatePath('/collections')
     return { ok: true, slug }
   } catch (error) {
@@ -42,8 +54,15 @@ export async function create(input: {
 
 export async function rename(collectionId: string, name: string): Promise<Result> {
   try {
-    await requireEditor()
+    const user = await requireEditor()
+    const before = await collectionName(collectionId)
     await renameCollection(getDb(), collectionId, name)
+    await audit(
+      user,
+      'collection.updated',
+      { type: 'collection', id: collectionId, label: before },
+      { renamedTo: name.trim() },
+    )
     revalidatePath('/collections')
     return { ok: true }
   } catch (error) {
@@ -53,9 +72,11 @@ export async function rename(collectionId: string, name: string): Promise<Result
 
 export async function remove(collectionId: string): Promise<Result> {
   try {
-    await requireEditor()
+    const user = await requireEditor()
+    const label = await collectionName(collectionId)
     // Only the grouping goes. Models and any child collections survive.
     await deleteCollection(getDb(), collectionId)
+    await audit(user, 'collection.deleted', { type: 'collection', id: collectionId, label })
     revalidatePath('/collections')
     return { ok: true }
   } catch (error) {

@@ -13,6 +13,7 @@ import {
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -43,12 +44,12 @@ function validate(input: PrintHostInput): string | null {
 
 export async function createPrintHost(input: PrintHostInput): Promise<Result> {
   try {
-    await requireAdmin()
+    const actor = await requireAdmin()
 
     const problem = validate(input)
     if (problem) return { ok: false, error: problem }
 
-    await getDb()
+    const [created] = await getDb()
       .insert(schema.printHosts)
       .values({
         name: input.name.trim(),
@@ -57,7 +58,16 @@ export async function createPrintHost(input: PrintHostInput): Promise<Result> {
         // Encrypted at rest: a database dump should not hand over every printer.
         credentials: input.apiKey ? encryptSecret(input.apiKey) : null,
       })
+      .returning({ id: schema.printHosts.id })
 
+    await audit(
+      actor,
+      'printer.created',
+      { type: 'printer', id: created?.id, label: input.name.trim() },
+      {
+        protocol: input.protocol,
+      },
+    )
     revalidatePath('/admin/printers')
     return { ok: true }
   } catch (error) {
@@ -68,7 +78,7 @@ export async function createPrintHost(input: PrintHostInput): Promise<Result> {
 
 export async function updatePrintHost(id: string, input: PrintHostInput): Promise<Result> {
   try {
-    await requireAdmin()
+    const actor = await requireAdmin()
 
     const problem = validate(input)
     if (problem) return { ok: false, error: problem }
@@ -96,6 +106,17 @@ export async function updatePrintHost(id: string, input: PrintHostInput): Promis
 
     if (updated.rowCount === 0) return { ok: false, error: 'That printer no longer exists.' }
 
+    await audit(
+      actor,
+      'printer.updated',
+      { type: 'printer', id, label: input.name.trim() },
+      {
+        protocol: input.protocol,
+        // Whether the key changed, never the key.
+        apiKeyChanged: input.apiKey !== undefined,
+      },
+    )
+
     revalidatePath('/admin/printers')
     return { ok: true }
   } catch (error) {
@@ -106,10 +127,15 @@ export async function updatePrintHost(id: string, input: PrintHostInput): Promis
 
 export async function deletePrintHost(id: string): Promise<Result> {
   try {
-    await requireAdmin()
-    const removed = await getDb().delete(schema.printHosts).where(eq(schema.printHosts.id, id))
+    const actor = await requireAdmin()
+    const [removed] = await getDb()
+      .delete(schema.printHosts)
+      .where(eq(schema.printHosts.id, id))
+      .returning({ name: schema.printHosts.name })
 
-    if (removed.rowCount === 0) return { ok: false, error: 'That printer no longer exists.' }
+    if (!removed) return { ok: false, error: 'That printer no longer exists.' }
+
+    await audit(actor, 'printer.deleted', { type: 'printer', id, label: removed.name })
 
     revalidatePath('/admin/printers')
     return { ok: true }

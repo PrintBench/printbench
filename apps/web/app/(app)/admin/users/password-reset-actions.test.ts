@@ -8,6 +8,8 @@ vi.mock('@pb/auth', () => ({
   PasswordRecoveryError: class extends Error {},
 }))
 vi.mock('@pb/db', () => ({ getDb: () => 'test-db' }))
+// The audit trail has its own tests; here it would only write to a real database.
+vi.mock('@/lib/audit', () => ({ audit: vi.fn(async () => {}) }))
 import { createPasswordResetLink } from './password-reset-actions'
 
 describe('admin password reset action', () => {

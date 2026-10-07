@@ -16,6 +16,7 @@ describeDb('better-auth schema compatibility', () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let getAuth: typeof import('./auth').getAuth
+  const startedAt = new Date()
 
   beforeAll(async () => {
     process.env.BETTER_AUTH_SECRET ??= 'test-secret-at-least-32-chars-long-xx'
@@ -26,6 +27,11 @@ describeDb('better-auth schema compatibility', () => {
   })
 
   afterAll(async () => {
+    await db.execute(sql`
+      DELETE FROM audit_events
+      WHERE actor_name IN ('Schema Probe', ${EMAIL})
+         OR (actor_name = '(not an email address)'
+             AND occurred_at >= ${startedAt.toISOString()}::timestamptz)`)
     await db.execute(sql`DELETE FROM "user" WHERE email = ${EMAIL}`)
     await pool.end()
   })
@@ -71,6 +77,48 @@ describeDb('better-auth schema compatibility', () => {
     await expect(
       getAuth().api.signInEmail({ body: { email: EMAIL, password: 'not-the-password' } }),
     ).rejects.toThrow()
+  })
+
+  it('records the sign-in and the refused attempt in the audit trail', async () => {
+    const events = await db.execute<{
+      action: string
+      outcome: string
+      actor_type: string
+      actor_id: string | null
+      actor_name: string | null
+    }>(sql`
+      SELECT action, outcome, actor_type, actor_id, actor_name FROM audit_events
+      WHERE actor_name IN ('Schema Probe', ${EMAIL}) ORDER BY occurred_at`)
+
+    const login = events.rows.find((event) => event.action === 'auth.login')
+    expect(login).toMatchObject({
+      outcome: 'success',
+      actor_type: 'user',
+      actor_name: 'Schema Probe',
+    })
+    expect(login?.actor_id).toBeTruthy()
+
+    // The refused attempt names the address that was tried, and nobody's account.
+    const refused = events.rows.find((event) => event.action === 'auth.login_failed')
+    expect(refused).toMatchObject({
+      outcome: 'failure',
+      actor_type: 'anonymous',
+      actor_id: null,
+      actor_name: EMAIL,
+    })
+  })
+
+  it('keeps a mistyped password out of the audit trail', async () => {
+    await expect(
+      getAuth().api.signInEmail({
+        body: { email: 'hunter2-not-an-email', password: 'whatever-it-is' },
+      }),
+    ).rejects.toThrow()
+
+    const leaked = await db.execute(
+      sql`SELECT 1 FROM audit_events WHERE actor_name = 'hunter2-not-an-email'`,
+    )
+    expect(leaked.rows).toHaveLength(0)
   })
 
   it('enforces the minimum password length', async () => {

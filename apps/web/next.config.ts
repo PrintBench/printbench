@@ -6,15 +6,13 @@ import { loadRootEnv } from '@pb/core'
 // Next only reads .env from apps/web; our .env lives at the repo root.
 loadRootEnv()
 
+// Bake the root manifest version into the UI and diagnostic reports.
 const { version } = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
-) as {
-  version: string
-}
+) as { version: string }
 
 const config: NextConfig = {
-  // Bake the release version into the UI so it identifies the running build.
-  env: { NEXT_PUBLIC_APP_VERSION: version },
+  env: { PB_VERSION: version, NEXT_PUBLIC_APP_VERSION: version },
   // Emits a minimal standalone server bundle, so the runtime Docker stage does
   // not need node_modules. Keeps the image small.
   output: 'standalone',

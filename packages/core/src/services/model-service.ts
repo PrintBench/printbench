@@ -49,6 +49,8 @@ export interface UpdateResult {
    * {@link syncSidecar}.
    */
   sidecarWritten: boolean
+  /** Set when saving named a creator that did not exist yet, for the audit trail. */
+  creatorCreated?: { id: string; name: string }
 }
 
 const MAX_NAME = 225
@@ -180,8 +182,11 @@ export async function updateModel(
       patch.licenseNotes === null ? null : patch.licenseNotes.slice(0, MAX_NOTES)
   }
 
+  let creatorCreated: UpdateResult['creatorCreated']
   if (patch.creator !== undefined) {
-    updates.creatorId = await resolveCreator(db, patch.creator)
+    updates.creatorId = await resolveCreator(db, patch.creator, (creator) => {
+      creatorCreated = creator
+    })
   }
 
   if (patch.previewFileId !== undefined) {
@@ -249,7 +254,7 @@ export async function updateModel(
 
   // A surrounding transaction must commit before an external filesystem write.
   const sidecarWritten = options.deferSidecar ? false : await syncSidecar(db, modelId)
-  return { ok: true, sidecarWritten }
+  return { ok: true, sidecarWritten, creatorCreated }
 }
 
 /** Replaces a model's tags, creating any that do not exist. */
@@ -304,7 +309,11 @@ async function resolveTag(db: Database, name: string): Promise<string> {
   return inserted.rows[0]!.id
 }
 
-async function resolveCreator(db: Database, name: string | null): Promise<string | null> {
+async function resolveCreator(
+  db: Database,
+  name: string | null,
+  onCreated?: (creator: { id: string; name: string }) => void,
+): Promise<string | null> {
   const trimmed = name?.trim() ?? ''
   if (trimmed.length === 0) return null
 
@@ -313,13 +322,15 @@ async function resolveCreator(db: Database, name: string | null): Promise<string
   )
   if (existing.rows[0]) return existing.rows[0].id
 
-  const inserted = await db.execute<{ id: string }>(sql`
+  const inserted = await db.execute<{ id: string; created: boolean }>(sql`
     INSERT INTO creators (name, slug, public_id)
     VALUES (${trimmed.slice(0, 225)}, ${slugify(trimmed) || `creator-${nanoid(6)}`}, ${nanoid(12)})
     ON CONFLICT (slug) DO UPDATE SET name = creators.name
-    RETURNING id
+    RETURNING id, (xmax = 0) AS created
   `)
-  return inserted.rows[0]!.id
+  const creator = inserted.rows[0]!
+  if (creator.created) onCreated?.({ id: creator.id, name: trimmed.slice(0, 225) })
+  return creator.id
 }
 
 /**

@@ -8,9 +8,9 @@
  */
 import { createServer } from 'node:http'
 import path from 'node:path'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { sql } from 'drizzle-orm'
-import { loadRootEnv } from '@pb/core'
+import { installLogCapture, loadRootEnv } from '@pb/core'
 import { createDb } from '@pb/db'
 import { JOB, getQueue, type JobHandler, type JobName } from '@pb/jobs'
 import { withMemoryDiagnostics } from './memory-diagnostics'
@@ -27,6 +27,21 @@ import { activeWatchCount, startWatchReconciler } from './watch/watcher'
 
 // Must run before anything reads DATABASE_URL.
 loadRootEnv()
+
+/*
+ * From here on, everything written to the console is also kept in Postgres,
+ * where the web UI can show it. Installed before anything else logs.
+ */
+const logs = installLogCapture({ role: 'worker', version: appVersion() })
+
+function appVersion(): string | undefined {
+  try {
+    const manifest = new URL('../../../package.json', import.meta.url)
+    return (JSON.parse(readFileSync(manifest, 'utf8')) as { version?: string }).version
+  } catch {
+    return undefined
+  }
+}
 
 const PORT = Number(process.env.WORKER_PORT ?? 3001)
 
@@ -182,8 +197,9 @@ async function shutdown(signal: string): Promise<void> {
     await stopWatching?.()
     await new Promise<void>((resolve) => server.close(() => resolve()))
     await queue.stop()
-    await pool.end()
     console.log('[worker] clean shutdown')
+    await logs.flush()
+    await pool.end()
     process.exit(0)
   } catch (error) {
     console.error('[worker] error during shutdown:', error)

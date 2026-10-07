@@ -14,6 +14,7 @@
 import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { excludedPaths } from '../services/delete-service'
+import { SYSTEM_ACTOR, recordAudit } from '../diagnostics/audit-service'
 import type { Database } from '@pb/db'
 import { schema } from '@pb/db'
 import {
@@ -902,12 +903,20 @@ async function restoreFromSidecar(
   }
 
   if (data.creator) {
-    const creator = await db.execute<{ id: string }>(sql`
+    const creator = await db.execute<{ id: string; created: boolean }>(sql`
       INSERT INTO creators (name, slug, public_id)
       VALUES (${data.creator}, ${slugify(data.creator) || 'creator'}, ${nanoid(12)})
       ON CONFLICT (slug) DO UPDATE SET name = creators.name
-      RETURNING id
+      RETURNING id, (xmax = 0) AS created
     `)
+    if (creator.rows[0]!.created) {
+      await recordAudit(db, {
+        action: 'creator.created',
+        actor: SYSTEM_ACTOR,
+        target: { type: 'creator', id: creator.rows[0]!.id, label: data.creator },
+        detail: { from: 'sidecar metadata' },
+      })
+    }
     await db.execute(sql`
       UPDATE models SET creator_id = ${creator.rows[0]!.id} WHERE id = ${modelId}
     `)

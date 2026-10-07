@@ -9,6 +9,7 @@ import {
   saveThingiverseToken,
 } from '@pb/core'
 import { getDb } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Failure = { ok: false; error: string }
 
@@ -48,6 +49,7 @@ export async function setThingiverseToken(
   try {
     const user = await authorize()
     await saveThingiverseToken(getDb(), user.id, token)
+    await audit(user, 'integration.connected', { type: 'integration', label: 'Thingiverse' })
     return { ok: true, saved: await getThingiverseTokenStatus(getDb(), user.id) }
   } catch (error) {
     return failure(error, 'Could not save your Thingiverse API token. Check it and try again.')

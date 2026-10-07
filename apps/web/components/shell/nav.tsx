@@ -83,7 +83,7 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { href: '/admin/printers', label: 'Printers', icon: 'printer', requires: 'printhost:manage' },
       {
         href: '/admin/health',
-        label: 'Library health',
+        label: 'Diagnostics',
         icon: 'health',
         requires: 'library:manage',
       },

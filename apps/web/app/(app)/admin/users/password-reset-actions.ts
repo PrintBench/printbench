@@ -3,6 +3,7 @@
 import { requireUser, issuePasswordReset, PasswordRecoveryError } from '@pb/auth'
 import { assertCan, PolicyError } from '@pb/core'
 import { getDb } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 export async function createPasswordResetLink(
   userId: string,
@@ -18,6 +19,11 @@ export async function createPasswordResetLink(
     }
     const reset = await issuePasswordReset(getDb(), userId)
     url.searchParams.set('token', reset.token)
+    await audit(actor, 'auth.password_reset_issued', {
+      type: 'user',
+      id: userId,
+      label: reset.userName,
+    })
     return { ok: true, url: url.toString(), expiresAt: reset.expiresAt.toISOString() }
   } catch (error) {
     return {

@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers'
 import { getAuth, requireUser } from '@pb/auth'
+import { audit } from '@/lib/audit'
 
 export async function changeOwnPassword(input: {
   currentPassword: string
@@ -17,6 +18,7 @@ export async function changeOwnPassword(input: {
       headers: await headers(),
       body: { ...input, revokeOtherSessions: true },
     })
+    await audit(user, 'auth.password_changed')
     return { ok: true }
   } catch {
     return {

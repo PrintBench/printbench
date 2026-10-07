@@ -10,5 +10,5 @@ export * from './prints'
 export * from './requests'
 export * from './ops'
 export * from './imports'
-
+export * from './diagnostics'
 export * from './filaments'

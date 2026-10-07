@@ -10,6 +10,8 @@ vi.mock('@pb/auth', () => ({
   getAuth: () => ({ api: { changePassword: mocks.changePassword } }),
 }))
 vi.mock('next/headers', () => ({ headers: mocks.headers }))
+// The audit trail has its own tests; here it would only write to a real database.
+vi.mock('@/lib/audit', () => ({ audit: vi.fn(async () => {}) }))
 import { changeOwnPassword } from './password-actions'
 
 describe('own password action', () => {

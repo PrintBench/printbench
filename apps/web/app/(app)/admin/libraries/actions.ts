@@ -21,6 +21,7 @@ import { assertCan, assertCanTriggerScan, cronProblem, PolicyError } from '@pb/c
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
 import { getStartedQueue, JOB } from '@pb/jobs'
+import { audit } from '@/lib/audit'
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string }
 
@@ -230,7 +231,7 @@ export async function createLibrary(input: {
   writeSidecar: boolean
 }): Promise<Result<{ id: string }>> {
   try {
-    await assertAdmin()
+    const actor = await assertAdmin()
 
     const name = input.name.trim()
     if (!name) return { ok: false, error: 'Give the library a name.' }
@@ -282,6 +283,16 @@ export async function createLibrary(input: {
         })
         .returning({ id: schema.libraries.id })
 
+      await audit(
+        actor,
+        'library.created',
+        { type: 'library', id: created!.id, label: name },
+        {
+          backend: 's3',
+          kind: input.kind,
+          grouping: input.groupingMode,
+        },
+      )
       revalidatePath('/admin/libraries')
       return { ok: true, data: { id: created!.id } }
     }
@@ -345,6 +356,16 @@ export async function createLibrary(input: {
       })
       .returning({ id: schema.libraries.id })
 
+    await audit(
+      actor,
+      'library.created',
+      { type: 'library', id: created!.id, label: name },
+      {
+        backend: 'local',
+        kind: input.kind,
+        grouping: input.groupingMode,
+      },
+    )
     revalidatePath('/admin/libraries')
     return { ok: true, data: { id: created!.id } }
   } catch (error) {
@@ -399,6 +420,25 @@ export async function triggerScan(
       }
     }
 
+    // A press that collapsed into a scan already queued did not request one.
+    if (jobId) {
+      const [library] = await getDb()
+        .select({ name: schema.libraries.name })
+        .from(schema.libraries)
+        .where(eq(schema.libraries.id, libraryId))
+        .limit(1)
+      await audit(
+        user,
+        'library.scan_requested',
+        { type: 'library', id: libraryId, label: library?.name },
+        {
+          mode: options.mode ?? 'fast',
+          force: options.force ?? false,
+          restoreSidecars: options.restoreSidecars ?? false,
+        },
+      )
+    }
+
     revalidatePath('/admin/libraries')
     return { ok: true }
   } catch (error) {
@@ -421,13 +461,13 @@ export async function updateLibrarySchedule(
   input: { scanCron: string; scanEnabled: boolean },
 ): Promise<Result> {
   try {
-    await assertAdmin()
+    const actor = await assertAdmin()
 
     const cron = input.scanCron.trim()
     const problem = cronProblem(cron)
     if (problem) return { ok: false, error: problem }
 
-    const updated = await getDb()
+    const [updated] = await getDb()
       .update(schema.libraries)
       .set({
         // Empty string and NULL both mean "no schedule"; store one of them.
@@ -436,10 +476,21 @@ export async function updateLibrarySchedule(
         updatedAt: new Date(),
       })
       .where(eq(schema.libraries.id, libraryId))
+      .returning({ name: schema.libraries.name })
 
     // Matching no rows is not success; saying otherwise reports a saved
     // schedule that was not saved.
-    if (updated.rowCount === 0) return { ok: false, error: 'That library no longer exists.' }
+    if (!updated) return { ok: false, error: 'That library no longer exists.' }
+
+    await audit(
+      actor,
+      'library.updated',
+      { type: 'library', id: libraryId, label: updated.name },
+      {
+        schedule: cron === '' ? 'none' : cron,
+        scanEnabled: input.scanEnabled,
+      },
+    )
 
     revalidatePath('/admin/libraries')
     return { ok: true }
@@ -462,14 +513,24 @@ export async function updateLibraryWatch(
   watchEnabled: boolean,
 ): Promise<Result> {
   try {
-    await assertAdmin()
+    const actor = await assertAdmin()
 
-    const updated = await getDb()
+    const [updated] = await getDb()
       .update(schema.libraries)
       .set({ watchEnabled, updatedAt: new Date() })
       .where(eq(schema.libraries.id, libraryId))
+      .returning({ name: schema.libraries.name })
 
-    if (updated.rowCount === 0) return { ok: false, error: 'That library no longer exists.' }
+    if (!updated) return { ok: false, error: 'That library no longer exists.' }
+
+    await audit(
+      actor,
+      'library.updated',
+      { type: 'library', id: libraryId, label: updated.name },
+      {
+        watching: watchEnabled ? 'on' : 'off',
+      },
+    )
 
     revalidatePath('/admin/libraries')
     return { ok: true }
@@ -481,11 +542,23 @@ export async function updateLibraryWatch(
 
 export async function deleteLibrary(libraryId: string): Promise<Result> {
   try {
-    await assertAdmin()
+    const actor = await assertAdmin()
     // Removes the index only. The user's files are never touched.
-    const removed = await getDb().delete(schema.libraries).where(eq(schema.libraries.id, libraryId))
+    const [removed] = await getDb()
+      .delete(schema.libraries)
+      .where(eq(schema.libraries.id, libraryId))
+      .returning({ name: schema.libraries.name, backend: schema.libraries.backend })
 
-    if (removed.rowCount === 0) return { ok: false, error: 'That library no longer exists.' }
+    if (!removed) return { ok: false, error: 'That library no longer exists.' }
+
+    await audit(
+      actor,
+      'library.deleted',
+      { type: 'library', id: libraryId, label: removed.name },
+      {
+        backend: removed.backend,
+      },
+    )
 
     revalidatePath('/admin/libraries')
     return { ok: true }
