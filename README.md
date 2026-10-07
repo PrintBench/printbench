@@ -75,14 +75,14 @@ Open <http://localhost:8080>, create your admin account, add a library and run a
 
 Everything else lives in the docs at **[docs.printbench.app](https://docs.printbench.app)**.
 
-| | |
-| --- | --- |
-| [Getting started](https://docs.printbench.app/getting-started/) | Install, first run and a tour of the app |
-| [User guide](https://docs.printbench.app/guide/) | Search, models, uploads, imports, print history, slicers and sharing |
-| [Administration](https://docs.printbench.app/admin/) | Libraries, users and roles, printers, library health |
-| [Deployment](https://docs.printbench.app/deploy/) | Docker Compose, Coolify, NAS, S3, backups, upgrades, troubleshooting |
-| [How it works](https://docs.printbench.app/concepts/) | Architecture, grouping, sidecars, search and the safety guards |
-| [Reference](https://docs.printbench.app/reference/) | Environment variables, roles, file formats, commands |
+|                                                                 |                                                                      |
+| --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [Getting started](https://docs.printbench.app/getting-started/) | Install, first run and a tour of the app                             |
+| [User guide](https://docs.printbench.app/guide/)                | Search, models, uploads, imports, print history, slicers and sharing |
+| [Administration](https://docs.printbench.app/admin/)            | Libraries, users and roles, printers, library health                 |
+| [Deployment](https://docs.printbench.app/deploy/)               | Docker Compose, Coolify, NAS, S3, backups, upgrades, troubleshooting |
+| [How it works](https://docs.printbench.app/concepts/)           | Architecture, grouping, sidecars, search and the safety guards       |
+| [Reference](https://docs.printbench.app/reference/)             | Environment variables, roles, file formats, commands                 |
 
 ## Contributing
 
