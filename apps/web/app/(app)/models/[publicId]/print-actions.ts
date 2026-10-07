@@ -25,6 +25,7 @@ import {
   type PrintStatus,
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
+import { audit } from '@/lib/audit'
 import { getDb, schema } from '@pb/db'
 
 type Result = { ok: true } | { ok: false; error: string }
@@ -99,6 +100,25 @@ async function modelIdFor(publicId: string): Promise<string | null> {
   return rows[0]?.id ?? null
 }
 
+/** The model's name, for the audit trail. */
+async function modelTarget(publicId: string) {
+  const rows = await getDb()
+    .select({ name: schema.models.name })
+    .from(schema.models)
+    .where(eq(schema.models.publicId, publicId))
+    .limit(1)
+  return { type: 'model', id: publicId, label: rows[0]?.name }
+}
+
+async function printStatusOf(printId: string): Promise<string | undefined> {
+  const rows = await getDb()
+    .select({ status: schema.printRuns.status })
+    .from(schema.printRuns)
+    .where(eq(schema.printRuns.id, printId))
+    .limit(1)
+  return rows[0]?.status
+}
+
 export async function recordPrint(publicId: string, input: PrintFormInput): Promise<Result> {
   try {
     const user = await requireUser()
@@ -108,6 +128,15 @@ export async function recordPrint(publicId: string, input: PrintFormInput): Prom
     if (!modelId) return { ok: false, error: 'That model no longer exists.' }
 
     await logPrint(getDb(), { ...toEntry(input), modelId, userId: user.id })
+
+    // A print logged as still running is not a completed print yet.
+    const status = input.status ?? 'success'
+    await audit(
+      user,
+      status === 'in_progress' ? 'print.logged' : 'print.completed',
+      await modelTarget(publicId),
+      { status, printer: input.printerName || undefined, material: input.material || undefined },
+    )
 
     revalidatePath(`/models/${publicId}`)
     revalidatePath('/prints')
@@ -138,7 +167,14 @@ export async function editPrint(
       return { ok: false, error: 'That print does not belong to this model.' }
     }
 
+    const before = await printStatusOf(printId)
     await updatePrint(getDb(), printId, toEntry(input))
+
+    const status = input.status ?? 'success'
+    const finished = before === 'in_progress' && status !== 'in_progress'
+    await audit(user, finished ? 'print.completed' : 'print.updated', await modelTarget(publicId), {
+      status,
+    })
 
     revalidatePath(`/models/${publicId}`)
     revalidatePath('/prints')
@@ -160,6 +196,7 @@ export async function removePrint(publicId: string, printId: string): Promise<Re
     }
 
     await deletePrint(getDb(), printId)
+    await audit(user, 'print.deleted', await modelTarget(publicId))
 
     revalidatePath(`/models/${publicId}`)
     revalidatePath('/prints')

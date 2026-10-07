@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { eq } from 'drizzle-orm'
 import { getAuth } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
+import { audit } from '@/lib/audit'
 import { needsFirstRunSetup } from '@/lib/setup'
 
 type Result = { ok: true } | { ok: false; error: string }
@@ -46,6 +47,7 @@ export async function createFirstAdmin(form: FormData): Promise<Result> {
       .set({ role: 'admin', emailVerified: true })
       .where(eq(schema.user.id, result.user.id))
 
+    await audit({ id: result.user.id, name }, 'auth.setup')
     return { ok: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not create the account.'

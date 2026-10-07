@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { PolicyError, assertCan, updateModel } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Result = { ok: true; sidecarWritten: boolean } | { ok: false; error: string }
 
@@ -36,7 +37,7 @@ export async function saveModel(
     assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'model:edit')
 
     const rows = await getDb()
-      .select({ id: schema.models.id })
+      .select({ id: schema.models.id, name: schema.models.name })
       .from(schema.models)
       .where(eq(schema.models.publicId, publicId))
       .limit(1)
@@ -46,6 +47,23 @@ export async function saveModel(
 
     const result = await updateModel(getDb(), model.id, patch)
     if (!result.ok) return { ok: false, error: result.error ?? 'Could not save.' }
+
+    // Which fields were sent, not their contents: notes can be long and private.
+    await audit(
+      user,
+      'model.updated',
+      { type: 'model', id: publicId, label: patch.name ?? model.name },
+      {
+        changed: Object.keys(patch).join(', '),
+      },
+    )
+    if (result.creatorCreated) {
+      await audit(user, 'creator.created', {
+        type: 'creator',
+        id: result.creatorCreated.id,
+        label: result.creatorCreated.name,
+      })
+    }
 
     revalidatePath(`/models/${publicId}`)
     revalidatePath('/models')

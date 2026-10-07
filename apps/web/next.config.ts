@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
 import { loadRootEnv } from '@pb/core'
@@ -5,7 +6,14 @@ import { loadRootEnv } from '@pb/core'
 // Next only reads .env from apps/web; our .env lives at the repo root.
 loadRootEnv()
 
+// The one version number lives in the root manifest. Read here, at build
+// time, because the standalone server has no dependable path back to it.
+const { version } = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+) as { version: string }
+
 const config: NextConfig = {
+  env: { PB_VERSION: version },
   // Emits a minimal standalone server bundle, so the runtime Docker stage does
   // not need node_modules. Keeps the image small.
   output: 'standalone',

@@ -72,7 +72,7 @@ export async function issuePasswordReset(
   db: Database,
   userId: string,
   options: RecoveryOptions = {},
-): Promise<{ token: string; expiresAt: Date }> {
+): Promise<{ token: string; expiresAt: Date; userName: string }> {
   return db.transaction(async (tx) => {
     // Serialize issuance and consumption for this user, including first issuance.
     const [user] = await tx
@@ -111,7 +111,7 @@ export async function issuePasswordReset(
       createdAt: now,
       updatedAt: now,
     })
-    return { token, expiresAt }
+    return { token, expiresAt, userName: user.name }
   })
 }
 
@@ -154,7 +154,7 @@ export async function resetPassword(
   db: Database,
   input: { token: string; password: string },
   options: RecoveryOptions = {},
-): Promise<void> {
+): Promise<{ userId: string; name: string }> {
   const identifier = tokenIdentifier(input.token)
   if (input.password.length < PASSWORD_MIN_LENGTH || input.password.length > PASSWORD_MAX_LENGTH) {
     throw new PasswordRecoveryError('PASSWORD_LENGTH')
@@ -163,7 +163,7 @@ export async function resetPassword(
   await validatePasswordReset(db, input.token, options)
   const password = await hashAccountPassword(input.password)
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [candidate] = await tx
       .select()
       .from(schema.verification)
@@ -216,5 +216,7 @@ export async function resetPassword(
       .where(eq(schema.account.id, account.id))
     await tx.delete(schema.session).where(eq(schema.session.userId, user.id))
     await tx.delete(schema.verification).where(eq(schema.verification.id, record.id))
+    // Who it was, so the caller can put a name in the audit trail.
+    return { userId: user.id, name: user.name }
   })
 }

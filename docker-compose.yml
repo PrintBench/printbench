@@ -38,6 +38,7 @@ services:
       LIBRARY_ROOTS: /libraries:/data/libraries
       # Must match the internal locations in docker/nginx.conf.
       ACCEL_MOUNTS: /_protected/library/=/libraries,/_protected/managed/=/data/libraries
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - previews:/data
       # Existing collections are read-only by default. Set LIBRARY_READ_ONLY=false
@@ -68,6 +69,7 @@ services:
       DATA_DIR: /data
       LIBRARY_ROOTS: /libraries:/data/libraries
       WORKER_MEMORY_LOG: ${WORKER_MEMORY_LOG:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - previews:/data
       - type: bind

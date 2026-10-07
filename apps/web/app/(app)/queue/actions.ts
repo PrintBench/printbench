@@ -22,6 +22,7 @@ import {
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -40,7 +41,8 @@ type AddResult =
 type Need = 'edit' | 'run'
 
 type Authorized =
-  { ok: false; error: string } | { ok: true; user: { id: string }; request: PrintRequest }
+  | { ok: false; error: string }
+  | { ok: true; user: { id: string; name?: string | null }; request: PrintRequest }
 
 async function authorize(requestId: string, need: Need): Promise<Authorized> {
   const user = await requireUser()
@@ -102,6 +104,18 @@ export async function addRequests(input: {
       user.id,
     )
 
+    if (result.created > 0) {
+      await audit(
+        user,
+        'request.created',
+        { type: 'request', label: lines[0]!.title },
+        {
+          requests: result.created,
+          requestedFor: requestedBy ?? undefined,
+        },
+      )
+    }
+
     revalidatePath('/queue')
     revalidatePath('/')
 
@@ -144,6 +158,15 @@ export async function addModelToQueue(input: {
       },
       user.id,
     )
+    await audit(
+      user,
+      'request.created',
+      { type: 'request', label: input.title },
+      {
+        quantity: input.quantity ?? 1,
+        requestedFor: requestedBy ?? undefined,
+      },
+    )
 
     revalidatePath('/queue')
     revalidatePath('/')
@@ -168,6 +191,12 @@ export async function setStatus(requestId: string, status: PrintRequestStatus): 
      * whoever marked it printed, exactly as it would be from the model page.
      */
     await setRequestStatus(getDb(), requestId, status, { userId: authorized.user.id })
+    await audit(
+      authorized.user,
+      status === 'done' ? 'request.completed' : 'request.status_changed',
+      { type: 'request', id: requestId, label: authorized.request.title },
+      { from: authorized.request.status, to: status },
+    )
     revalidateFor(authorized.request)
     return { ok: true }
   } catch (error) {
@@ -181,6 +210,16 @@ export async function editRequest(requestId: string, patch: RequestPatch): Promi
     if (!authorized.ok) return authorized
 
     await updateRequest(getDb(), requestId, patch)
+    await audit(
+      authorized.user,
+      'request.updated',
+      {
+        type: 'request',
+        id: requestId,
+        label: authorized.request.title,
+      },
+      { changed: Object.keys(patch).join(', ') },
+    )
     revalidateFor(authorized.request)
     return { ok: true }
   } catch (error) {
@@ -218,6 +257,11 @@ export async function removeRequest(requestId: string): Promise<Result> {
     if (!authorized.ok) return authorized
 
     await deleteRequest(getDb(), requestId)
+    await audit(authorized.user, 'request.deleted', {
+      type: 'request',
+      id: requestId,
+      label: authorized.request.title,
+    })
     revalidateFor(authorized.request)
     return { ok: true }
   } catch (error) {
