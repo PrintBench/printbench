@@ -5,6 +5,7 @@ import { getDb } from '@pb/db'
 import { needsFirstRunSetup } from '@/lib/setup'
 import { Sidebar } from '@/components/shell/sidebar'
 import { PreviewStatusProvider } from '@/components/model/preview-status-provider'
+import { ActivityPanel } from '@/components/shell/activity-panel'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <PreviewStatusProvider>{children}</PreviewStatusProvider>
         </div>
       </main>
+      <ActivityPanel />
     </div>
   )
 }
