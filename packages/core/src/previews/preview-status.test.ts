@@ -10,7 +10,7 @@ const IMAGE = 'a8480000-0000-4000-8000-000000000004'
 const OTHER = 'a8480000-0000-4000-8000-000000000005'
 const PUBLIC_ID = 'preview-status-fixture'
 
-describe.skipIf(!process.env.DATABASE_URL)('modelPreviewStatuses', () => {
+describe('modelPreviewStatuses', { tags: ['integration'] }, () => {
   let db: ReturnType<typeof createDb>['db']
   let pool: ReturnType<typeof createDb>['pool']
   beforeAll(() => {

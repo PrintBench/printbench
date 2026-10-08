@@ -16,3 +16,7 @@ libraries/
 
 # AGPL reference material must never enter a build context.
 reference/
+
+# Browser smoke artifacts
+test-results/
+playwright-report/

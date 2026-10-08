@@ -17,12 +17,10 @@ import { handleFileDigest } from './analyze'
  * that a genuine rename keeps its thumbnail and analysis rather than starting
  * from "pending" again.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIBRARY_ID = '4e000000-0000-4000-8000-000000000001'
 
-describeDb('rename detection', () => {
+describe('rename detection', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let base = ''

@@ -18,8 +18,9 @@ someone is representing the project.
 
 ## Reporting
 
-Report unacceptable behaviour privately to **[ADD A CONTACT ADDRESS BEFORE
-PUBLISHING]**. Reports are handled confidentially, and the maintainers will
+Report unacceptable behaviour privately to
+[support@owl-media.co.uk](mailto:support@owl-media.co.uk).
+Reports are handled confidentially, and the maintainers will
 respond as promptly as they reasonably can.
 
 Maintainers are obliged to respect the privacy and security of anyone who

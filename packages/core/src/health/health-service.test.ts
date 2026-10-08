@@ -21,8 +21,6 @@ import {
  * A dashboard that keeps reporting things you have already fixed stops being
  * read, so most of these tests fix something and assert it goes away.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIB = '88000000-0000-4000-8000-000000000001'
 const OTHER_LIB = '88000000-0000-4000-8000-000000000002'
@@ -31,7 +29,7 @@ const TAG = '88000000-0000-4000-8000-00000000000d'
 
 const id = (suffix: string) => `88aa0000-0000-4000-8000-0000000000${suffix}`
 
-describeDb('library health', () => {
+describe('library health', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

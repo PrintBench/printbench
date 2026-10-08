@@ -103,11 +103,10 @@ describe('sidecar serialisation', () => {
 })
 
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIBRARY_ID = '6a6a6a6a-0000-4000-8000-00000000side'.replace('side', 'a001')
 
-describeDb('sidecar round trip', () => {
+describe('sidecar round trip', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let root: string

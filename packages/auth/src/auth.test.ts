@@ -8,11 +8,10 @@ import { createDb } from '@pb/db'
  * output is not authoritative — signing a real user up is.
  */
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const EMAIL = 'schema-probe@example.test'
 
-describeDb('better-auth schema compatibility', () => {
+describe('better-auth schema compatibility', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let getAuth: typeof import('./auth').getAuth

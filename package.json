@@ -40,7 +40,7 @@
     "db:generate": "npm run generate -w @pb/db",
     "db:migrate": "npm run migrate -w @pb/db",
     "build": "npm run build -w @pb/web && npm run build -w @pb/worker",
-    "typecheck": "tsc --build && npm run typecheck -w @pb/web",
+    "typecheck": "tsc --build && npm run typecheck -w @pb/web && tsc --project tsconfig.smoke.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -59,11 +59,18 @@
     "verify:phase8": "tsx scripts/verify-phase8.mts",
     "verify:phase9": "tsx scripts/verify-phase9.mts",
     "verify:s3": "tsx scripts/verify-s3.mts",
-    "backup": "tsx scripts/backup.mts"
+    "backup": "tsx scripts/backup.mts",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:release && npm test",
+    "test:unit": "vitest run --mode unit",
+    "test:integration": "vitest run --mode integration",
+    "release:check": "node scripts/release-metadata.mjs",
+    "test:release": "node --test scripts/release-metadata.test.mjs",
+    "verify:smoke": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@next/eslint-plugin-next": "^16.3.8",
+    "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.3",
     "concurrently": "^10.0.5",
     "eslint": "^10.11.0",

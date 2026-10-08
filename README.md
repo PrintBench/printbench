@@ -20,7 +20,7 @@
   <img src="screenshots/models.png" alt="The PrintBench model library" width="860">
 </p>
 
-Point PrintBench at a folder of print files and it turns them into a searchable, visual library: thumbnails, 3D previews, tags, creators, collections, print history and a print queue. It never moves, renames or deletes your files.
+Point PrintBench at a folder of print files and it turns them into a searchable, visual library: thumbnails, 3D previews, tags, creators, collections, print history and a print queue. Existing libraries are read-only by default. Managed libraries can opt into file changes.
 
 Postgres is the **only** thing it needs. No Redis, no message broker, no Elasticsearch, and no native 3D toolchain to install.
 
@@ -85,16 +85,20 @@ Everything else lives in the docs at **[docs.printbench.app](https://docs.printb
 | [How it works](https://docs.printbench.app/concepts/)           | Architecture, grouping, sidecars, search and the safety guards       |
 | [Reference](https://docs.printbench.app/reference/)             | Environment variables, roles, file formats, commands                 |
 
+## Getting help
+
+See [SUPPORT.md](SUPPORT.md) for setup questions, bug reports and private reporting routes.
+
 ## Contributing
 
 Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers local development setup, the checks CI runs and the handful of rules worth knowing before changing things.
 
-One thing to read first: without a `.env`, the database-backed third of the test suite skips silently, so a green run proves much less than it looks like.
+Run `npm run test:unit` for checks without Postgres. The full `npm test` suite and `npm run check` require `DATABASE_URL` and a running, migrated development database; they fail at startup if the variable is missing.
 
 To run from source:
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 npm run db:up        # Postgres 18 on port 5433
 npm run db:migrate

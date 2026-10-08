@@ -21,7 +21,6 @@ import { EXCLUDED_TABLES, SECRET_COLUMNS, listForeignKeys } from './tables'
  * a place to try that.
  */
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIBRARY = '5b000000-0000-4000-8000-000000000001'
 const MODEL = '5b000000-0000-4000-8000-000000000002'
@@ -29,7 +28,7 @@ const FILE = '5b000000-0000-4000-8000-000000000003'
 const TAG = '5b000000-0000-4000-8000-000000000004'
 const PRINTER = '5b000000-0000-4000-8000-000000000005'
 
-describeDb('backup and restore', () => {
+describe('backup and restore', { tags: ['integration'] }, () => {
   let admin: pg.Pool
   let work = ''
   const databases: string[] = []

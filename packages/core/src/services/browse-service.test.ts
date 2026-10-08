@@ -28,8 +28,6 @@ import {
  * because a creator page promising forty models when eight are on an unplugged
  * drive sends you looking for something that is not there.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIB = '6b000000-0000-4000-8000-000000000001'
 const CREATOR_A = '6b000000-0000-4000-8000-00000000000a'
@@ -38,7 +36,7 @@ const TAG_X = '6b000000-0000-4000-8000-0000000000c1'
 const TAG_Y = '6b000000-0000-4000-8000-0000000000c2'
 const id = (suffix: string) => `6baa0000-0000-4000-8000-0000000000${suffix}`
 
-describeDb('browse', () => {
+describe('browse', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

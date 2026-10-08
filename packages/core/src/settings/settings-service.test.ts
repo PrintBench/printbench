@@ -11,9 +11,6 @@ import {
   validate,
 } from './settings-service'
 
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
-
 describe('validation', () => {
   it('accepts sensible values', () => {
     expect(validate('siteName', '  Rich’s Prints  ')).toBe('Rich’s Prints')
@@ -63,7 +60,7 @@ describe('validation', () => {
   })
 })
 
-describeDb('settings storage', () => {
+describe('settings storage', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

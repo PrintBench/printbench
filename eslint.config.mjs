@@ -28,6 +28,8 @@ export default tseslint.config(
       // work and reports every problem twice, against files not in this tree.
       '.claude/worktrees/**',
       'data/**',
+      'test-results/**',
+      'playwright-report/**',
       'packages/*/dist/**',
     ],
   },

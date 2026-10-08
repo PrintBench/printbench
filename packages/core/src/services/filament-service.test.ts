@@ -51,7 +51,7 @@ describe('filament input and permissions', () => {
   })
 })
 
-describe.skipIf(!url)('filament inventory with Postgres', () => {
+describe('filament inventory with Postgres', { tags: ['integration'] }, () => {
   let db: ReturnType<typeof createDb>['db']
   let pool: ReturnType<typeof createDb>['pool']
   let ids: string[] = []

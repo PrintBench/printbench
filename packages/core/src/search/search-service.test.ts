@@ -13,7 +13,6 @@ import { quickSearch, searchModels } from './search-service'
  * here rather than be discovered by someone who cannot find their dragon.
  */
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIB_A = '7a000000-0000-4000-8000-00000000000a'
 const LIB_B = '7b000000-0000-4000-8000-00000000000b'
@@ -23,7 +22,7 @@ const TAG_DRAGON = '7e000000-0000-4000-8000-00000000000e'
 const TAG_TERRAIN = '7f000000-0000-4000-8000-00000000000f'
 const PREVIEW_IMAGE = '7f000000-0000-4000-8000-000000000010'
 
-describeDb('searchModels', () => {
+describe('searchModels', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 
