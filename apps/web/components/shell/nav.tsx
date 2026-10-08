@@ -80,7 +80,6 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
     title: 'Manage',
     items: [
-      { href: '/settings', label: 'Account settings', icon: 'settings', requires: 'file:upload' },
       { href: '/admin/libraries', label: 'Libraries', icon: 'drive', requires: 'library:manage' },
       { href: '/admin/printers', label: 'Printers', icon: 'printer', requires: 'printhost:manage' },
       {
@@ -91,7 +90,12 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
       },
       { href: '/admin/users', label: 'Users', icon: 'users', requires: 'user:manage' },
       { href: '/admin/backup', label: 'Backup', icon: 'backup', requires: 'instance:backup' },
-      { href: '/admin/settings', label: 'Settings', icon: 'settings', requires: 'settings:manage' },
+      {
+        href: '/admin/settings',
+        label: 'System settings',
+        icon: 'settings',
+        requires: 'settings:manage',
+      },
     ],
   },
 ]
