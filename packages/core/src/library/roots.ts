@@ -83,7 +83,8 @@ export function libraryRoots(): string[] {
    */
   const likely = ['libraries', 'demo-library']
     .map((name) => path.join(repoRoot, name))
-    .filter((candidate) => existsSync(candidate))
+    // Library contents are runtime data, not files to include in the server bundle.
+    .filter((candidate) => existsSync(/* turbopackIgnore: true */ candidate))
     .sort((a, b) => Number(isEmptyDir(a)) - Number(isEmptyDir(b)))
 
   return likely.length > 0 ? likely : [repoRoot]
@@ -159,7 +160,9 @@ export async function browseDirectories(target?: string | null): Promise<BrowseR
    * case in Docker — open it directly rather than making someone click through
    * a list of one.
    */
-  const current = target?.trim() ? path.resolve(target.trim()) : (roots[0] ?? path.resolve('.'))
+  const current = target?.trim()
+    ? path.resolve(target.trim())
+    : (roots[0] ?? path.resolve(/* turbopackIgnore: true */ '.'))
 
   if (!isWithinRoots(current, roots)) {
     throw new RootError('That folder is outside the places this server may browse.')
