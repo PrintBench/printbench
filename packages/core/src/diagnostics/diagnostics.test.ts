@@ -72,12 +72,11 @@ describe('audit labels', () => {
 })
 
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 /** Marks this file's rows so it never touches a real trail in the dev database. */
 const MARK = 'diagnostics-test'
 
-describeDb('diagnostics storage', () => {
+describe('diagnostics storage', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

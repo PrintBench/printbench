@@ -8,7 +8,7 @@ const LIBRARY = 'ac710000-0000-4000-8000-000000000001'
 const MODEL = 'ac710000-0000-4000-8000-000000000002'
 const FILE = 'ac710000-0000-4000-8000-000000000003'
 
-describe.skipIf(!process.env.DATABASE_URL)('activity database snapshot', () => {
+describe('activity database snapshot', { tags: ['integration'] }, () => {
   let database: ReturnType<typeof createDb>
   let queue: JobQueue
   const jobIds: string[] = []

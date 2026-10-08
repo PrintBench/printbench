@@ -11,11 +11,10 @@ import {
 } from './password-recovery'
 
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 const oldPassword = 'previous-password-123'
 const newPassword = 'replacement-password-456'
 
-describeDb('administrator-issued password recovery', () => {
+describe('administrator-issued password recovery', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let userId: string

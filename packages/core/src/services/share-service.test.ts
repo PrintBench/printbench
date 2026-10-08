@@ -17,15 +17,13 @@ import {
  * are mostly about the boundary: a token opens exactly one model and its files,
  * and nothing else in the library.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIB = '5a000000-0000-4000-8000-000000000001'
 const SHARED = '5aaa0000-0000-4000-8000-00000000000a'
 const PRIVATE = '5aaa0000-0000-4000-8000-00000000000b'
 const USER = 'share-test-user'
 
-describeDb('share links', () => {
+describe('share links', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let sharedFileId: string

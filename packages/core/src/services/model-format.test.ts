@@ -4,11 +4,10 @@ import { createDb } from '@pb/db'
 import { modelFormatSql, modelGeometrySql, modelThumbnailSql } from './model-format'
 
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 const LIB = 'a4230000-0000-4000-8000-000000000001'
 const MODEL = 'a4230000-0000-4000-8000-000000000002'
 
-describeDb('model format badges', () => {
+describe('model format badges', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

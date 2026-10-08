@@ -13,10 +13,9 @@ import {
 import { saveMakerWorldCookie } from './import-service'
 import type { BambuAuthRequest } from './makerworld-auth'
 
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip
 const reply = (body: unknown, status = 200) => ({ status, body: Buffer.from(JSON.stringify(body)) })
 
-describeDb('personal MakerWorld sign-in lifecycle', () => {
+describe('personal MakerWorld sign-in lifecycle', { tags: ['integration'] }, () => {
   let db: ReturnType<typeof createDb>['db']
   let pool: ReturnType<typeof createDb>['pool']
   let member: string

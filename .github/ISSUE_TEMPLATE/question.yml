@@ -1,0 +1,33 @@
+name: Help / question
+description: Ask about setup or use after checking the documentation.
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [the docs](https://docs.printbench.app) and existing issues first.
+        Do not post secrets or private files. For vulnerabilities, follow
+        [the security policy](https://github.com/PrintBench/printbench/blob/main/SECURITY.md).
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need help with?
+      description: Describe your goal, what you tried and where you got stuck.
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: PrintBench version or commit
+    validations: { required: true }
+  - type: input
+    id: deployment
+    attributes:
+      label: Deployment method
+      placeholder: Docker Compose, Coolify or local development
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant redacted logs
+      description: Remove secrets, credentials and private paths before posting.
+      render: shell

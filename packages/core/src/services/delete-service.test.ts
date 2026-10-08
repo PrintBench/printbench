@@ -25,13 +25,11 @@ import type { LibraryLocation } from '../storage/types'
  * was — and a scan must not then put the model straight back, which is the
  * failure that makes a delete button look broken.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const IN_PLACE = '4d000000-0000-4000-8000-000000000001'
 const MANAGED = '4d000000-0000-4000-8000-000000000002'
 
-describeDb('deleting models', () => {
+describe('deleting models', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let base = ''
