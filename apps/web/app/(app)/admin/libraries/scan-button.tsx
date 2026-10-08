@@ -32,7 +32,9 @@ export function ScanButton({
     startTransition(async () => {
       const result = await triggerScan(libraryId, options)
       setMessage(result.ok ? 'Scan queued' : result.error)
-      router.refresh()
+      // Nothing changed on failure, and a refresh can replace the page (a
+      // revoked role, say) before the error has been read.
+      if (result.ok) router.refresh()
     })
   }
 
