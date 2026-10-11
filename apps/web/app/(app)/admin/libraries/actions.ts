@@ -309,7 +309,8 @@ export async function createLibrary(input: {
       const { join } = await import('node:path')
       const { mkdir } = await import('node:fs/promises')
 
-      path = join(managedRoot(), slugify(name) || 'library')
+      // Uploaded files live on runtime storage, outside the server bundle.
+      path = join(/* turbopackIgnore: true */ managedRoot(), slugify(name) || 'library')
       await mkdir(path, { recursive: true })
     } else {
       /*
