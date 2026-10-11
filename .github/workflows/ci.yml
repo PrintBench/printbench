@@ -72,7 +72,7 @@ jobs:
 
       - name: Save smoke failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-failures
           path: test-results/
