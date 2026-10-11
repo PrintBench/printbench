@@ -11,6 +11,7 @@ import {
 } from '@pb/core'
 import { getDb } from '@pb/db'
 import { getStartedQueue, JOB } from '@pb/jobs'
+import { audit } from '@/lib/audit'
 
 type Failure = { ok: false; error: string }
 export interface MakerWorldImportStatus {
@@ -72,9 +73,23 @@ export async function startModelSourceImport(input: {
       await markMakerWorldImportQueueFailed(getDb(), user.id, created.id)
       return { ok: false, error: 'Could not queue the import. Please try again.' }
     }
+    await audit(user, 'model.imported', {
+      type: 'import',
+      id: created.id,
+      label: sourceHost(input.url),
+    })
     return { ok: true, id: created.id }
   } catch (error) {
     return failure(error, 'Could not start the import. Check the model URL and writable library.')
+  }
+}
+
+/** Where it came from, without the path: enough to recognise, nothing to leak. */
+function sourceHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return 'a model site'
   }
 }
 

@@ -25,20 +25,25 @@ export class JobQueue {
   /** In-flight start, so concurrent callers await one bootstrap, not several. */
   private starting: Promise<void> | undefined
 
-  constructor(options: QueueOptions = {}) {
-    const connectionString = options.connectionString ?? process.env.DATABASE_URL
+  constructor(private readonly options: QueueOptions = {}) {
+    this.boss = this.createBoss()
+  }
+
+  private createBoss(): PgBoss {
+    const connectionString = this.options.connectionString ?? process.env.DATABASE_URL
     if (!connectionString) throw new Error('DATABASE_URL is not set')
 
-    this.boss = new PgBoss({
+    const boss = new PgBoss({
       connectionString,
-      schema: options.schema ?? 'pgboss',
+      schema: this.options.schema ?? 'pgboss',
       // Warn before the job table becomes a problem nobody is watching for.
       warningQueueSize: 10_000,
     })
 
-    this.boss.on('error', (error: unknown) => {
+    boss.on('error', (error: unknown) => {
       console.error('[queue] pg-boss error:', error)
     })
+    return boss
   }
 
   async start(): Promise<void> {
@@ -88,6 +93,28 @@ export class JobQueue {
     // Let in-flight jobs finish: a scan killed mid-write leaves a partial index.
     await this.boss.stop({ graceful: true, timeout: 30_000 })
     this.started = false
+    /*
+     * A fresh instance, so the queue can be started again. Restoring a backup
+     * pauses work and resumes it in the same process; handlers registered with
+     * work() do not survive this and have to be registered again.
+     */
+    this.boss = this.createBoss()
+  }
+
+  /**
+   * Discards every job that has not finished.
+   *
+   * After a restore they name files and libraries from the database that was
+   * just replaced. Best effort: the schedules and the reconcile sweep queue
+   * whatever the restored data actually needs.
+   */
+  async discardPending(): Promise<void> {
+    this.assertStarted('discard pending jobs')
+    for (const name of Object.values(JOB)) {
+      await this.boss.deleteQueuedJobs(name).catch((error: unknown) => {
+        console.warn(`[queue] could not clear ${name}: ${String(error)}`)
+      })
+    }
   }
 
   /**

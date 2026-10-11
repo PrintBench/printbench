@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@pb/auth', () => ({ requireUser: mocks.requireUser }))
 vi.mock('@pb/db', () => ({ getDb: () => 'db' }))
+// The audit trail has its own tests; here it would only write to a real database.
+vi.mock('@/lib/audit', () => ({ audit: vi.fn(async () => {}) }))
 vi.mock('@pb/core', () => ({
   PolicyError: class PolicyError extends Error {},
   MakerWorldImportError: class MakerWorldImportError extends Error {},

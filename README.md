@@ -20,7 +20,7 @@
   <img src="screenshots/models.png" alt="The PrintBench model library" width="860">
 </p>
 
-Point PrintBench at a folder of print files and it turns them into a searchable, visual library: thumbnails, 3D previews, tags, creators, collections, print history and a print queue. It never moves, renames or deletes your files.
+Point PrintBench at a folder of print files and it turns them into a searchable, visual library: thumbnails, 3D previews, tags, creators, collections, print history and a print queue. Existing libraries are read-only by default. Managed libraries can opt into file changes.
 
 Postgres is the **only** thing it needs. No Redis, no message broker, no Elasticsearch, and no native 3D toolchain to install.
 
@@ -30,6 +30,7 @@ Postgres is the **only** thing it needs. No Redis, no message broker, no Elastic
 - **Fast search that forgives typos.** Filter by tag, creator, licence, format or "never printed". Searches are plain URLs you can bookmark and share.
 - **Preview in 3D** right in the browser.
 - **Organise your way** with tags (and tag merge), creators, nested collections and a private Liked list.
+- **Know your filament stock.** Manage individual spools, weigh remaining filament, and track multi-spool print consumption and costs.
 - **Keep a print log.** Record printer, material, settings, rating and notes, and see a success rate per model.
 - **A print queue for the household.** Paste a list of things people asked for, one per line, and PrintBench links the ones it recognises.
 - **Hand files to your slicer.** Open in Bambu Studio, Creality Print, OrcaSlicer, PrusaSlicer, Cura or Lychee, and send sliced files to OctoPrint, Moonraker or PrusaLink printers.
@@ -75,25 +76,29 @@ Open <http://localhost:8080>, create your admin account, add a library and run a
 
 Everything else lives in the docs at **[docs.printbench.app](https://docs.printbench.app)**.
 
-| | |
-| --- | --- |
-| [Getting started](https://docs.printbench.app/getting-started/) | Install, first run and a tour of the app |
-| [User guide](https://docs.printbench.app/guide/) | Search, models, uploads, imports, print history, slicers and sharing |
-| [Administration](https://docs.printbench.app/admin/) | Libraries, users and roles, printers, library health |
-| [Deployment](https://docs.printbench.app/deploy/) | Docker Compose, Coolify, NAS, S3, backups, upgrades, troubleshooting |
-| [How it works](https://docs.printbench.app/concepts/) | Architecture, grouping, sidecars, search and the safety guards |
-| [Reference](https://docs.printbench.app/reference/) | Environment variables, roles, file formats, commands |
+|                                                                 |                                                                      |
+| --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [Getting started](https://docs.printbench.app/getting-started/) | Install, first run and a tour of the app                             |
+| [User guide](https://docs.printbench.app/guide/)                | Search, models, uploads, imports, print history, slicers and sharing |
+| [Administration](https://docs.printbench.app/admin/)            | Libraries, users and roles, printers, library health                 |
+| [Deployment](https://docs.printbench.app/deploy/)               | Docker Compose, Coolify, NAS, S3, backups, upgrades, troubleshooting |
+| [How it works](https://docs.printbench.app/concepts/)           | Architecture, grouping, sidecars, search and the safety guards       |
+| [Reference](https://docs.printbench.app/reference/)             | Environment variables, roles, file formats, commands                 |
+
+## Getting help
+
+See [SUPPORT.md](SUPPORT.md) for setup questions, bug reports and private reporting routes.
 
 ## Contributing
 
 Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers local development setup, the checks CI runs and the handful of rules worth knowing before changing things.
 
-One thing to read first: without a `.env`, the database-backed third of the test suite skips silently, so a green run proves much less than it looks like.
+Run `npm run test:unit` for checks without Postgres. The full `npm test` suite and `npm run check` require `DATABASE_URL` and a running, migrated development database; they fail at startup if the variable is missing.
 
 To run from source:
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 npm run db:up        # Postgres 18 on port 5433
 npm run db:migrate

@@ -1,10 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, eq } from 'drizzle-orm'
 import { betterAuth } from 'better-auth'
+import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api'
 import { hashPassword, verifyPassword } from 'better-auth/crypto'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins/admin'
 import { nextCookies } from 'better-auth/next-js'
+import { recordAudit } from '@pb/core'
 import { getDb, schema, type Database } from '@pb/db'
 import { ROLES, type Role } from './roles'
 
@@ -224,12 +226,78 @@ function buildNativeAuth(database: Database) {
       },
     },
 
+    /*
+     * Sign-ins are recorded here rather than in the login form's code path
+     * because this is the only place that sees every attempt, including the
+     * ones made straight at the API by something that is not our form.
+     */
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/sign-out') return
+        // After the endpoint runs the session is gone, and with it the name.
+        const current = await getSessionFromCtx(ctx).catch(() => null)
+        if (!current) return
+        await recordAudit(database, {
+          action: 'auth.logout',
+          actor: { type: 'user', id: current.user.id, name: current.user.name },
+          ip: clientIp(ctx.headers),
+        })
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/sign-in/email') return
+        const created = ctx.context.newSession
+        if (created) {
+          await recordAudit(database, {
+            action: 'auth.login',
+            actor: { type: 'user', id: created.user.id, name: created.user.name },
+            // The header first: the session stores IPv6 addresses masked to a prefix.
+            ip: clientIp(ctx.headers) ?? created.session.ipAddress,
+          })
+          return
+        }
+
+        const returned = ctx.context.returned
+        const body = ctx.body as { email?: unknown } | undefined
+        await recordAudit(database, {
+          action: 'auth.login_failed',
+          outcome: 'failure',
+          actor: { type: 'anonymous', name: attemptedEmail(body?.email) },
+          detail: {
+            reason: returned instanceof APIError ? returned.message : 'Sign-in was refused',
+          },
+          ip: clientIp(ctx.headers),
+        })
+      }),
+    },
+
     plugins: [
       admin({ defaultRole: 'viewer', adminRoles: [ROLES.admin] }),
       // Must be last: lets server actions set cookies.
       nextCookies(),
     ],
   })
+}
+
+/** Same header order better-auth is configured with above. */
+function clientIp(headers: Headers | undefined): string | null {
+  for (const name of ['cf-connecting-ip', 'x-forwarded-for', 'x-real-ip']) {
+    const value = headers?.get(name)?.split(',')[0]?.trim()
+    if (value) return value
+  }
+  return null
+}
+
+/**
+ * What was typed into the email box of a failed sign-in.
+ *
+ * Kept only when it is shaped like an address: people paste passwords into
+ * the wrong field, and the audit trail must not become where those end up.
+ */
+function attemptedEmail(value: unknown): string {
+  if (typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(value)) {
+    return value.toLowerCase()
+  }
+  return '(not an email address)'
 }
 
 export type Auth = ReturnType<typeof createAuth>

@@ -13,6 +13,7 @@ import {
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
 import { JOB, getStartedQueue } from '@pb/jobs'
+import { audit } from '@/lib/audit'
 
 /**
  * Moving a model to another library.
@@ -156,6 +157,15 @@ export async function moveToLibrary(
         destinationPath,
       },
       { singletonKey: `move:${found.model.id}` },
+    )
+    await audit(
+      user,
+      'model.moved',
+      { type: 'model', id: publicId, label: found.model.name },
+      {
+        from: found.library.name,
+        to: destinationRow.name,
+      },
     )
 
     revalidatePath(`/models/${publicId}`)

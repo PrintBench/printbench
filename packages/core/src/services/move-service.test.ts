@@ -22,14 +22,12 @@ import type { LibraryLocation, StorageAdapter } from '../storage/types'
  * are all about two systems disagreeing: files moved but the row not updated,
  * a row updated but files left behind, a scan afterwards undoing either.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const SOURCE = '4d000000-0000-4000-8000-000000000101'
 const DESTINATION = '4d000000-0000-4000-8000-000000000102'
 const READ_ONLY = '4d000000-0000-4000-8000-000000000103'
 
-describeDb('moving a model between libraries', () => {
+describe('moving a model between libraries', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let base = ''

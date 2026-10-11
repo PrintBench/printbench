@@ -20,13 +20,12 @@ import {
  * running, a duration nobody typed in, a model never printed at all.
  */
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIB = '71000000-0000-4000-8000-000000000001'
 const MODEL_A = '71aa0000-0000-4000-8000-00000000000a'
 const MODEL_B = '71bb0000-0000-4000-8000-00000000000b'
 
-describeDb('print history', () => {
+describe('print history', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let fileId: string

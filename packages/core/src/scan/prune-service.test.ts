@@ -11,14 +11,12 @@ import { pendingDeletions, prune } from './prune-service'
  * missing and past the grace period, and deleting them would throw away
  * exactly what the sidecars exist to protect.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIVE_LIB = '99000000-0000-4000-8000-000000000001'
 const DEAD_LIB = '99000000-0000-4000-8000-000000000002'
 const id = (suffix: string) => `99aa0000-0000-4000-8000-0000000000${suffix}`
 
-describeDb('prune', () => {
+describe('prune', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

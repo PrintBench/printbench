@@ -12,14 +12,12 @@ import { watchTargets } from './watcher'
  * reliably in CI. This is the part that decides WHAT to watch, and it is
  * plain SQL with no side effects, so it can be asserted directly.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LOCAL_ON = '7900e000-0000-4000-8000-000000000001'
 const LOCAL_OFF = '7900e000-0000-4000-8000-000000000002'
 const S3_ON = '7900e000-0000-4000-8000-000000000003'
 
-describeDb('watchTargets', () => {
+describe('watchTargets', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

@@ -1,8 +1,10 @@
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '@pb/db'
 import {
+  SYSTEM_ACTOR,
   createStorageAdapter,
   libraryLocationFromRow,
+  recordAudit,
   scanLibrary,
   type LibraryLocation,
 } from '@pb/core'
@@ -47,6 +49,8 @@ export async function handleLibraryScan(
   console.log(`[scan] starting ${payload.mode} scan of "${library.name}"`)
   const started = Date.now()
 
+  const target = { type: 'library', id: library.id, label: library.name }
+
   const outcome = await scanLibrary(
     {
       db,
@@ -80,7 +84,19 @@ export async function handleLibraryScan(
         await queue.sendMany(JOB.fileDigest, payloads)
       },
     },
-  )
+  ).catch(async (error: unknown) => {
+    await recordAudit(db, {
+      action: 'library.scan_failed',
+      outcome: 'failure',
+      actor: SYSTEM_ACTOR,
+      target,
+      detail: {
+        mode: payload.mode,
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    })
+    throw error
+  })
 
   const seconds = ((Date.now() - started) / 1000).toFixed(1)
 
@@ -90,6 +106,13 @@ export async function handleLibraryScan(
     console.warn(
       `[scan] ABORTED "${library.name}" after ${seconds}s — ${outcome.abortReason}: ${outcome.abortDetail}`,
     )
+    await recordAudit(db, {
+      action: 'library.scan_aborted',
+      outcome: 'failure',
+      actor: SYSTEM_ACTOR,
+      target,
+      detail: { mode: payload.mode, reason: outcome.abortReason, detail: outcome.abortDetail },
+    })
     return
   }
 
@@ -103,6 +126,31 @@ export async function handleLibraryScan(
 
   if (outcome.errors.length > 0) {
     console.warn(`[scan] ${outcome.errors.length} directories could not be read`)
+  }
+
+  /*
+   * Scans are how most models arrive and disappear, so this is the audit
+   * trail's record of models added, changed and gone missing. Only written
+   * when something changed: a watched library is rescanned constantly, and a
+   * trail full of scans that found nothing buries the ones that did.
+   */
+  const changed =
+    outcome.modelsCreated + outcome.modelsUpdated + outcome.modelsRenamed + outcome.modelsMissing
+  if (changed > 0 || outcome.errors.length > 0) {
+    await recordAudit(db, {
+      action: 'library.scan_completed',
+      actor: SYSTEM_ACTOR,
+      target,
+      detail: {
+        mode: payload.mode,
+        modelsAdded: outcome.modelsCreated,
+        modelsUpdated: outcome.modelsUpdated,
+        modelsRenamed: outcome.modelsRenamed,
+        modelsMissing: outcome.modelsMissing,
+        unreadableDirectories: outcome.errors.length,
+        seconds: Number(seconds),
+      },
+    })
   }
 
   /*

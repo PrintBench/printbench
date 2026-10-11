@@ -6,7 +6,7 @@ import { NotPermitted } from '@/components/shell/not-permitted'
 import { SettingsForm } from './settings-form'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Settings' }
+export const metadata = { title: 'System settings' }
 
 export default async function SettingsPage() {
   const user = await getSessionUser()
@@ -19,7 +19,7 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader
-        title="Settings"
+        title="System settings"
         description="Instance-wide options. Anything that belongs to one library is on that library instead."
       />
       <SettingsForm initial={settings} />

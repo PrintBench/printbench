@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
@@ -23,7 +23,9 @@ describe('library roots', () => {
   let outside = ''
 
   beforeAll(async () => {
-    base = await mkdtemp(path.join(tmpdir(), 'pb-roots-'))
+    // macOS temp paths can traverse /var -> /private/var. Use the real path
+    // so missing-child assertions compare against the same canonical root.
+    base = await realpath(await mkdtemp(path.join(tmpdir(), 'pb-roots-')))
     root = path.join(base, 'libraries')
     outside = path.join(base, 'private')
 

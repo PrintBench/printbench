@@ -13,6 +13,7 @@ import {
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Result = { ok: true; count?: number } | { ok: false; error: string }
 
@@ -22,6 +23,7 @@ async function requirePermission() {
     { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
     'problem:resolve',
   )
+  return user
 }
 
 /** UUIDs only: these ids go straight into an `= ANY(...)` array parameter. */
@@ -30,19 +32,19 @@ function clean(ids: string[]): string[] {
 }
 
 export async function ignore(ids: string[]): Promise<Result> {
-  return act(() => ignoreProblems(getDb(), clean(ids)), 'Could not ignore those.')
+  return act(() => ignoreProblems(getDb(), clean(ids)), 'Could not ignore those.', 'ignored')
 }
 
 export async function unignore(ids: string[]): Promise<Result> {
-  return act(() => unignoreProblems(getDb(), clean(ids)), 'Could not restore those.')
+  return act(() => unignoreProblems(getDb(), clean(ids)), 'Could not restore those.', 'restored')
 }
 
 export async function resolve(ids: string[]): Promise<Result> {
-  return act(() => resolveProblems(getDb(), clean(ids)), 'Could not resolve those.')
+  return act(() => resolveProblems(getDb(), clean(ids)), 'Could not resolve those.', 'resolved')
 }
 
 export async function ignoreWholeKind(kind: ProblemKind): Promise<Result> {
-  return act(() => ignoreKind(getDb(), kind), 'Could not ignore that kind.')
+  return act(() => ignoreKind(getDb(), kind), 'Could not ignore that kind.', `ignored all ${kind}`)
 }
 
 /**
@@ -59,10 +61,15 @@ export async function recheck(): Promise<Result> {
   }, 'Could not re-examine the library.')
 }
 
-async function act(work: () => Promise<number>, failure: string): Promise<Result> {
+/** `triage` names what was done to the problems; absent for a plain recheck. */
+async function act(work: () => Promise<number>, failure: string, triage?: string): Promise<Result> {
   try {
-    await requirePermission()
+    const user = await requirePermission()
     const count = await work()
+    if (!triage) await audit(user, 'health.rechecked', undefined, { changes: count })
+    else if (count > 0) {
+      await audit(user, 'health.problems_updated', undefined, { change: triage, problems: count })
+    }
     revalidatePath('/admin/health')
     revalidatePath('/')
     return { ok: true, count }

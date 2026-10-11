@@ -1,6 +1,13 @@
 import { sql } from 'drizzle-orm'
 import { getDb } from '@pb/db'
-import { getSettings, prune } from '@pb/core'
+import {
+  SYSTEM_ACTOR,
+  getSettings,
+  prune,
+  pruneAuditEvents,
+  pruneLogs,
+  recordAudit,
+} from '@pb/core'
 import { JOB, getQueue } from '@pb/jobs'
 
 /**
@@ -57,7 +64,7 @@ export async function handleMaintArchive(): Promise<void> {
 
   // The grace period is a setting, so an operator who wants a shorter or longer
   // one gets it without a redeploy.
-  const { missingGraceDays } = await getSettings(db)
+  const { missingGraceDays, auditRetentionDays, logRetentionDays } = await getSettings(db)
   const result = await prune(db, { graceDays: missingGraceDays })
 
   if (result.librariesSkipped.length > 0) {
@@ -72,6 +79,15 @@ export async function handleMaintArchive(): Promise<void> {
       `[maint] removed ${result.modelsDeleted} models and ${result.filesDeleted} files ` +
         `missing for more than ${missingGraceDays} days`,
     )
+    await recordAudit(db, {
+      action: 'maintenance.pruned',
+      actor: SYSTEM_ACTOR,
+      detail: {
+        modelsDeleted: result.modelsDeleted,
+        filesDeleted: result.filesDeleted,
+        graceDays: missingGraceDays,
+      },
+    })
   }
 
   if (result.scanRunsDeleted + result.problemsDeleted > 0) {
@@ -79,5 +95,12 @@ export async function handleMaintArchive(): Promise<void> {
       `[maint] archived ${result.scanRunsDeleted} scan runs and ` +
         `${result.problemsDeleted} resolved problems`,
     )
+  }
+
+  // Diagnostics are bounded here too, so neither table grows for ever.
+  const auditPruned = await pruneAuditEvents(db, auditRetentionDays)
+  const logsPruned = await pruneLogs(db, logRetentionDays)
+  if (auditPruned + logsPruned > 0) {
+    console.log(`[maint] trimmed ${auditPruned} audit events and ${logsPruned} log lines`)
   }
 }

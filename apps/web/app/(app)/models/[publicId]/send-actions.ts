@@ -13,6 +13,7 @@ import {
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type SendResult = { ok: true; message: string } | { ok: false; error: string }
 
@@ -118,6 +119,17 @@ export async function sendFileToPrinter(
       { startPrint },
     )
 
+    await audit(
+      user,
+      'model.sent_to_printer',
+      { type: 'model', id: row.model.publicId, label: row.model.name },
+      {
+        printer: host.name,
+        file: filename,
+        startPrint,
+        error: result.ok ? undefined : result.error,
+      },
+    )
     if (!result.ok) return { ok: false, error: result.error ?? 'The printer refused the file.' }
 
     return {

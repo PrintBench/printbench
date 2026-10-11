@@ -6,17 +6,18 @@ import { headers } from 'next/headers'
 import { PolicyError, assertCan, getSettings, shareModel, unshareModel } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type ShareResult =
   { ok: true; url: string } | { ok: false; error: string; sharingDisabled?: boolean }
 
-async function modelIdFor(publicId: string): Promise<string | null> {
+async function modelFor(publicId: string): Promise<{ id: string; name: string } | null> {
   const rows = await getDb()
-    .select({ id: schema.models.id })
+    .select({ id: schema.models.id, name: schema.models.name })
     .from(schema.models)
     .where(eq(schema.models.publicId, publicId))
     .limit(1)
-  return rows[0]?.id ?? null
+  return rows[0] ?? null
 }
 
 /**
@@ -42,10 +43,11 @@ export async function createShareLink(publicId: string): Promise<ShareResult> {
       }
     }
 
-    const modelId = await modelIdFor(publicId)
-    if (!modelId) return { ok: false, error: 'That model no longer exists.' }
+    const model = await modelFor(publicId)
+    if (!model) return { ok: false, error: 'That model no longer exists.' }
 
-    const { token } = await shareModel(getDb(), modelId, user.id)
+    const { token } = await shareModel(getDb(), model.id, user.id)
+    await audit(user, 'model.shared', { type: 'model', id: publicId, label: model.name })
 
     revalidatePath(`/models/${publicId}`)
     return { ok: true, url: `${await origin()}/share/${token}` }
@@ -60,10 +62,11 @@ export async function revokeShareLink(publicId: string): Promise<{ ok: boolean; 
     const user = await requireUser()
     assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'model:edit')
 
-    const modelId = await modelIdFor(publicId)
-    if (!modelId) return { ok: false, error: 'That model no longer exists.' }
+    const model = await modelFor(publicId)
+    if (!model) return { ok: false, error: 'That model no longer exists.' }
 
-    await unshareModel(getDb(), modelId)
+    await unshareModel(getDb(), model.id)
+    await audit(user, 'model.unshared', { type: 'model', id: publicId, label: model.name })
     revalidatePath(`/models/${publicId}`)
     return { ok: true }
   } catch (error) {

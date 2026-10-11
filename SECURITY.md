@@ -1,5 +1,15 @@
 # Security policy
 
+## Supported versions
+
+Security fixes are provided for the latest stable release only. Older releases
+and prereleases are not supported for security fixes. Upgrade to the latest
+stable release to receive fixes, following the deployment guide's backup and
+upgrade instructions.
+
+Reports affecting older releases are still welcome; please say whether the
+issue also affects the latest stable release if you can verify it.
+
 ## Reporting a vulnerability
 
 **Please do not open a public issue for a security problem.**
@@ -21,7 +31,11 @@ steps that demonstrates it.
 ## What is in scope
 
 PrintBench is self-hosted, so the trust boundary is the instance and the people
-with accounts on it. The areas most worth your attention:
+with accounts on it. Having a legitimate account does not put a report out of
+scope: bypassing permissions, accessing another user's restricted data, or
+escalating a viewer or member account to admin is in scope.
+
+The areas most worth your attention:
 
 | Area                         | Why it matters                                                                                                                                                                                          |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -35,9 +49,10 @@ with accounts on it. The areas most worth your attention:
 
 ## What is out of scope
 
-- **Anything requiring an account you were given.** An admin can point a library
-  at a folder and delete files in a managed one — that is the feature, not a
-  privilege escalation.
+- **Intended actions within an account's granted permissions.** An admin can
+  point a library at an allowed folder and delete files in a managed library.
+  Those authorised actions are not vulnerabilities; bypassing role checks or
+  path confinement is in scope.
 - **Instances exposed to the internet without a reverse proxy or TLS.** The
   deployment guide is explicit about this; running otherwise is a
   misconfiguration rather than a vulnerability.

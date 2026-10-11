@@ -21,6 +21,8 @@ export function roleAtLeast(role: Role | null | undefined, minimum: Role): boole
 
 export type Action =
   // Reading
+  | 'filament:view'
+  | 'filament:manage'
   | 'model:view'
   | 'file:download'
   // Curation — the day-to-day work
@@ -46,9 +48,13 @@ export type Action =
   | 'printhost:manage'
   | 'user:manage'
   | 'settings:manage'
+  | 'diagnostics:view'
+  | 'instance:backup'
 
 /** Minimum role for each action. Absent = admin only, by deliberate default. */
 const MINIMUM: Record<Action, Role> = {
+  'filament:view': ROLES.viewer,
+  'filament:manage': ROLES.member,
   'model:view': ROLES.viewer,
   'file:download': ROLES.viewer,
   'list:manage': ROLES.viewer,
@@ -77,6 +83,12 @@ const MINIMUM: Record<Action, Role> = {
   'printhost:manage': ROLES.admin,
   'user:manage': ROLES.admin,
   'settings:manage': ROLES.admin,
+  // Audit trail, logs and the debug report expose who did what and how the
+  // instance is run, so they are for whoever runs it.
+  'diagnostics:view': ROLES.admin,
+  // A backup holds every account and credential, and a restore replaces the
+  // whole instance.
+  'instance:backup': ROLES.admin,
 }
 
 export interface PolicyUser {

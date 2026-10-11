@@ -38,6 +38,7 @@ services:
       LIBRARY_ROOTS: /libraries:/data/libraries
       # Must match the internal locations in docker/nginx.conf.
       ACCEL_MOUNTS: /_protected/library/=/libraries,/_protected/managed/=/data/libraries
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - previews:/data
       # Existing collections are read-only by default. Set LIBRARY_READ_ONLY=false
@@ -64,18 +65,27 @@ services:
       db: { condition: service_healthy }
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-printbench}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-printbench}
-      # The worker decrypts provider credentials saved by web using this same secret.
+      # The worker verifies the links the web tier signs for uploads, ZIPs and
+      # backups, and decrypts stored credentials, so it needs the same secret.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
       APP_URL: ${APP_URL:-}
       DATA_DIR: /data
       LIBRARY_ROOTS: /libraries:/data/libraries
       WORKER_MEMORY_LOG: ${WORKER_MEMORY_LOG:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - previews:/data
       - type: bind
         source: ${LIBRARY_PATH:-./libraries}
         target: /libraries
         read_only: ${LIBRARY_READ_ONLY:-true}
+
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '--max-time', '5', 'http://127.0.0.1:3001/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   nginx:
     build: { context: ., dockerfile: docker/nginx.Dockerfile }
@@ -89,6 +99,13 @@ services:
         source: ${LIBRARY_PATH:-./libraries}
         target: /libraries
         read_only: true
+    healthcheck:
+      # Check the proxy and the web/database readiness endpoint together.
+      test: ['CMD', 'wget', '-q', '-T', '5', '-O', '/dev/null', 'http://127.0.0.1/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
 volumes:
   pgdata:

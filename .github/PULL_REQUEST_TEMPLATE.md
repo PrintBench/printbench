@@ -4,11 +4,13 @@
 
 ## Checks
 
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
-- [ ] `npm test` — **with the database up.** A run reporting skipped files did
-      not exercise the database-backed third of the suite; see
-      [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md).
+- [ ] `npm run check` — formatting, lint, typechecking, release preparation tests
+      and the full application suite, **with the
+      development/test database configured, running and migrated**. This runs
+      the full suite; see
+      [CONTRIBUTING.md](https://github.com/PrintBench/printbench/blob/main/CONTRIBUTING.md).
+- [ ] `npm run build`, if this affects builds.
+- [ ] `npm run verify:smoke`, if this affects browser scan, upload or permissions.
 - [ ] Relevant `npm run verify:phase*` script, if this touches that surface.
       Note these start their own job queue, so check the browser too if the
       change is queue-shaped.

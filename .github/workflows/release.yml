@@ -1,18 +1,5 @@
-# Release automation.
-#
-# How this works:
-#
-#   1. Bump "version" in package.json and land it on main.
-#   2. Tag that commit and push the tag:
-#
-#        git tag v0.1.0 && git push origin v0.1.0
-#
-#   3. This workflow builds the image from the tagged commit, publishes it to
-#      ghcr.io, attests its provenance, and opens a GitHub Release with
-#      generated notes.
-#
-# Nothing is published by merging to main. Pushing a tag is the deliberate act
-# that ships a release, and the tag must match the version in package.json.
+# Validate the tagged commit before granting publication permissions.
+# See docs/releasing.md for the checklist, prereleases and recovery.
 name: Release
 
 on:
@@ -23,15 +10,41 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.repository }}
   cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
 
 jobs:
+  prepare:
+    name: Validate tag and release notes
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      image: ${{ steps.meta.outputs.image }}
+      notes: ${{ steps.meta.outputs.notes }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      tags: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Prepare release metadata
+        id: meta
+        run: node scripts/release-metadata.mjs "$GITHUB_REF_NAME"
+
+  verify:
+    name: Validate tagged commit
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   publish:
     name: Publish container image
+    needs: [prepare, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the GitHub Release
@@ -40,36 +53,6 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@v7
-        with:
-          # Full history, so the generated release notes can see what changed.
-          fetch-depth: 0
-
-      - name: Derive the version from the tag
-        id: meta
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          # OCI repository names must be lowercase, and github.repository
-          # preserves the case of the owner (PrintBench/printbench). Publishing
-          # it verbatim fails tag validation before any layer is built.
-          {
-            echo "version=$version"
-            echo "majorminor=${version%.*}"
-            echo "major=${version%%.*}"
-            echo "image=${GITHUB_REPOSITORY,,}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Check the tag matches package.json
-        # Catches tagging without bumping, which would publish an image whose
-        # label disagrees with the version baked into it.
-        run: |
-          declared=$(node -p "require('./package.json').version")
-          tagged="${{ steps.meta.outputs.version }}"
-          if [ "$declared" != "$tagged" ]; then
-            echo "::error::tag v$tagged does not match package.json version $declared"
-            echo "Bump package.json to $tagged, land it on main, then re-tag."
-            exit 1
-          fi
-          echo "package.json and tag agree on $declared"
 
       - uses: docker/setup-qemu-action@v4
 
@@ -96,18 +79,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # Pinned, minor and major tags let deployers choose how much
-          # automatic upgrading they want. `latest` is for trying it out, not
-          # for production.
-          tags: |
-            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
-            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.majorminor }}
-            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.major }}
-            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}:latest
+          tags: ${{ needs.prepare.outputs.tags }}
           labels: |
             org.opencontainers.image.title=PrintBench
             org.opencontainers.image.description=Self-hosted web app for managing and finding your 3D print files (STL, 3MF, OBJ, PLY)
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=MIT
@@ -117,17 +93,22 @@ jobs:
         # by this workflow: gh attestation verify oci://... --repo <owner>/<repo>
         uses: actions/attest-build-provenance@v4
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ steps.meta.outputs.image }}
+          subject-name: ${{ needs.prepare.outputs.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
       - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: ${{ needs.prepare.outputs.notes }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
         run: |
-          # --generate-notes picks up from the previous release by itself,
-          # and falls back to the start of history when there is not one.
+          flags=(--latest)
+          if [ "$PRERELEASE" = "true" ]; then
+            flags=(--prerelease --latest=false)
+          fi
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            --verify-tag
+            --notes-file "$RELEASE_NOTES" \
+            --verify-tag \
+            "${flags[@]}"

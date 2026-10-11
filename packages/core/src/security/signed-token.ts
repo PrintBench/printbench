@@ -12,7 +12,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
  * file cannot be replayed against the upload endpoint. Every token expires.
  */
 
-export type TokenPurpose = 'file' | 'zip' | 'upload'
+export type TokenPurpose = 'file' | 'zip' | 'upload' | 'backup-export' | 'backup-restore'
 
 export interface SignedToken {
   token: string

@@ -138,6 +138,50 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <h2 className="text-sm font-semibold">Diagnostics</h2>
+
+          <Field
+            label="Keep the audit trail for"
+            htmlFor="audit-days"
+            hint="The record of sign-ins and changes under Diagnostics. Older entries are removed overnight. Use 0 to keep everything."
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                id="audit-days"
+                type="number"
+                min={0}
+                max={3650}
+                value={values.auditRetentionDays}
+                onChange={(e) => set('auditRetentionDays', Number(e.target.value))}
+                className="w-28"
+              />
+              <span className="text-sm text-[var(--color-ink-muted)]">days</span>
+            </div>
+          </Field>
+
+          <Field
+            label="Keep application logs for"
+            htmlFor="log-days"
+            hint="Logs are for diagnosing a problem while it is fresh, and grow quickly on a busy library."
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                id="log-days"
+                type="number"
+                min={1}
+                max={90}
+                value={values.logRetentionDays}
+                onChange={(e) => set('logRetentionDays', Number(e.target.value))}
+                className="w-28"
+              />
+              <span className="text-sm text-[var(--color-ink-muted)]">days</span>
+            </div>
+          </Field>
+        </CardContent>
+      </Card>
+
       {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
 
       <div className="flex items-center gap-3">

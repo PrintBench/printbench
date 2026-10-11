@@ -5,7 +5,6 @@ import { createDb, schema } from '@pb/db'
 import { createAuth, verifyAccountPassword } from './auth'
 import { issuePasswordReset, resetPassword, validatePasswordReset } from './password-recovery'
 
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip
 const originalPassword = 'original-password-123'
 const recoveryPassword = 'recovered-password-456'
 const changedPassword = 'stale-change-password-789'
@@ -19,7 +18,7 @@ function latch() {
   return { promise, release }
 }
 
-describeDb('native password changes serialize with recovery', () => {
+describe('native password changes serialize with recovery', { tags: ['integration'] }, () => {
   let db: ReturnType<typeof createDb>['db']
   let pool: ReturnType<typeof createDb>['pool']
   let auth: ReturnType<typeof createAuth>

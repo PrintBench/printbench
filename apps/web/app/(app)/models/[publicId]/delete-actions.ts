@@ -15,6 +15,7 @@ import {
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Result = { ok: true; message: string } | { ok: false; error: string }
 
@@ -47,6 +48,15 @@ export async function removeFromLibrary(publicId: string): Promise<Result> {
     if (!found) return { ok: false, error: 'That model no longer exists.' }
 
     const result = await removeModel(getDb(), found.model.id, user.id)
+    await audit(
+      user,
+      'model.deleted',
+      { type: 'model', id: publicId, label: result.name },
+      {
+        library: found.library.name,
+        filesKept: true,
+      },
+    )
 
     revalidatePath('/models')
     revalidatePath('/admin/libraries')
@@ -83,6 +93,18 @@ export async function deleteFiles(publicId: string): Promise<Result> {
       found.model.id,
     )
 
+    await audit(
+      user,
+      'model.files_deleted',
+      { type: 'model', id: publicId, label: found.model.name },
+      {
+        library: found.library.name,
+        filesDeleted: result.filesDeleted,
+        bytesFreed: result.bytesFreed,
+        failures: result.failures.length,
+      },
+    )
+
     if (result.failures.length > 0) {
       // The model is deliberately kept when anything survived, so say so
       // rather than reporting a success that left files behind.
@@ -116,6 +138,7 @@ export async function restore(libraryId: string, path: string): Promise<Result> 
 
     const restored = await restoreExclusion(getDb(), libraryId, path)
     if (!restored) return { ok: false, error: 'That was not on the removed list.' }
+    await audit(user, 'model.restored', { type: 'model', label: path }, { libraryId })
 
     revalidatePath('/admin/libraries')
     return { ok: true, message: 'Restored. It reappears after the next scan of that library.' }

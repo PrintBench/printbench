@@ -21,15 +21,13 @@ import {
  * these are about that happening exactly once — including when two tabs like
  * something at the same moment.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIB = '7c000000-0000-4000-8000-000000000001'
 const USER = 'list-test-user'
 const OTHER_USER = 'list-test-other'
 const id = (suffix: string) => `7caa0000-0000-4000-8000-0000000000${suffix}`
 
-describeDb('lists and likes', () => {
+describe('lists and likes', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

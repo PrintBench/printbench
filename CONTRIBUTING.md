@@ -7,45 +7,116 @@ messages applies here too, but you already know it.
 ## Getting set up
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 npm run db:up        # Postgres 18 on port 5433
 npm run db:migrate
 npm run dev          # web on :3000, worker alongside
 ```
 
-You need Node 24 (see `.nvmrc`) and Docker for the database.
+Use Node 24 (see `.nvmrc`), the version CI tests, and Docker for the database.
+The package engine declares Node 22 as the minimum, but CI currently verifies
+Node 24 only.
 
 ## Running the checks
 
-CI runs exactly these, in this order. Run them before opening a pull request:
+Start and migrate the development database, then run the standard local checks:
 
 ```bash
+npm run db:up
+npm run db:migrate
+npm run check
+```
+
+`npm run check` runs formatting, lint, typechecking, release preparation tests
+and the application test suite, in that order.
+You can also run each check separately:
+
+```bash
+npm run format:check
 npm run lint
 npm run typecheck
+npm run test:release
 npm test
 ```
 
-### `.env` matters more than you would expect
+CI runs release preparation tests, applies migrations, runs formatting, lint,
+typechecking and the unit and integration suites, builds the web app, and runs
+`verify:smoke` against the production web server and real worker. The smoke
+suite includes the existing `verify:phase1` authentication checks. A separate
+CI job builds the Docker image. The local `check` command does not start a server or build images.
+For changes affecting builds, also run `npm run build`.
 
-**A third of the test suite is database-backed, and those tests skip silently
-when `DATABASE_URL` is unset.** `vitest.config.ts` loads `.env` if it is there,
-so without one you will see a comfortable green run that proved much less than
-you think:
+### Unit and integration tests
 
+```bash
+npm run test:unit          # no Postgres required
+npm run test:integration   # database-backed tests only
+npm test                  # both kinds of test
+npm run test:watch        # both kinds, in watch mode
 ```
-Test Files  24 passed | 14 skipped (39)      <- no .env, no database
-Test Files  39 passed (39)                   <- what a real run looks like
+
+`npm test`, `npm run test:integration`, `npm run test:watch` and `npm run check`
+require `DATABASE_URL`. They load `.env` when present and fail at startup with
+setup instructions if the variable is missing or blank. Copy `.env.example` to
+`.env`, start the development database and apply migrations first. A git
+worktree does not inherit `.env` from the main checkout.
+
+Use a disposable development/test database: integration fixtures write data,
+and some tests clear shared tables. Never point these commands at production.
+
+Database suites use Vitest's `integration` tag, including in files that also
+contain pure tests. The unit command excludes that tag and the integration
+command selects it. Skipped tests in these filtered runs are expected; the full
+`npm test` run should execute both sets. Unit runs do not load `.env` or connect
+to Postgres, even when `DATABASE_URL` is already set.
+
+When adding a database suite, tag it explicitly:
+
+```ts
+describe('database behaviour', { tags: ['integration'] }, () => {
+  // Create connections and fixtures in beforeAll, not during collection.
+})
 ```
 
-If your skip count is not zero, your database is not up. This bites hardest in a
-git worktree, which does not inherit the `.env` from the main checkout.
+CI runs unit and integration tests as separate steps against its migrated
+Postgres service so each result is visible.
+
+### Browser smoke tests
+
+After building the web app, run the browser smoke suite against an empty,
+migrated test database:
+
+```bash
+npx playwright install chromium
+npm run build -w @pb/web
+DATABASE_URL=postgres://printbench:printbench@localhost:5433/printbench npm run verify:smoke
+```
+
+Use a disposable Postgres database. The suite refuses a database containing
+users or libraries before starting the worker. Ports 3000 and 3001 must be free;
+it starts and stops its own production web server and worker and uses a shared
+temporary directory for library files, uploads and previews. It does not reuse
+an existing app server. Both app processes use a fixed test-only auth secret.
+
+The browser clicks the real scan and upload controls; the verifier never starts
+a job queue or mints its own upload ticket. It waits for the worker to finish,
+checks the model pages and thumbnail delivery, and tests permission revocation
+on an already-open admin page. It also reruns the phase 1 authentication checks.
+Generated account and library rows are removed in `finally`; temporary files
+are removed during teardown. Force-killed runs may leave fixtures, so discard
+the test database before another run.
+
+CI installs Chromium and runs this suite after the unit/integration tests and
+web build. Failure screenshots are kept as a `smoke-failures` Actions artifact
+for seven days. `npm run check` does not launch the browser suite.
 
 ### The verify scripts
 
 These drive a running dev server end to end, creating throwaway accounts and
-cleaning up after themselves. They are not part of CI beyond phase 1, but they
-are the fastest way to know a change actually works:
+cleaning up after themselves. The phase scripts beyond phase 1 are not part of
+CI; the browser smoke suite covers selected scan, upload and permission flows.
+Use the phase scripts to check changes to their individual surfaces:
 
 ```bash
 npm run dev          # in another terminal, for everything past phase 1
@@ -57,9 +128,10 @@ npm run verify:phase5   # search, facets and the command palette
 npm run verify:phase6   # uploads, editing and the restore drill
 npm run verify:phase7   # print history, slicer links and a stubbed printer
 npm run verify:phase8   # health, settings, schedules, sharing and prune
+npm run verify:phase9   # print queue, roles and auto-linking
 ```
 
-Note that a verify script starts its own job queue. That means it can pass while
+Several phase verification scripts start their own job queue. That means it can pass while
 the same flow is broken in the browser, because the web process has a queue of
 its own — if you are changing anything queue-shaped, check the UI too.
 
@@ -108,5 +180,20 @@ up in `apps/web`, the worker cannot enforce it.
 
 ## Reporting bugs and security issues
 
-Bugs go in the issue tracker. **Security vulnerabilities do not** — see
+Use [SUPPORT.md](SUPPORT.md) to choose between a bug report, feature request
+and setup question. Maintainers can follow [the triage guide](docs/maintaining.md).
+**Security vulnerabilities do not go in the issue tracker** — see
 [SECURITY.md](SECURITY.md).
+
+## Community conduct
+
+Follow the [Code of Conduct](CODE_OF_CONDUCT.md) in issues, pull requests and
+other project spaces. Report unacceptable behaviour privately to
+[support@owl-media.co.uk](mailto:support@owl-media.co.uk).
+
+## Releasing
+
+Follow the [release checklist](docs/releasing.md) for versioning, authored notes,
+prereleases and recovery. Releases validate the tagged commit with the same CI
+workflow before publishing images or a GitHub release. `npm run release:check --
+v<version>` checks release metadata locally without publishing.

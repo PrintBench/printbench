@@ -9,7 +9,6 @@ import { scanLibrary } from '../scan/scan-service'
 import { applyEmbeddedModelMetadata, isEmbeddedMetadataSource } from './embedded-metadata-service'
 import { updateModel } from './model-service'
 
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip
 const LIBRARY_ID = 'e3b00000-0000-4000-8000-000000000001'
 const metadata = {
   title: 'Miniature Bread Set',
@@ -21,7 +20,7 @@ const metadata = {
   sourceIdentifiers: { 'MakerWorld internal design ID': 'USopaqueinternalid' },
 }
 
-describeDb('embedded metadata persistence', () => {
+describe('embedded metadata persistence', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let root = ''

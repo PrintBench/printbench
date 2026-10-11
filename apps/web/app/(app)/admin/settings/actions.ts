@@ -11,6 +11,7 @@ import {
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -23,6 +24,7 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Result> {
     )
 
     await updateSettings(getDb(), patch)
+    await audit(user, 'settings.updated', undefined, { changed: Object.keys(patch).join(', ') })
 
     // Settings shape the shell and the health report, so both are stale now.
     revalidatePath('/', 'layout')
@@ -44,6 +46,7 @@ export async function resetToDefault(key: keyof Settings): Promise<Result> {
     )
 
     await resetSetting(getDb(), key)
+    await audit(user, 'settings.reset', undefined, { setting: key })
     revalidatePath('/', 'layout')
     return { ok: true }
   } catch (error) {

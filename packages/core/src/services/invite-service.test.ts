@@ -17,13 +17,11 @@ import {
  * no email to prove ownership — so most of what matters here is what a token
  * stops working after: being used, being revoked, and running out of time.
  */
-const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const ADMIN = 'invite-test-admin'
 const JOINER = 'invite-test-joiner'
 
-describeDb('invitations', () => {
+describe('invitations', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

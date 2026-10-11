@@ -9,11 +9,10 @@ import type { LibraryLocation } from '../storage/types'
 import { MASS_DISAPPEARANCE_THRESHOLD, scanLibrary } from './scan-service'
 
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIBRARY_ID = '0f0f0f0f-0000-4000-8000-00000000scan'.replace('scan', 'a001')
 
-describeDb('scanLibrary', () => {
+describe('scanLibrary', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let root: string

@@ -11,16 +11,17 @@
     "./requests": "./src/services/request-lines.ts",
     "./schedule": "./src/scan/schedule-presets.ts",
     "./health": "./src/health/problem-kinds.ts",
-    "./prints": "./src/services/print-fields.ts"
+    "./prints": "./src/services/print-fields.ts",
+    "./filaments": "./src/services/filament-fields.ts"
   },
   "scripts": {
     "build": "tsc --build",
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1139.0",
-    "@aws-sdk/lib-storage": "^3.1139.0",
-    "@aws-sdk/s3-request-presigner": "^3.1139.0",
+    "@aws-sdk/client-s3": "^3.1144.0",
+    "@aws-sdk/lib-storage": "^3.1144.0",
+    "@aws-sdk/s3-request-presigner": "^3.1144.0",
     "@pb/db": "*",
     "cron-parser": "^5.10.1",
     "drizzle-orm": "^0.45.3",

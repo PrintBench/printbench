@@ -8,8 +8,7 @@ import {
   type LibraryScanLock,
 } from './library-scan-lock'
 
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip
-describeDb('library scan publication lease', () => {
+describe('library scan publication lease', { tags: ['integration'] }, () => {
   let first: ReturnType<typeof createDb>
   let second: ReturnType<typeof createDb>
   beforeAll(() => {

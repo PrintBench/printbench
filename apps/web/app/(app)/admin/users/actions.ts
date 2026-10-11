@@ -14,6 +14,7 @@ import {
 } from '@pb/core'
 import { getAuth, requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Result = { ok: true } | { ok: false; error: string }
 type InviteResult = { ok: true; token: string } | { ok: false; error: string }
@@ -69,18 +70,25 @@ export async function setUserRole(userId: string, role: string): Promise<Result>
       return { ok: false, error: 'There must be at least one admin.' }
     }
 
-    const updated = await db
+    const [updated] = await db
       .update(schema.user)
       .set({ role, updatedAt: new Date() })
       .where(and(eq(schema.user.id, userId), ne(schema.user.id, actor.id)))
+      .returning({ name: schema.user.name })
 
     /*
      * An UPDATE matching nothing is not success. Without this the UI reports a
      * role change that never happened — which is what you get when the account
      * was removed in another tab.
      */
-    if (updated.rowCount === 0) return { ok: false, error: 'That account no longer exists.' }
+    if (!updated) return { ok: false, error: 'That account no longer exists.' }
 
+    await audit(
+      actor,
+      'user.role_changed',
+      { type: 'user', id: userId, label: updated.name },
+      { role },
+    )
     revalidatePath('/admin/users')
     return { ok: true }
   } catch (error) {
@@ -103,7 +111,7 @@ export async function addUser(input: {
   role: string
 }): Promise<Result> {
   try {
-    await requireAdmin()
+    const actor = await requireAdmin()
 
     const name = input.name.trim()
     const email = input.email.trim().toLowerCase()
@@ -138,6 +146,14 @@ export async function addUser(input: {
       .set({ role: input.role, emailVerified: true })
       .where(eq(schema.user.id, created.user.id))
 
+    await audit(
+      actor,
+      'user.created',
+      { type: 'user', id: created.user.id, label: name },
+      {
+        role: input.role,
+      },
+    )
     revalidatePath('/admin/users')
     return { ok: true }
   } catch (error) {
@@ -151,7 +167,7 @@ export async function updateUser(
   input: { name: string; email: string },
 ): Promise<Result> {
   try {
-    await requireAdmin()
+    const actor = await requireAdmin()
 
     const name = input.name.trim()
     const email = input.email.trim().toLowerCase()
@@ -173,6 +189,7 @@ export async function updateUser(
 
     if (updated.rowCount === 0) return { ok: false, error: 'That account no longer exists.' }
 
+    await audit(actor, 'user.updated', { type: 'user', id: userId, label: name })
     revalidatePath('/admin/users')
     return { ok: true }
   } catch (error) {
@@ -199,7 +216,7 @@ export async function setSuspended(userId: string, suspended: boolean): Promise<
     }
 
     const db = getDb()
-    const updated = await db
+    const [updated] = await db
       .update(schema.user)
       .set({
         banned: suspended,
@@ -207,12 +224,19 @@ export async function setSuspended(userId: string, suspended: boolean): Promise<
         updatedAt: new Date(),
       })
       .where(eq(schema.user.id, userId))
+      .returning({ name: schema.user.name })
 
-    if (updated.rowCount === 0) return { ok: false, error: 'That account no longer exists.' }
+    if (!updated) return { ok: false, error: 'That account no longer exists.' }
 
     if (suspended) {
       await db.delete(schema.session).where(eq(schema.session.userId, userId))
     }
+
+    await audit(actor, suspended ? 'user.suspended' : 'user.restored', {
+      type: 'user',
+      id: userId,
+      label: updated.name,
+    })
 
     revalidatePath('/admin/users')
     return { ok: true }
@@ -239,8 +263,20 @@ export async function deleteUser(userId: string): Promise<Result> {
       return { ok: false, error: 'There must be at least one admin.' }
     }
 
-    const removed = await getDb().delete(schema.user).where(eq(schema.user.id, userId))
-    if (removed.rowCount === 0) return { ok: false, error: 'That account no longer exists.' }
+    const [removed] = await getDb()
+      .delete(schema.user)
+      .where(eq(schema.user.id, userId))
+      .returning({ name: schema.user.name, role: schema.user.role })
+    if (!removed) return { ok: false, error: 'That account no longer exists.' }
+
+    await audit(
+      actor,
+      'user.deleted',
+      { type: 'user', id: userId, label: removed.name },
+      {
+        role: removed.role,
+      },
+    )
 
     revalidatePath('/admin/users')
     return { ok: true }
@@ -261,6 +297,14 @@ export async function invite(input: { email?: string; role: string }): Promise<I
       role: input.role as Role,
       createdBy: actor.id,
     })
+    await audit(
+      actor,
+      'user.invited',
+      { type: 'invitation', label: input.email?.trim() || 'Open invitation' },
+      {
+        role: input.role,
+      },
+    )
 
     revalidatePath('/admin/users')
     return { ok: true, token }
@@ -271,9 +315,10 @@ export async function invite(input: { email?: string; role: string }): Promise<I
 
 export async function cancelInvite(id: string): Promise<Result> {
   try {
-    await requireAdmin()
+    const actor = await requireAdmin()
     const revoked = await revokeInvite(getDb(), id)
     if (!revoked) return { ok: false, error: 'That invitation is no longer active.' }
+    await audit(actor, 'user.invite_cancelled', { type: 'invitation', id })
 
     revalidatePath('/admin/users')
     return { ok: true }

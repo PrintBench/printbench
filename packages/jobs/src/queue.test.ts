@@ -10,9 +10,8 @@ import { JobQueue, getQueue, getStartedQueue } from './queue'
  * Uses its own schema so it never touches the real job tables.
  */
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
-describeDb('JobQueue', () => {
+describe('JobQueue', { tags: ['integration'] }, () => {
   let queue: JobQueue
 
   beforeAll(async () => {
@@ -128,7 +127,7 @@ describeDb('JobQueue', () => {
   })
 })
 
-describeDb('JobQueue lifecycle', () => {
+describe('JobQueue lifecycle', { tags: ['integration'] }, () => {
   /*
    * Regression: the worker held its own JobQueue while handlers reached for the
    * getQueue() singleton, so enqueuing from inside a handler hit an unstarted
@@ -163,7 +162,7 @@ describeDb('JobQueue lifecycle', () => {
  * server action threw and was reported to the user as a generic failure — the
  * Scan button could not work at all.
  */
-describeDb('getStartedQueue', () => {
+describe('getStartedQueue', { tags: ['integration'] }, () => {
   /*
    * Proved with stats() rather than send(): this touches the real job schema,
    * and enqueuing a job for a file id that does not exist would leave the

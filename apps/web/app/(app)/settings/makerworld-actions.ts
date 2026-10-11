@@ -17,6 +17,7 @@ import {
   type MakerWorldConnectionState,
 } from '@pb/core'
 import { getDb } from '@pb/db'
+import { audit } from '@/lib/audit'
 
 type Failure = { ok: false; error: string; retryChallengeId?: string; restart?: boolean }
 
@@ -66,6 +67,7 @@ export async function setMakerWorldCookie(
     const user = await authorize()
     await cancelMakerWorldSignIn(getDb(), user.id)
     await saveMakerWorldCookie(getDb(), user.id, cookie)
+    await audit(user, 'integration.connected', { type: 'integration', label: 'MakerWorld' })
     return { ok: true, saved: await getMakerWorldCookieStatus(getDb(), user.id) }
   } catch (error) {
     return failure(error, 'Could not save your MakerWorld cookie. Check its value and try again.')

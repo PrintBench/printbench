@@ -30,7 +30,6 @@ import {
 import type { MakerWorldModel } from './makerworld'
 import type { ExternalSourceModel, SourceFileFormat } from './source-provider-types'
 
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip
 const sourceUrl = 'https://makerworld.com/en/models/123'
 const token = 'synthetic.own-session.value'
 const thingiverseToken = 'synthetic-own-thingiverse-token'
@@ -53,7 +52,7 @@ const modelBytes = Buffer.from(
   'base64',
 )
 
-describeDb('model source import service', () => {
+describe('model source import service', { tags: ['integration'] }, () => {
   let db: ReturnType<typeof createDb>['db']
   let pool: ReturnType<typeof createDb>['pool']
   let root: string

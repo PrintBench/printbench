@@ -172,6 +172,43 @@ what each error message means.
 
 ## Backups
 
+### The whole instance, from the UI
+
+**Manage → Backup** downloads one `.pbbackup` file holding everything the
+instance knows: accounts, libraries, models, tags, collections, print history,
+printers, settings and the audit trail. Restoring it makes another PrintBench a
+copy of this one.
+
+Two choices when you download:
+
+- **Include uploaded files** adds the model files from libraries PrintBench
+  stores uploads in. Folders you pointed PrintBench at, and S3 libraries, are
+  never copied — they are yours, and they are already somewhere.
+- **A passphrase** carries printer keys, S3 secrets and import sign-ins across,
+  re-encrypted so that the new instance does not need the old
+  `BETTER_AUTH_SECRET`. Without one they are left out and re-entered afterwards.
+
+Thumbnails are not in the file; they are re-rendered after a restore. Signed-in
+sessions and application logs are not either.
+
+The file is not encrypted as a whole. It holds email addresses and password
+hashes, so keep it as carefully as you would a database dump.
+
+To restore:
+
+- **On a new server**, open it for the first time and choose _Restore from a
+  backup_ on the setup screen. There is nothing to replace, and you sign in
+  with an account from the backup.
+- **Over an existing instance**, use Manage → Backup → Restore. This replaces
+  everything and signs everyone out. It either completes or changes nothing:
+  the database is rebuilt in a single transaction.
+
+A backup restores into the same or a newer PrintBench, never an older one. If
+your existing folders are mounted at a different path on the new server, their
+models show as missing until the mount matches; nothing is deleted meanwhile.
+
+The rest of this section is the manual equivalents.
+
 Three things can be backed up, and they are not equally important.
 
 ### 1. Your model files

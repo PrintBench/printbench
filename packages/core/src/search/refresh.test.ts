@@ -4,7 +4,6 @@ import { createDb } from '@pb/db'
 import { refreshModelSearchVectors } from './refresh'
 
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIB = '11111111-1111-1111-1111-1111111111aa'
 const CREATOR = '22222222-2222-2222-2222-2222222222aa'
@@ -12,10 +11,9 @@ const TAG = '33333333-3333-3333-3333-3333333333aa'
 const DRAGON = '44444444-4444-4444-4444-4444444444aa'
 const BOX = '55555555-5555-5555-5555-5555555555aa'
 
-describeDb('refreshModelSearchVectors', () => {
-  // Built in beforeAll, not here: vitest still evaluates the body of a skipped
-  // describe, so constructing the pool at collection time would throw when
-  // DATABASE_URL is unset.
+describe('refreshModelSearchVectors', { tags: ['integration'] }, () => {
+  // Create the pool in beforeAll: suite bodies also run during collection
+  // when the unit command filters out integration tests.
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
 

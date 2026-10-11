@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
 import { loadRootEnv } from '@pb/core'
@@ -5,7 +6,13 @@ import { loadRootEnv } from '@pb/core'
 // Next only reads .env from apps/web; our .env lives at the repo root.
 loadRootEnv()
 
+// Bake the root manifest version into the UI and diagnostic reports.
+const { version } = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+) as { version: string }
+
 const config: NextConfig = {
+  env: { PB_VERSION: version, NEXT_PUBLIC_APP_VERSION: version },
   // Emits a minimal standalone server bundle, so the runtime Docker stage does
   // not need node_modules. Keeps the image small.
   output: 'standalone',
@@ -32,6 +39,7 @@ const config: NextConfig = {
       // hands back, so both the collection and its children are forwarded.
       { source: '/api/upload', destination: `${worker}/api/upload` },
       { source: '/api/upload/:path*', destination: `${worker}/api/upload/:path*` },
+      { source: '/api/backup/:path*', destination: `${worker}/api/backup/:path*` },
     ]
   },
 }

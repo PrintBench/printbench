@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
+// The audit trail has its own tests; here it would only write to a real database.
+vi.mock('@/lib/audit', () => ({ audit: vi.fn(async () => {}) }))
 vi.mock('@pb/auth', () => ({
   requireUser: vi.fn().mockResolvedValue({ id: 'user', role: 'admin' }),
 }))

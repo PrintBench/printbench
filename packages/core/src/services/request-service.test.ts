@@ -101,7 +101,6 @@ describe('parsing a pasted list', () => {
 })
 
 const url = process.env.DATABASE_URL
-const describeDb = url ? describe : describe.skip
 
 const LIB = '7d000000-0000-4000-8000-000000000001'
 const DRAGON = '7daa0000-0000-4000-8000-00000000000a'
@@ -112,7 +111,7 @@ const TWIN_TWO = '7daa0000-0000-4000-8000-00000000000d'
 const GONE = '7daa0000-0000-4000-8000-00000000000e'
 const USER = 'request-test-user'
 
-describeDb('print queue', () => {
+describe('print queue', { tags: ['integration'] }, () => {
   let pool: ReturnType<typeof createDb>['pool']
   let db: ReturnType<typeof createDb>['db']
   let dragonFileId: string

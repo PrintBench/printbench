@@ -8,9 +8,9 @@
  */
 import { createServer } from 'node:http'
 import path from 'node:path'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { sql } from 'drizzle-orm'
-import { loadRootEnv } from '@pb/core'
+import { installLogCapture, loadRootEnv } from '@pb/core'
 import { createDb } from '@pb/db'
 import { JOB, getQueue, type JobHandler, type JobName } from '@pb/jobs'
 import { withMemoryDiagnostics } from './memory-diagnostics'
@@ -23,10 +23,26 @@ import { handleMaintArchive, handleMaintReconcile } from './jobs/maintenance'
 import { handleScheduleSweep } from './jobs/schedule'
 import { handleZipRequest } from './http/zip'
 import { handleUploadRequest } from './http/upload'
+import { createBackupHandler } from './backup/http'
 import { activeWatchCount, startWatchReconciler } from './watch/watcher'
 
 // Must run before anything reads DATABASE_URL.
 loadRootEnv()
+
+/*
+ * From here on, everything written to the console is also kept in Postgres,
+ * where the web UI can show it. Installed before anything else logs.
+ */
+const logs = installLogCapture({ role: 'worker', version: appVersion() })
+
+function appVersion(): string | undefined {
+  try {
+    const manifest = new URL('../../../package.json', import.meta.url)
+    return (JSON.parse(readFileSync(manifest, 'utf8')) as { version?: string }).version
+  } catch {
+    return undefined
+  }
+}
 
 const PORT = Number(process.env.WORKER_PORT ?? 3001)
 
@@ -48,6 +64,18 @@ const { pool, db } = createDb()
  * is exactly what happened when the scan tried to queue thumbnail work.
  */
 const queue = getQueue()
+
+/*
+ * Backup and restore. A restore replaces the database underneath everything
+ * else in this process, so it gets to stop the job handlers and the watchers
+ * first and start them again afterwards.
+ */
+const backup = createBackupHandler({
+  directory: path.resolve(process.env.DATA_DIR ?? './data', 'backups'),
+  appVersion: appVersion(),
+  pause: pauseWork,
+  resume: resumeWork,
+})
 
 const server = createServer((req, res) => {
   // Named pathname, not path: `path` is the node module imported above.
@@ -77,9 +105,20 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (pathname.startsWith('/api/backup/')) {
+    void backup.handle(req, res)
+    return
+  }
+
   // Resumable uploads. tus owns everything under this prefix, including the
   // per-upload URLs it hands back.
   if (pathname.startsWith('/api/upload')) {
+    if (backup.isRestoring()) {
+      // An upload landing now would be indexed into a database about to vanish.
+      res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '60' })
+      res.end('A restore is in progress')
+      return
+    }
     handleUploadRequest(req, res, STAGING_DIR)
     return
   }
@@ -88,10 +127,8 @@ const server = createServer((req, res) => {
   res.end(JSON.stringify({ error: 'not found' }))
 })
 
-async function main(): Promise<void> {
-  await db.execute(sql`select 1`)
-  console.log('[worker] database reachable')
-
+/** Registers every job handler and schedule. Run at boot and again after a restore. */
+async function startWork(): Promise<void> {
   await queue.start()
   console.log('[worker] job queue ready')
 
@@ -153,6 +190,30 @@ async function main(): Promise<void> {
    */
   stopWatching = startWatchReconciler()
   console.log('[worker] watch reconciler started, sweeping every 60s')
+}
+
+/** Stops handlers and watchers, waiting for running jobs to finish. */
+async function pauseWork(): Promise<void> {
+  await stopWatching?.()
+  stopWatching = undefined
+  await queue.stop()
+  console.log('[worker] job handlers paused')
+}
+
+async function resumeWork({ restored }: { restored: boolean }): Promise<void> {
+  if (restored) {
+    // Whatever was queued names files and libraries from the old database.
+    await queue.start()
+    await queue.discardPending()
+  }
+  await startWork()
+}
+
+async function main(): Promise<void> {
+  await db.execute(sql`select 1`)
+  console.log('[worker] database reachable')
+
+  await startWork()
 
   await new Promise<void>((resolve) => server.listen(PORT, resolve))
   console.log(`[worker] listening on :${PORT}`)
@@ -182,8 +243,9 @@ async function shutdown(signal: string): Promise<void> {
     await stopWatching?.()
     await new Promise<void>((resolve) => server.close(() => resolve()))
     await queue.stop()
-    await pool.end()
     console.log('[worker] clean shutdown')
+    await logs.flush()
+    await pool.end()
     process.exit(0)
   } catch (error) {
     console.error('[worker] error during shutdown:', error)
