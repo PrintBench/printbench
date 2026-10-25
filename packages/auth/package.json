@@ -15,7 +15,7 @@
   "dependencies": {
     "@pb/core": "*",
     "@pb/db": "*",
-    "better-auth": "1.7.10",
+    "better-auth": "1.7.12",
     "next": "^16.4.1"
   }
 }
