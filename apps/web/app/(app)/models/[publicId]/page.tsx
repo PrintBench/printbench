@@ -173,7 +173,16 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   // row as the primary source so every additional URL remains visible.
   const sourceLinkIndex = modelLinks.rows.findIndex((link) => link.title === 'Original model page')
   const sourceLink = sourceLinkIndex >= 0 ? modelLinks.rows[sourceLinkIndex] : undefined
-  const additionalLinks = modelLinks.rows.filter((_, index) => index !== sourceLinkIndex)
+  const additionalLinks = modelLinks.rows.filter((link, index) => {
+    if (index === sourceLinkIndex) return false
+    if (link.title !== 'Original model page') return true
+
+    try {
+      return ['https:', 'http:'].includes(new URL(link.url).protocol)
+    } catch {
+      return false
+    }
+  })
 
   // Grouping by category makes a 40-file model legible; a flat list does not.
   const byCategory = new Map<string, FileRow[]>()
