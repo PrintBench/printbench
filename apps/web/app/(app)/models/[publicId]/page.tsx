@@ -761,7 +761,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                       className="block break-words text-[var(--color-accent)] hover:underline"
                     >
                       {link.title === 'Original model page'
-                        ? 'Additional model page'
+                        ? (link.host?.replace(/^www\./i, '') ?? 'Additional model page')
                         : (link.title ?? link.host ?? link.url)}
                     </a>
                   ))}
