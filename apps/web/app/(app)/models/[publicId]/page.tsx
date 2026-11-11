@@ -168,8 +168,21 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     ORDER BY position, id
   `)
 
-  const sourceLink = modelLinks.rows.find((link) => link.title === 'Original model page')
-  const additionalLinks = modelLinks.rows.filter((link) => link.title !== 'Original model page')
+  // The editor enforces a single Original model page link, but imported or
+  // hand-edited sidecars can contain duplicates. Treat only the first matching
+  // row as the primary source so every additional URL remains visible.
+  const sourceLinkIndex = modelLinks.rows.findIndex((link) => link.title === 'Original model page')
+  const sourceLink = sourceLinkIndex >= 0 ? modelLinks.rows[sourceLinkIndex] : undefined
+  const additionalLinks = modelLinks.rows.filter((link, index) => {
+    if (index === sourceLinkIndex) return false
+    if (link.title !== 'Original model page') return true
+
+    try {
+      return ['https:', 'http:'].includes(new URL(link.url).protocol)
+    } catch {
+      return false
+    }
+  })
 
   // Grouping by category makes a 40-file model legible; a flat list does not.
   const byCategory = new Map<string, FileRow[]>()
@@ -206,16 +219,6 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
   const creator = meta.rows[0]?.creator ?? null
   const creatorId = meta.rows[0]?.creator_id ?? null
   const tags = meta.rows[0]?.tags ?? []
-  const sources = await db.execute<{ url: string; title: string | null }>(sql`
-    SELECT url, title FROM model_links WHERE model_id = ${model.id} ORDER BY position, url
-  `)
-  const safeSources = sources.rows.filter((source) => {
-    try {
-      return ['https:', 'http:'].includes(new URL(source.url).protocol)
-    } catch {
-      return false
-    }
-  })
 
   const user = await getSessionUser()
   const policyUser = { id: user?.id ?? '', role: user?.role ?? null }
@@ -556,24 +559,6 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
         </div>
 
         <aside className="min-w-0 space-y-4">
-          {safeSources.length > 0 && (
-            <Card>
-              <CardContent className="space-y-2 p-4 text-sm">
-                <h2 className="font-semibold">Source links</h2>
-                {safeSources.map((source) => (
-                  <a
-                    key={source.url}
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block break-words text-[var(--color-accent)] hover:underline"
-                  >
-                    {source.title || new URL(source.url).hostname}
-                  </a>
-                ))}
-              </CardContent>
-            </Card>
-          )}
           <Card>
             <CardContent className="space-y-3 p-4 text-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
@@ -784,7 +769,9 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                       rel="noreferrer"
                       className="block break-words text-[var(--color-accent)] hover:underline"
                     >
-                      {link.title ?? link.host ?? link.url}
+                      {link.title === 'Original model page'
+                        ? (link.host?.replace(/^www\./i, '') ?? 'Additional model page')
+                        : (link.title ?? link.host ?? link.url)}
                     </a>
                   ))}
                 </div>
