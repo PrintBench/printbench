@@ -17,7 +17,20 @@ multi-gigabyte downloads never pass through Node.
 
 ## Quick start on this computer
 
-With Docker and Compose installed, download
+The release images are private. Use a GitHub account with read access to both
+the `printbench` and `printbench-nginx` packages and a personal access token
+(classic) with the `read:packages` scope. If your organisation requires single
+sign-on, authorise the token for the organisation. See
+[GitHub's Container Registry authentication guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry).
+
+With Docker and Compose installed, sign in to the registry. When Docker prompts
+for a password, enter the token.
+
+```bash
+docker login ghcr.io --username YOUR_GITHUB_USERNAME
+```
+
+Download
 [compose.yaml](https://github.com/PrintBench/printbench/releases/latest/download/compose.yaml)
 into an empty folder. Open a terminal in that folder and run this command.
 
@@ -40,6 +53,8 @@ To upgrade, back up the instance, replace `compose.yaml` with the asset from the
 new release, and run `docker compose up -d` from the same folder. The Compose
 file selects the matching application and nginx versions. If you already have a
 deployment, keep using its Compose files and follow its normal upgrade procedure.
+
+You can also [build PrintBench from source](#docker-compose-from-source).
 
 ## Docker Compose from source
 
