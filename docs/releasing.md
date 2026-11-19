@@ -49,8 +49,15 @@ The tag must name the prepared commit. Do not move or reuse a published tag.
    and the Docker build. Preparation and verification have read-only repository
    permissions.
 3. **Publish:** only after both succeed, build and push `amd64` and `arm64`
-   images, attest their digest, then create a GitHub release using the authored
-   Markdown file. Only this job receives publication permissions.
+   application and nginx images, attest their digests, then create a GitHub
+   release with the authored Markdown and a `compose.yaml` asset pinned to the
+   release's image tags. The official release checks that both image manifests
+   can be read anonymously before publishing the asset.
+
+The official GHCR packages `printbench` and `printbench-nginx` must be public
+for a Docker-only quick start. After the first push of a private package, an
+organisation owner can update its visibility in Package settings. Rerun the
+failed publish job after both packages are publicly readable.
 
 | Release                  | Container tags                | GitHub release           |
 | ------------------------ | ----------------------------- | ------------------------ |
@@ -66,11 +73,12 @@ published version.
 
 - Check that the workflow completed, the GitHub body matches the authored notes,
   and prerelease status is correct.
-- Check both container architectures and record the published digest from the
+- Check both container architectures and record the published digests from the
   workflow output. Verify provenance with `gh attestation verify
-oci://ghcr.io/printbench/printbench:<version> --repo PrintBench/printbench`.
-- Smoke-test the pinned image on a disposable instance before recommending an
-  upgrade. Follow the normal backup and upgrade guidance for real deployments.
+oci://ghcr.io/printbench/printbench:<version> --repo PrintBench/printbench` and
+  repeat for `printbench-nginx`.
+- Smoke-test the released `compose.yaml` on a disposable instance. Follow the
+  normal backup and upgrade guidance for real deployments.
 
 ## Recovering from a failed run
 
@@ -82,12 +90,10 @@ oci://ghcr.io/printbench/printbench:<version> --repo PrintBench/printbench`.
   and the logs before retrying. Rerun failed jobs for the same commit only before
   a newer stable release ships, because a retry can overwrite rolling tags and
   rebuild the pinned image with a different digest.
-- **GitHub release creation failed after attestation succeeded:** the image is
-  already published. Prefer completing this final step from the same tagged
-  checkout with `gh release create <tag> --verify-tag --title <tag> --notes-file
-docs/releases/<tag>.md --latest`. For a prerelease, replace `--latest` with
-  `--prerelease --latest=false`. If the release already exists, inspect it rather
-  than attempting another creation or rerunning image publication.
+- **GitHub release creation failed after attestation succeeded:** the images are
+  already published. If the release is absent, rerun the failed job from the same
+  tag before publishing any newer stable release. If the release exists, check
+  that its notes and pinned `compose.yaml` asset match the tag.
 - **A completed release is faulty:** publish a new fixed version. Do not move the
   original tag or rerun an older completed release. Migrations are forward-only;
   operator rollback requires the appropriate database backup.

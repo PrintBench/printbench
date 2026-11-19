@@ -23,9 +23,11 @@ jobs:
     outputs:
       version: ${{ steps.meta.outputs.version }}
       image: ${{ steps.meta.outputs.image }}
+      nginx_image: ${{ steps.meta.outputs.nginx_image }}
       notes: ${{ steps.meta.outputs.notes }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
       tags: ${{ steps.meta.outputs.tags }}
+      nginx_tags: ${{ steps.meta.outputs.nginx_tags }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -43,7 +45,7 @@ jobs:
       contents: read
 
   publish:
-    name: Publish container image
+    name: Publish container images and quick start
     needs: [prepare, verify]
     runs-on: ubuntu-latest
     permissions:
@@ -97,6 +99,57 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
+      - name: Build and push nginx
+        id: nginx
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/nginx.Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ needs.prepare.outputs.nginx_tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+
+      - name: Attest nginx build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ needs.prepare.outputs.nginx_image }}
+          subject-digest: ${{ steps.nginx.outputs.digest }}
+          push-to-registry: true
+
+      - name: Package the versioned Compose file
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          APP_IMAGE: ${{ needs.prepare.outputs.image }}
+          NGINX_IMAGE: ${{ needs.prepare.outputs.nginx_image }}
+        run: |
+          compose_file="$RUNNER_TEMP/compose.yaml"
+          sed -e "s|ghcr\.io/printbench/printbench:latest|$APP_IMAGE:$VERSION|" \
+              -e "s|ghcr\.io/printbench/printbench-nginx:latest|$NGINX_IMAGE:$VERSION|" \
+              compose.quickstart.yaml > "$compose_file"
+          images=$(docker compose -f "$compose_file" config --images)
+          grep -Fxq "$APP_IMAGE:$VERSION" <<< "$images"
+          grep -Fxq "$NGINX_IMAGE:$VERSION" <<< "$images"
+
+      - name: Verify anonymous access to the official images
+        if: github.repository == 'PrintBench/printbench'
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          APP_IMAGE: ${{ needs.prepare.outputs.image }}
+          NGINX_IMAGE: ${{ needs.prepare.outputs.nginx_image }}
+        run: |
+          export DOCKER_CONFIG="$(mktemp -d)"
+          for image in "$APP_IMAGE" "$NGINX_IMAGE"; do
+            if ! docker manifest inspect "$image:$VERSION" > /dev/null; then
+              echo "::error::$image:$VERSION could not be read anonymously. Check GHCR package visibility."
+              exit 1
+            fi
+          done
+
       - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -107,7 +160,7 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then
             flags=(--prerelease --latest=false)
           fi
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/compose.yaml" \
             --title "$GITHUB_REF_NAME" \
             --notes-file "$RELEASE_NOTES" \
             --verify-tag \

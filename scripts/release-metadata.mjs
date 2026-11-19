@@ -50,11 +50,20 @@ export function prepareRelease({ tag, repository, root = process.cwd() }) {
 
   const prerelease = Boolean(match[4])
   const image = `ghcr.io/${repository.toLowerCase()}`
-  const tags = [`${image}:${version}`]
+  const nginxImage = `${image}-nginx`
+  const versions = [version]
   if (!prerelease) {
-    tags.push(`${image}:${match[1]}.${match[2]}`, `${image}:${match[1]}`, `${image}:latest`)
+    versions.push(`${match[1]}.${match[2]}`, match[1], 'latest')
   }
-  return { version, image, notes, prerelease, tags }
+  return {
+    version,
+    image,
+    nginxImage,
+    notes,
+    prerelease,
+    tags: versions.map((value) => `${image}:${value}`),
+    nginxTags: versions.map((value) => `${nginxImage}:${value}`),
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -66,11 +75,15 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const output = [
       `version=${meta.version}`,
       `image=${meta.image}`,
+      `nginx_image=${meta.nginxImage}`,
       `notes=${meta.notes}`,
       `prerelease=${meta.prerelease}`,
       'tags<<RELEASE_TAGS',
       ...meta.tags,
       'RELEASE_TAGS',
+      'nginx_tags<<RELEASE_NGINX_TAGS',
+      ...meta.nginxTags,
+      'RELEASE_NGINX_TAGS',
       '',
     ].join('\n')
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, output)

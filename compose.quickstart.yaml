@@ -1,0 +1,103 @@
+name: printbench-quickstart
+
+x-app: &app
+  image: ${PRINTBENCH_IMAGE:-ghcr.io/printbench/printbench:latest}
+  entrypoint: [/usr/bin/tini, --, /usr/local/bin/local-entrypoint.sh]
+
+x-app-environment: &app-environment
+  APP_URL: http://localhost:${PRINTBENCH_PORT:-8080}
+  DATA_DIR: /data
+  LIBRARY_ROOTS: /libraries:/data/libraries
+
+x-library: &library
+  type: bind
+  source: ${LIBRARY_PATH:-./libraries}
+  target: /libraries
+  read_only: true
+
+x-app-volumes: &app-volumes
+  - credentials:/run/printbench:ro
+  - data:/data
+  - *library
+
+services:
+  credentials:
+    <<: *app
+    command: [init]
+    user: '0:0'
+    volumes:
+      - credentials:/run/printbench
+      - pgdata:/var/lib/postgresql:ro
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    depends_on:
+      credentials: { condition: service_completed_successfully }
+    environment:
+      POSTGRES_USER: printbench
+      POSTGRES_DB: printbench
+      POSTGRES_PASSWORD_FILE: /run/printbench/postgres-password
+      PGDATA: /var/lib/postgresql/18/docker
+    volumes:
+      - credentials:/run/printbench:ro
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      # The temporary Postgres used for initialization only listens on a socket.
+      test: [CMD, pg_isready, -h, '127.0.0.1', -U, printbench, -d, printbench]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    <<: *app
+    command: [web]
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      <<: *app-environment
+      FILE_DELIVERY: xaccel
+      ACCEL_MOUNTS: /_protected/library/=/libraries,/_protected/managed/=/data/libraries
+    volumes: *app-volumes
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS http://$$(hostname):3000/api/health']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    <<: *app
+    command: [worker]
+    restart: unless-stopped
+    depends_on:
+      web: { condition: service_healthy }
+    environment: *app-environment
+    volumes: *app-volumes
+    healthcheck:
+      test: [CMD, curl, -fsS, 'http://127.0.0.1:3001/health']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  nginx:
+    image: ${PRINTBENCH_NGINX_IMAGE:-ghcr.io/printbench/printbench-nginx:latest}
+    restart: unless-stopped
+    depends_on:
+      web: { condition: service_healthy, restart: true }
+      worker: { condition: service_healthy, restart: true }
+    ports:
+      - '127.0.0.1:${PRINTBENCH_PORT:-8080}:80'
+    volumes:
+      - data:/data:ro
+      - *library
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1/api/health']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  credentials:
+  pgdata:
+  data:

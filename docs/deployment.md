@@ -15,7 +15,33 @@ multi-gigabyte downloads never pass through Node.
 
 ---
 
-## Docker Compose
+## Quick start on this computer
+
+With Docker and Compose installed, download
+[compose.yaml](https://github.com/PrintBench/printbench/releases/latest/download/compose.yaml)
+into an empty folder. Open a terminal in that folder and run this command.
+
+```bash
+docker compose up -d
+```
+
+Open <http://localhost:8080> and create your admin account. Create a library for
+uploads and add your first model. To index an existing folder, set `LIBRARY_PATH`
+in a `.env` file next to `compose.yaml`, run `docker compose up -d` again, and
+select `/libraries` in the library setup. The existing folder is mounted read-only.
+Set `PRINTBENCH_PORT` in the same file if port 8080 is in use, and open the new port.
+
+The quick start listens on localhost. It generates the PostgreSQL password and
+auth secret once and stores them in the `credentials` volume. Keep that volume
+with the `pgdata` and `data` volumes when backing up Docker volumes. Use
+`docker compose down` to stop and remove the containers while keeping the volumes.
+
+To upgrade, back up the instance, replace `compose.yaml` with the asset from the
+new release, and run `docker compose up -d` from the same folder. The Compose
+file selects the matching application and nginx versions. If you already have a
+deployment, keep using its Compose files and follow its normal upgrade procedure.
+
+## Docker Compose from source
 
 ```bash
 cp .env.example .env
@@ -61,7 +87,7 @@ first admin account. That page stops working the moment a user exists.
 
 ## Coolify
 
-Coolify runs the same `docker-compose.yml`. Two things to know.
+Coolify runs the repository's `docker-compose.yml`. Two things to know.
 
 The library mounts use long YAML syntax so Coolify can parse the host path and
 read-only setting independently. If an older 0.5.0 compose file fails with
