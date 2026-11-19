@@ -46,8 +46,8 @@ COPY --from=build /app/package.json ./package.json
 # Local operators need the same recovery command when the last admin is locked out.
 COPY --from=build /app/scripts/issue-password-reset.mts ./scripts/issue-password-reset.mts
 
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh \
+COPY docker/entrypoint.sh docker/local-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/local-entrypoint.sh \
  && useradd --system --uid 10001 --create-home app \
  && mkdir -p /data /libraries && chown -R app:app /data /libraries /app
 USER app

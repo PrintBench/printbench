@@ -25,7 +25,7 @@ function fixture(
   return { root, tag: `v${version}`, repository: 'PrintBench/PrintBench' }
 }
 
-test('stable releases publish all four image tags with a lowercase repository', () => {
+test('stable releases publish matching tags for both images under a lowercase repository', () => {
   const meta = prepareRelease(fixture())
   assert.equal(meta.prerelease, false)
   assert.equal(meta.notes, 'docs/releases/v1.2.3.md')
@@ -35,6 +35,12 @@ test('stable releases publish all four image tags with a lowercase repository', 
     'ghcr.io/printbench/printbench:1',
     'ghcr.io/printbench/printbench:latest',
   ])
+  assert.deepEqual(meta.nginxTags, [
+    'ghcr.io/printbench/printbench-nginx:1.2.3',
+    'ghcr.io/printbench/printbench-nginx:1.2',
+    'ghcr.io/printbench/printbench-nginx:1',
+    'ghcr.io/printbench/printbench-nginx:latest',
+  ])
 })
 
 test('prereleases never publish stable rolling tags', () => {
@@ -42,6 +48,7 @@ test('prereleases never publish stable rolling tags', () => {
     const meta = prepareRelease(fixture(version))
     assert.equal(meta.prerelease, true)
     assert.deepEqual(meta.tags, [`ghcr.io/printbench/printbench:${version}`])
+    assert.deepEqual(meta.nginxTags, [`ghcr.io/printbench/printbench-nginx:${version}`])
   }
 })
 
@@ -106,6 +113,11 @@ test('CLI writes validated multiline GitHub outputs and exits nonzero on failure
   assert.equal(result.status, 0, result.stderr)
   const output = readFileSync(outputFile, 'utf8')
   assert.match(output, /prerelease=true\n/)
+  assert.match(output, /nginx_image=ghcr\.io\/printbench\/printbench-nginx\n/)
+  assert.match(
+    output,
+    /nginx_tags<<RELEASE_NGINX_TAGS\nghcr\.io\/printbench\/printbench-nginx:1\.2\.3-rc\.1\nRELEASE_NGINX_TAGS\n/,
+  )
   assert.match(
     output,
     /tags<<RELEASE_TAGS\nghcr.io\/printbench\/printbench:1.2.3-rc.1\nRELEASE_TAGS\n/,

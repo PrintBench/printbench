@@ -90,5 +90,29 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: false
+          load: true
+          tags: printbench-ci:app
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify clean local Compose startup and recreation
+        env:
+          PRINTBENCH_IMAGE: printbench-ci:app
+          PRINTBENCH_NGINX_IMAGE: printbench-ci:nginx
+        run: |
+          docker build -t "$PRINTBENCH_NGINX_IMAGE" -f docker/nginx.Dockerfile .
+          quickstart_dir=$(mktemp -d)
+          cp compose.quickstart.yaml "$quickstart_dir/compose.yaml"
+          cd "$quickstart_dir"
+          trap 'docker compose down --volumes' EXIT
+
+          docker compose up -d --wait --wait-timeout 180 || { docker compose logs; exit 1; }
+          curl -fsS http://localhost:8080/api/health
+          curl -fsS http://localhost:8080/setup -o /dev/null
+          credentials_before=$(docker compose exec -T web sha256sum /run/printbench/postgres-password /run/printbench/auth-secret)
+
+          docker compose down
+          docker compose up -d --wait --wait-timeout 180 || { docker compose logs; exit 1; }
+          credentials_after=$(docker compose exec -T web sha256sum /run/printbench/postgres-password /run/printbench/auth-secret)
+          test "$credentials_before" = "$credentials_after"
+          curl -fsS http://localhost:8080/api/health

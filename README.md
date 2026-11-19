@@ -50,27 +50,15 @@ Postgres is the **only** thing it needs. No Redis, no message broker, no Elastic
 
 ## Quick start
 
-You need Docker with Compose.
+With Docker and Compose installed, download [compose.yaml](https://github.com/PrintBench/printbench/releases/latest/download/compose.yaml) into an empty folder. Open a terminal in that folder and run this command.
 
 ```bash
-git clone https://github.com/PrintBench/printbench.git
-cd printbench
-cp .env.example .env
+docker compose up -d
 ```
 
-Open `.env` and set:
+Open <http://localhost:8080>, create your admin account, then create a library for uploads and drop in your first model. Docker pulls the images and PrintBench generates and stores the credentials on first startup.
 
-- `POSTGRES_PASSWORD`: anything long
-- `BETTER_AUTH_SECRET`: generate one with `openssl rand -base64 32` and keep it safe
-- `LIBRARY_PATH`: the folder that holds your print files
-
-Then start it:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
-```
-
-Open <http://localhost:8080>, create your admin account, add a library and run a scan. Your library is mounted **read-only**, so nothing in it can be changed.
+To index an existing folder, build from source, or host on a domain with Coolify, see the [deployment guide](docs/deployment.md).
 
 ## Documentation
 
