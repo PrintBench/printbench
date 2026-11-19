@@ -54,10 +54,9 @@ The tag must name the prepared commit. Do not move or reuse a published tag.
    release's image tags. While signed in to GHCR, the workflow checks that each
    image manifest contains both Linux architectures before publishing the asset.
 
-Keep the official GHCR packages `printbench` and `printbench-nginx` private.
-Users of the Compose asset need read access to both packages and must sign in
-to GHCR before pulling the images. The release workflow uses the repository's
-GitHub Actions token to authenticate.
+Keep the official GHCR packages `printbench` and `printbench-nginx` public so
+users can pull the quick-start images anonymously. The release workflow uses
+the repository's GitHub Actions token to publish the images.
 
 | Release                  | Container tags                | GitHub release           |
 | ------------------------ | ----------------------------- | ------------------------ |
@@ -77,8 +76,9 @@ published version.
   workflow output. Verify provenance with `gh attestation verify
 oci://ghcr.io/printbench/printbench:<version> --repo PrintBench/printbench` and
   repeat for `printbench-nginx`.
-- Sign in to GHCR and smoke-test the released `compose.yaml` on a disposable
-  instance. Follow the normal backup and upgrade guidance for real deployments.
+- Smoke-test the released `compose.yaml` on a disposable instance with a fresh
+  Docker configuration so the test exercises anonymous pulls. Follow the normal
+  backup and upgrade guidance for real deployments.
 
 ## Recovering from a failed run
 
