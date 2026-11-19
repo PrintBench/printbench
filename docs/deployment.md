@@ -17,20 +17,7 @@ multi-gigabyte downloads never pass through Node.
 
 ## Quick start on this computer
 
-The release images are private. Use a GitHub account with read access to both
-the `printbench` and `printbench-nginx` packages and a personal access token
-(classic) with the `read:packages` scope. If your organisation requires single
-sign-on, authorise the token for the organisation. See
-[GitHub's Container Registry authentication guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry).
-
-With Docker and Compose installed, sign in to the registry. When Docker prompts
-for a password, enter the token.
-
-```bash
-docker login ghcr.io --username YOUR_GITHUB_USERNAME
-```
-
-Download
+With Docker and Compose installed, download
 [compose.yaml](https://github.com/PrintBench/printbench/releases/latest/download/compose.yaml)
 into an empty folder. Open a terminal in that folder and run this command.
 
@@ -38,7 +25,8 @@ into an empty folder. Open a terminal in that folder and run this command.
 docker compose up -d
 ```
 
-Open <http://localhost:8080> and create your admin account. Create a library for
+Docker pulls the public release images anonymously. Open <http://localhost:8080>
+and create your admin account. Create a library for
 uploads and add your first model. To index an existing folder, set `LIBRARY_PATH`
 in a `.env` file next to `compose.yaml`, run `docker compose up -d` again, and
 select `/libraries` in the library setup. The existing folder is mounted read-only.

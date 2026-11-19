@@ -50,7 +50,7 @@ Postgres is the **only** thing it needs. No Redis, no message broker, no Elastic
 
 ## Quick start
 
-With Docker and Compose installed and access to the PrintBench container packages, download [compose.yaml](https://github.com/PrintBench/printbench/releases/latest/download/compose.yaml) into an empty folder. [Sign in to GitHub Container Registry](docs/deployment.md#quick-start-on-this-computer), then run this command in that folder.
+With Docker and Compose installed, download [compose.yaml](https://github.com/PrintBench/printbench/releases/latest/download/compose.yaml) into an empty folder. Open a terminal in that folder and run this command.
 
 ```bash
 docker compose up -d
