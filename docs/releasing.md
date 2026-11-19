@@ -51,13 +51,13 @@ The tag must name the prepared commit. Do not move or reuse a published tag.
 3. **Publish:** only after both succeed, build and push `amd64` and `arm64`
    application and nginx images, attest their digests, then create a GitHub
    release with the authored Markdown and a `compose.yaml` asset pinned to the
-   release's image tags. The official release checks that both image manifests
-   can be read anonymously before publishing the asset.
+   release's image tags. While signed in to GHCR, the workflow checks that each
+   image manifest contains both Linux architectures before publishing the asset.
 
-The official GHCR packages `printbench` and `printbench-nginx` must be public
-for a Docker-only quick start. After the first push of a private package, an
-organisation owner can update its visibility in Package settings. Rerun the
-failed publish job after both packages are publicly readable.
+Keep the official GHCR packages `printbench` and `printbench-nginx` private.
+Users of the Compose asset need read access to both packages and must sign in
+to GHCR before pulling the images. The release workflow uses the repository's
+GitHub Actions token to authenticate.
 
 | Release                  | Container tags                | GitHub release           |
 | ------------------------ | ----------------------------- | ------------------------ |
@@ -77,8 +77,8 @@ published version.
   workflow output. Verify provenance with `gh attestation verify
 oci://ghcr.io/printbench/printbench:<version> --repo PrintBench/printbench` and
   repeat for `printbench-nginx`.
-- Smoke-test the released `compose.yaml` on a disposable instance. Follow the
-  normal backup and upgrade guidance for real deployments.
+- Sign in to GHCR and smoke-test the released `compose.yaml` on a disposable
+  instance. Follow the normal backup and upgrade guidance for real deployments.
 
 ## Recovering from a failed run
 

@@ -135,17 +135,16 @@ jobs:
           grep -Fxq "$APP_IMAGE:$VERSION" <<< "$images"
           grep -Fxq "$NGINX_IMAGE:$VERSION" <<< "$images"
 
-      - name: Verify anonymous access to the official images
-        if: github.repository == 'PrintBench/printbench'
+      - name: Verify the published image manifests
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
           APP_IMAGE: ${{ needs.prepare.outputs.image }}
           NGINX_IMAGE: ${{ needs.prepare.outputs.nginx_image }}
         run: |
-          export DOCKER_CONFIG="$(mktemp -d)"
           for image in "$APP_IMAGE" "$NGINX_IMAGE"; do
-            if ! docker manifest inspect "$image:$VERSION" > /dev/null; then
-              echo "::error::$image:$VERSION could not be read anonymously. Check GHCR package visibility."
+            if ! docker buildx imagetools inspect --raw "$image:$VERSION" | jq -e \
+              '[.manifests[].platform | select(.os == "linux") | .architecture] | contains(["amd64", "arm64"])' > /dev/null; then
+              echo "::error::$image:$VERSION is missing a readable linux/amd64 or linux/arm64 manifest."
               exit 1
             fi
           done
