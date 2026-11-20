@@ -1,0 +1,174 @@
+:root {
+  color-scheme: light dark;
+  font:
+    14px/1.45 system-ui,
+    sans-serif;
+  --foreground: #172230;
+  --background: #ffffff;
+  --surface: #f3f6f9;
+  --border: #a9b6c4;
+  --accent: #1557ae;
+  --button-label: #ffffff;
+  --error: #a32135;
+  --model-action: oklch(56% 0.125 219);
+  --model-action-hover: oklch(50% 0.125 219);
+  --model-action-ink: white;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground: #e8eff6;
+    --background: #151d28;
+    --surface: #1e2936;
+    --border: #63778c;
+    --accent: #97c5ff;
+    --button-label: #091c32;
+    --error: #ff9fac;
+    --model-action: oklch(72% 0.115 219);
+    --model-action-hover: oklch(78% 0.105 219);
+    --model-action-ink: oklch(18% 0.02 219);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.popup {
+  width: 340px;
+}
+
+main {
+  padding: 16px;
+}
+
+.extension-version {
+  margin-top: 20px;
+  font-size: 12px;
+}
+
+.options main {
+  max-width: 510px;
+  margin: 36px auto;
+}
+
+header,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+header {
+  justify-content: space-between;
+}
+
+.actions {
+  flex-wrap: wrap;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+p {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+
+form {
+  display: grid;
+  gap: 8px;
+}
+
+input,
+select,
+button,
+.model-action {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 7px 10px;
+  font: inherit;
+}
+
+select,
+input {
+  width: 100%;
+}
+
+button,
+.model-action {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--button-label);
+}
+
+button.secondary {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+a {
+  color: var(--accent);
+}
+
+.model-action {
+  display: inline-flex;
+  align-items: center;
+  border-color: transparent;
+  background: var(--model-action);
+  color: var(--model-action-ink);
+  text-decoration: none;
+}
+
+.model-action:hover {
+  background: var(--model-action-hover);
+}
+
+.model-action:focus-visible {
+  outline-color: var(--model-action);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#latest {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+[role='alert'] {
+  color: var(--error);
+}

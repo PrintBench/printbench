@@ -127,6 +127,13 @@
       "when": 1791380559152,
       "tag": "0017_diagnostics",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795166801909,
+      "tag": "0018_rare_spacker_dave",
+      "breakpoints": true
     }
   ]
 }
