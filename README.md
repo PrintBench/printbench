@@ -24,6 +24,8 @@ Point PrintBench at a folder of print files and it turns them into a searchable,
 
 Postgres is the **only** thing it needs. No Redis, no message broker, no Elasticsearch, and no native 3D toolchain to install.
 
+See the [PrintBench roadmap](https://printbench.app/roadmap/) for planned, in-progress and shipped work.
+
 ## Features
 
 - **Finds your models for you.** Folders become models, with thumbnails rendered for STL, 3MF, OBJ and PLY. Even a 6 GB STL renders without trouble.
