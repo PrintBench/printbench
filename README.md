@@ -37,6 +37,7 @@ See the [PrintBench roadmap](https://printbench.app/roadmap/) for planned, in-pr
 - **A print queue for the household.** Paste a list of things people asked for, one per line, and PrintBench links the ones it recognises.
 - **Hand files to your slicer.** Open in Bambu Studio, Creality Print, OrcaSlicer, PrusaSlicer, Cura or Lychee, and send sliced files to OctoPrint, Moonraker or PrusaLink printers.
 - **Import from model sites.** Paste a MakerWorld, Printables or Thingiverse link, or drop in a 3MF and let its embedded details fill in the blanks.
+- **Send a model from your browser.** The [PrintBench browser clipper](docs/model-imports.md#browser-clipper) imports the current model page into a library you choose.
 - **Share one model by link**, or invite people as viewers, members or admins.
 - **Local disk, NAS or S3.** Existing libraries are mounted read-only. Uploads are resumable and ZIPs are extracted for you.
 - **Safe by design.** An unmounted NAS never looks like a mass deletion, and your metadata is written next to each model so the database can be rebuilt from disk.

@@ -76,7 +76,8 @@ This personal settings page is available from the navigation and account menu
 to users who can upload. On **Upload**, choose **Save to library** and either
 select local files/folders or paste a MakerWorld model-page URL into the same card.
 A `#profileId-...` fragment selects that published print profile. Without a
-fragment, the first published profile is imported.
+fragment, the first published profile is imported. If Bambu Cloud returns an empty file
+link, PrintBench checks the MakerWorld download endpoint for the same profile.
 
 The worker fetches the model's title, creator, description, tags, license, source
 link, artwork, and selected 3MF. Downloaded files go into a dedicated model folder
@@ -137,6 +138,48 @@ preserves the other connection.
 A local Printables or Thingiverse file cannot be identified from its filename
 alone. Generic embedded 3MF metadata still imports, but website metadata requires
 a model-page link. This importer does not guess a source or search by filename.
+
+## Browser clipper
+
+The [PrintBench GitHub releases](https://github.com/PrintBench/printbench/releases)
+include the clipper for desktop Chrome, Edge, and Firefox. Update your PrintBench
+installation to the corresponding release before connecting the extension.
+
+- **Chrome or Edge:** Extract `printbench-clipper-chrome-edge.zip`. Open
+  `chrome://extensions` or `edge://extensions`, enable **Developer mode**, then
+  choose **Load unpacked** and select the extracted folder containing
+  `manifest.json`. To upgrade, replace the files in that same folder and use
+  **Reload** on the extension card.
+- **Firefox 140 or newer:** Download the signed
+  `printbench-clipper-firefox.xpi`. In `about:addons`, open the gear menu and
+  choose **Install Add-on From File**. Use the same steps with the new XPI to
+  upgrade.
+
+In PrintBench, open **Account settings → Browser clipper** and generate a token
+named for your browser profile. Open the extension’s **Settings**, enter the
+installation address (for example, `http://localhost:8080`) and paste the token.
+Approve browser access to that host. Use HTTPS for remote installations. Plain
+HTTP is supported on `localhost`, `127.0.0.1`, and `[::1]`.
+
+On a supported model page, open the toolbar popup, choose the destination library,
+and select **Send to PrintBench**. Reopen the popup for progress or **Open model**.
+MakerWorld and Thingiverse use the provider connections already saved in
+PrintBench. If a library is missing, ask an administrator whether writes, storage,
+and scanning are configured for it.
+
+### Clipper privacy and connection tokens
+
+The extension reads the active tab’s URL when you open the toolbar popup. It
+sends the canonical model URL and selected library to your configured PrintBench
+server when you choose **Send to PrintBench**. It sends the connection token to
+that same server for authentication and stores the token locally in the browser
+profile. It does not collect telemetry, read provider cookies, or send data to a
+PrintBench-operated service.
+
+Tokens expire after 90 days. Generate a new token and reconnect when needed.
+**Disconnect** removes the connection from this browser. **Revoke** in PrintBench
+Account settings invalidates the token immediately across browsers. PrintBench
+portable backups exclude clipper tokens, so reconnect after restoring one.
 
 ## Verification
 

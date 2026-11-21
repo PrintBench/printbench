@@ -103,6 +103,29 @@ describe('MakerWorld provider', () => {
     expect(request.mock.calls[0]?.[1].headers).toEqual({})
   })
 
+  it('prefers the translated design title and cleans its markup', async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValue(
+        response({ ...design, titleTranslated: '<b>English &amp; translated</b>' }),
+      )
+    const model = await fetchMakerWorldModel('https://makerworld.com/models/123', undefined, {
+      request,
+    })
+    expect(model.title).toBe('English & translated')
+  })
+
+  it.each([undefined, null, '   ', '<p></p>', 123, 'x'.repeat(1001)])(
+    'falls back to the original title when the translation is unusable',
+    async (titleTranslated) => {
+      const request = vi.fn().mockResolvedValue(response({ ...design, titleTranslated }))
+      const model = await fetchMakerWorldModel('https://makerworld.com/models/123', undefined, {
+        request,
+      })
+      expect(model.title).toBe('Useful & Model')
+    },
+  )
+
   it('resolves the selected profile with only the token, preserving signed URL bytes', async () => {
     const url = 'https://s3.us-west-2.amazonaws.com/bucket/file?key=a%2Fb&key=c+z'
     const request = vi
@@ -120,6 +143,42 @@ describe('MakerWorld provider', () => {
       'https://api.bambulab.com/v1/iot-service/api/user/profile/1001?model_id=USexample',
     )
     expect(request.mock.calls[1]?.[1].headers).toEqual({ Authorization: 'Bearer own.token' })
+  })
+
+  it('looks up the selected design instance when the cloud profile omits its file URL', async () => {
+    const url = 'https://makerworld.bblmw.com/model.3mf?key=a%2Fb&key=c+z'
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(response(design))
+      .mockResolvedValueOnce(response({ url: '', name: 'Alternate' }))
+      .mockResolvedValueOnce(response({ url, name: 'Alternate.3mf' }))
+
+    const model = await fetchMakerWorldModel(
+      'https://makerworld.com/models/123#profileId-789',
+      'own.token',
+      { request },
+    )
+    expect(model.files).toEqual([{ profileId: '789', filename: 'Alternate.3mf', url }])
+    expect(request.mock.calls[2]?.[0]).toBe(
+      'https://api.bambulab.com/v1/design-service/instance/789/f3mf?type=download',
+    )
+    expect(request.mock.calls[2]?.[1].headers).toEqual({ Authorization: 'Bearer own.token' })
+    expect(request).toHaveBeenCalledTimes(3)
+  })
+
+  it.each([
+    ['', 'MakerWorld did not provide a 3MF download link for this print profile'],
+    ['https://attacker.example/file.3mf', 'MakerWorld returned an unsupported download host'],
+  ])('reports a controlled error for fallback link %j', async (url, message) => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(response(design))
+      .mockResolvedValueOnce(response({ url: '' }))
+      .mockResolvedValueOnce(response({ url }))
+    await expect(
+      fetchMakerWorldModel('https://makerworld.com/models/123', 'own.token', { request }),
+    ).rejects.toMatchObject({ code: 'INVALID_RESPONSE', message })
+    expect(request).toHaveBeenCalledTimes(3)
   })
 
   it('selects one default profile rather than every profile, and deduplicates explicit selections', async () => {

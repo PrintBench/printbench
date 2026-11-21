@@ -39,6 +39,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run build:clipper
 
       - name: Release preparation tests
         run: npm run test:release
