@@ -1,7 +1,7 @@
 import { getSessionUser } from '@pb/auth'
-import { can } from '@pb/core'
+import { can, getSettings, peekUpdateStatus } from '@pb/core'
 import { getDb, getPool } from '@pb/db'
-import { readActivity } from '@/lib/activity'
+import { readActivity, updateActivity } from '@/lib/activity'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +27,13 @@ export async function GET(request: Request): Promise<Response> {
       can(policyUser, 'library:manage'),
       trackedIds,
     )
+    // Only the people who can act on an upgrade are told about one, and only
+    // when the instance is configured to look. `peek` never waits on the
+    // network: this response is on a three-second poll.
+    if (can(policyUser, 'settings:manage') && (await getSettings(getDb())).updateChecks) {
+      const update = updateActivity(peekUpdateStatus({ currentVersion: process.env.PB_VERSION }))
+      if (update) activities.push(update)
+    }
     return Response.json({ activities }, { headers: { 'cache-control': 'private, no-store' } })
   } catch {
     return Response.json(
