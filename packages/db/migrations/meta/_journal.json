@@ -127,6 +127,13 @@
       "when": 1791380559152,
       "tag": "0017_diagnostics",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795348584796,
+      "tag": "0018_peaceful_thunderbird",
+      "breakpoints": true
     }
   ]
 }

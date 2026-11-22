@@ -13,6 +13,7 @@ import {
   getSettings,
   isLiked,
   listCollections,
+  listNotes,
   listPrints,
   listSpools,
   modelGeometrySql,
@@ -36,8 +37,17 @@ import { MoveButton } from './move-button'
 import { LikeButton } from './like-button'
 import { CollectionPicker } from './collection-picker'
 import { QueueButton } from './queue-button'
+import { ModelNotes } from './notes'
 
 export const dynamic = 'force-dynamic'
+
+/** How a linked print reads in the notes dropdown and on a note's badge. */
+const PRINT_OUTCOME: Record<string, string> = {
+  success: 'Printed',
+  failed: 'Failed print',
+  partial: 'Partial print',
+  in_progress: 'Print in progress',
+}
 
 type ModelDetail = {
   id: string
@@ -228,7 +238,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const canQueue = can(policyUser, 'request:create')
 
-  const [prints, stats, suggestions, settings, memberships, liked, queued, spools] =
+  const [prints, stats, suggestions, settings, memberships, liked, queued, spools, notes] =
     await Promise.all([
       listPrints(db, { modelId: model.id, limit: 50 }),
       printStats(db, model.id),
@@ -238,7 +248,36 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
       user ? isLiked(db, user.id, model.id) : Promise.resolve(false),
       canQueue ? openRequestsForModel(db, model.id) : Promise.resolve([]),
       canLogPrints ? listSpools(db) : Promise.resolve([]),
+      listNotes(db, model.id),
     ])
+
+  /*
+   * A note is authored, so who may change one depends on who wrote it, not on
+   * the role alone. Resolved here with the same can() the server action
+   * enforces with, so the buttons and the action cannot disagree.
+   */
+  const noteViews = notes.map((note) => ({
+    id: note.id,
+    body: note.body,
+    printRunId: note.printRunId,
+    authorName: note.authorName,
+    createdAt: note.createdAt.toISOString(),
+    updatedAt: note.updatedAt.toISOString(),
+    canManage: can(policyUser, 'note:manage', { userId: note.userId }),
+  }))
+
+  const NOTE_DATE = new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+
+  const notePrintOptions = prints.map((print) => ({
+    id: print.id,
+    label: `${PRINT_OUTCOME[print.status] ?? 'Print'} · ${NOTE_DATE.format(
+      print.startedAt ?? print.createdAt,
+    )}`,
+  }))
 
   const canCollect = can(policyUser, 'collection:edit')
   const allCollections = canCollect ? await listCollections(db) : []
@@ -462,9 +501,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           {model.notes && (
             <Card>
               <details className="p-4">
-                <summary className="cursor-pointer text-sm font-semibold">
-                  Description and notes
-                </summary>
+                <summary className="cursor-pointer text-sm font-semibold">Description</summary>
                 <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[var(--color-ink-muted)]">
                   {model.notes}
                 </p>
@@ -556,6 +593,13 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               }))}
             />
           )}
+
+          <ModelNotes
+            publicId={model.public_id}
+            notes={noteViews}
+            prints={notePrintOptions}
+            canCreate={can(policyUser, 'note:create')}
+          />
         </div>
 
         <aside className="min-w-0 space-y-4">
