@@ -7,17 +7,20 @@ import { PrintBenchMark } from '@/components/brand/logo'
 import type { Action, PolicyUser } from '@pb/core/policy'
 import { can } from '@pb/core/policy'
 import { cn } from '@/lib/cn'
-import { NAV_SECTIONS, NavLink } from './nav'
+import { NAV_SECTIONS, NavLink, type NavCounts } from './nav'
 import { UserMenu } from './user-menu'
 import { CommandTrigger } from './command-menu'
 
 export function Sidebar({
   user,
   siteName,
+  counts = {},
 }: {
   user: PolicyUser & { name: string; email: string }
   /** From settings, so an instance can be named for the shop it serves. */
   siteName: string
+  /** Pill counts by href, read on the server so they are right on first paint. */
+  counts?: NavCounts
 }) {
   const [open, setOpen] = useState(false)
 
@@ -91,7 +94,7 @@ export function Sidebar({
                 </p>
               )}
               {section.items.map((item) => (
-                <NavLink key={item.href} item={item} />
+                <NavLink key={item.href} item={item} count={counts[item.href]} />
               ))}
             </div>
           ))}

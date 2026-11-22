@@ -28,6 +28,11 @@ interface NavItemBase {
   icon: keyof typeof ICONS
   /** Hidden unless the signed-in user has this permission. */
   requires?: Action
+  /**
+   * What this item's count pill is counting, for screen readers. Lives with
+   * the nav definition so NavLink itself stays generic.
+   */
+  countLabel?: string
 }
 
 /**
@@ -62,7 +67,13 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { href: '/', label: 'Dashboard', icon: 'home' },
       { href: '/search', label: 'Search', icon: 'search' },
       { href: '/models', label: 'Models', icon: 'boxes' },
-      { href: '/queue', label: 'Print queue', icon: 'queue', requires: 'request:create' },
+      {
+        href: '/queue',
+        label: 'Print queue',
+        icon: 'queue',
+        requires: 'request:create',
+        countLabel: 'still to print',
+      },
       { href: '/upload', label: 'Upload', icon: 'upload', requires: 'file:upload' },
     ],
   },
@@ -100,7 +111,15 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
   },
 ]
 
-export function NavLink({ item }: { item: NavItem }) {
+/**
+ * Counts shown as a pill on a nav item, keyed by href.
+ *
+ * They are read on the server in the app layout and passed down, so the pill
+ * is correct on first paint and no nav item fetches anything of its own.
+ */
+export type NavCounts = Partial<Record<string, number>>
+
+export function NavLink({ item, count }: { item: NavItem; count?: number }) {
   const pathname = usePathname()
   const Icon = ICONS[item.icon]
   const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
@@ -132,6 +151,26 @@ export function NavLink({ item }: { item: NavItem }) {
     >
       <Icon className="size-4 shrink-0" />
       <span className="truncate">{item.label}</span>
+      {/* Zero is not shown: an empty queue is the normal state, and a "0" pill
+       * reads as something that needs attention. */}
+      {count != null && count > 0 && (
+        <>
+          <span
+            aria-hidden
+            className={cn(
+              'ml-auto shrink-0 rounded-full px-1.5 text-[11px] font-semibold leading-[18px] tabular-nums',
+              active
+                ? 'bg-[var(--color-accent)] text-[var(--color-surface)]'
+                : 'bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]',
+            )}
+          >
+            {count > 99 ? '99+' : count}
+          </span>
+          <span className="sr-only">
+            {count} {item.countLabel ?? 'items'}
+          </span>
+        </>
+      )}
     </Link>
   )
 }
