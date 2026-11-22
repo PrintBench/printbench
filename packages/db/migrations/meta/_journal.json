@@ -134,6 +134,13 @@
       "when": 1795348584796,
       "tag": "0018_peaceful_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795349642284,
+      "tag": "0019_daffy_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

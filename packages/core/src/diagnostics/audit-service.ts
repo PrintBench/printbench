@@ -61,6 +61,10 @@ export const AUDIT_ACTIONS = {
   'note.updated': 'Edited a note on a model',
   'note.deleted': 'Deleted a note on a model',
 
+  'photo.added': 'Added a photo to a model',
+  'photo.updated': 'Edited a photo on a model',
+  'photo.deleted': 'Deleted a photo from a model',
+
   'print.logged': 'Logged a print',
   'print.completed': 'Print completed',
   'print.updated': 'Edited a print',

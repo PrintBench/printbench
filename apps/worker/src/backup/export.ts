@@ -5,10 +5,11 @@ import { finished } from 'node:stream/promises'
 import { ZipArchive, type ArchiverError, type ZipEntryData } from 'archiver'
 import type pg from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
-import { decryptSecret } from '@pb/core'
+import { decryptSecret, getPhotoStore, isPhotoKey } from '@pb/core'
 import {
   BACKUP_FORMAT_VERSION,
   FILES_PREFIX,
+  PHOTOS_PREFIX,
   MANIFEST_ENTRY,
   SECRETS_ENTRY,
   tableEntry,
@@ -134,6 +135,27 @@ export async function writeBackup(options: ExportOptions): Promise<BackupManifes
     }
   }
 
+  /*
+   * Photographs are always included, whatever includeFiles says.
+   *
+   * That flag exists because a managed library can be tens of gigabytes of
+   * meshes the owner usually still has. Photographs are a few megabytes and
+   * exist nowhere else — leaving them out would make "restore from backup"
+   * quietly lose data, which is the one thing a backup must not do.
+   */
+  const photos = { count: 0, bytes: 0 }
+  const photoRoot = getPhotoStore().root
+  for await (const file of walk(photoRoot)) {
+    if (options.signal?.aborted) throw new Error('Backup cancelled')
+    // Anything else under the root is not ours to carry, and would be
+    // refused by the restore's key check anyway.
+    if (!isPhotoKey(file.relative)) continue
+    const entry: ZipEntryData = { name: `${PHOTOS_PREFIX}${file.relative}`, store: true }
+    archive.file(file.absolute, entry)
+    photos.count++
+    photos.bytes += file.size
+  }
+
   const manifest: BackupManifest = {
     formatVersion: BACKUP_FORMAT_VERSION,
     appVersion: options.appVersion ?? null,
@@ -142,6 +164,7 @@ export async function writeBackup(options: ExportOptions): Promise<BackupManifes
     tables,
     libraries,
     files,
+    photos,
     secrets,
   }
   // Last, because the row counts are only known once the tables are written.
