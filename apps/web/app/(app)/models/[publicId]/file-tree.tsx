@@ -110,7 +110,9 @@ function FileRow({ file, depth }: { file: TreeFile; depth: number }) {
 
       {!file.missing_at && (
         <>
-          {file.canOpenInSlicer && <OpenInSlicer fileId={file.id} filename={file.filename} />}
+          {file.canOpenInSlicer && (
+            <OpenInSlicer files={[{ id: file.id, filename: file.filename }]} compactLabel />
+          )}
 
           {file.canSendToPrinter && <SendToPrinter fileId={file.id} filename={file.filename} />}
 

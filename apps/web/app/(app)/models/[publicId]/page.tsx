@@ -36,6 +36,7 @@ import { MoveButton } from './move-button'
 import { LikeButton } from './like-button'
 import { CollectionPicker } from './collection-picker'
 import { QueueButton } from './queue-button'
+import { OpenInSlicer } from './open-in-slicer'
 
 export const dynamic = 'force-dynamic'
 
@@ -290,6 +291,17 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
    * creator supplied. Largest wins: a support-only variant is rarely the one
    * someone wants to inspect.
    */
+  /*
+   * Opening a file in a slicer is the thing most people came to do, so it
+   * belongs beside Download rather than only on a file row inside a collapsed
+   * folder. Supports and other extras are legitimate choices, so the button
+   * offers every file a slicer can take rather than guessing one.
+   */
+  const slicerFiles = files.rows
+    .filter((f) => !f.missing_at && slicersFor(f.extension).length > 0)
+    .sort((a, b) => Number(b.size) - Number(a.size))
+    .map((f) => ({ id: f.id, filename: f.filename }))
+
   const VIEWABLE = new Set(['stl', '3mf', 'obj', 'ply'])
   const viewable = files.rows
     .filter((f) => !f.missing_at && VIEWABLE.has(f.extension.toLowerCase()))
@@ -403,6 +415,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   })),
                 }}
               />
+              <OpenInSlicer files={slicerFiles} label="Open in slicer" variant="secondary" />
               <DownloadModelButton publicId={model.public_id} />
             </div>
           )
