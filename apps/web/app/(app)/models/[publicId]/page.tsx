@@ -13,6 +13,8 @@ import {
   getSettings,
   isLiked,
   listCollections,
+  listNotes,
+  listPhotos,
   listPrints,
   listSpools,
   modelGeometrySql,
@@ -20,6 +22,7 @@ import {
   printStats,
   printSuggestions,
   slicersFor,
+  MAX_PHOTOS_PER_MODEL,
 } from '@pb/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -36,8 +39,19 @@ import { MoveButton } from './move-button'
 import { LikeButton } from './like-button'
 import { CollectionPicker } from './collection-picker'
 import { QueueButton } from './queue-button'
+import { OpenInSlicer } from './open-in-slicer'
+import { ModelNotes } from './notes'
+import { ModelPhotos } from './photos'
 
 export const dynamic = 'force-dynamic'
+
+/** How a linked print reads in the notes dropdown and on a note's badge. */
+const PRINT_OUTCOME: Record<string, string> = {
+  success: 'Printed',
+  failed: 'Failed print',
+  partial: 'Partial print',
+  in_progress: 'Print in progress',
+}
 
 type ModelDetail = {
   id: string
@@ -228,7 +242,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const canQueue = can(policyUser, 'request:create')
 
-  const [prints, stats, suggestions, settings, memberships, liked, queued, spools] =
+  const [prints, stats, suggestions, settings, memberships, liked, queued, spools, notes, photos] =
     await Promise.all([
       listPrints(db, { modelId: model.id, limit: 50 }),
       printStats(db, model.id),
@@ -238,7 +252,50 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
       user ? isLiked(db, user.id, model.id) : Promise.resolve(false),
       canQueue ? openRequestsForModel(db, model.id) : Promise.resolve([]),
       canLogPrints ? listSpools(db) : Promise.resolve([]),
+      listNotes(db, model.id),
+      listPhotos(db, model.id),
     ])
+
+  /*
+   * A note is authored, so who may change one depends on who wrote it, not on
+   * the role alone. Resolved here with the same can() the server action
+   * enforces with, so the buttons and the action cannot disagree.
+   */
+  const noteViews = notes.map((note) => ({
+    id: note.id,
+    body: note.body,
+    printRunId: note.printRunId,
+    authorName: note.authorName,
+    createdAt: note.createdAt.toISOString(),
+    updatedAt: note.updatedAt.toISOString(),
+    canManage: can(policyUser, 'note:manage', { userId: note.userId }),
+  }))
+
+  const NOTE_DATE = new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+
+  const notePrintOptions = prints.map((print) => ({
+    id: print.id,
+    label: `${PRINT_OUTCOME[print.status] ?? 'Print'} · ${NOTE_DATE.format(
+      print.startedAt ?? print.createdAt,
+    )}`,
+  }))
+
+  // Same ownership rule as notes: the uploader may change their own, and only
+  // an admin may change someone else's.
+  const photoViews = photos.map((photo) => ({
+    id: photo.id,
+    caption: photo.caption,
+    printRunId: photo.printRunId,
+    uploaderName: photo.uploaderName,
+    width: photo.width,
+    height: photo.height,
+    createdAt: photo.createdAt.toISOString(),
+    canManage: can(policyUser, 'photo:manage', { userId: photo.userId }),
+  }))
 
   const canCollect = can(policyUser, 'collection:edit')
   const allCollections = canCollect ? await listCollections(db) : []
@@ -290,6 +347,17 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
    * creator supplied. Largest wins: a support-only variant is rarely the one
    * someone wants to inspect.
    */
+  /*
+   * Opening a file in a slicer is the thing most people came to do, so it
+   * belongs beside Download rather than only on a file row inside a collapsed
+   * folder. Supports and other extras are legitimate choices, so the button
+   * offers every file a slicer can take rather than guessing one.
+   */
+  const slicerFiles = files.rows
+    .filter((f) => !f.missing_at && slicersFor(f.extension).length > 0)
+    .sort((a, b) => Number(b.size) - Number(a.size))
+    .map((f) => ({ id: f.id, filename: f.filename }))
+
   const VIEWABLE = new Set(['stl', '3mf', 'obj', 'ply'])
   const viewable = files.rows
     .filter((f) => !f.missing_at && VIEWABLE.has(f.extension.toLowerCase()))
@@ -403,6 +471,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                   })),
                 }}
               />
+              <OpenInSlicer files={slicerFiles} label="Open in slicer" variant="secondary" />
               <DownloadModelButton publicId={model.public_id} />
             </div>
           )
@@ -462,9 +531,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
           {model.notes && (
             <Card>
               <details className="p-4">
-                <summary className="cursor-pointer text-sm font-semibold">
-                  Description and notes
-                </summary>
+                <summary className="cursor-pointer text-sm font-semibold">Description</summary>
                 <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[var(--color-ink-muted)]">
                   {model.notes}
                 </p>
@@ -556,6 +623,21 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               }))}
             />
           )}
+
+          <ModelPhotos
+            publicId={model.public_id}
+            photos={photoViews}
+            prints={notePrintOptions}
+            canUpload={can(policyUser, 'photo:create')}
+            full={photos.length >= MAX_PHOTOS_PER_MODEL}
+          />
+
+          <ModelNotes
+            publicId={model.public_id}
+            notes={noteViews}
+            prints={notePrintOptions}
+            canCreate={can(policyUser, 'note:create')}
+          />
         </div>
 
         <aside className="min-w-0 space-y-4">
@@ -569,10 +651,18 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
                   Library
                 </p>
-                <p className="mt-0.5 flex items-center gap-1.5">
+                {/*
+                 * A library has no page of its own: search filtered by library
+                 * id is the library, with every facet and sort already there.
+                 * The same route the library facet checkbox builds.
+                 */}
+                <Link
+                  href={`/search?library=${encodeURIComponent(model.library_id)}` as Route}
+                  className="mt-0.5 flex items-center gap-1.5 text-[var(--color-accent)] hover:underline"
+                >
                   <HardDrive className="size-3.5 text-[var(--color-ink-faint)]" />
                   {model.library_name}
-                </p>
+                </Link>
               </div>
 
               <div>

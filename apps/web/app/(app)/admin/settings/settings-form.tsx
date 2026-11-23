@@ -3,13 +3,14 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Loader2 } from 'lucide-react'
-import type { Settings } from '@pb/core'
+import type { Settings, UpdateStatus } from '@pb/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { Card, CardContent } from '@/components/ui/card'
 import { saveSettings } from './actions'
+import { UpdateStatusPanel } from './update-status'
 
 /**
  * The settings page, kept deliberately short.
@@ -18,7 +19,13 @@ import { saveSettings } from './actions'
  * with forty of them is one nobody configures correctly, so anything that
  * belongs to a single library lives on that library instead.
  */
-export function SettingsForm({ initial }: { initial: Settings }) {
+export function SettingsForm({
+  initial,
+  update,
+}: {
+  initial: Settings
+  update: UpdateStatus | null
+}) {
   const router = useRouter()
   const [values, setValues] = useState<Settings>(initial)
   const [pending, startTransition] = useTransition()
@@ -134,6 +141,21 @@ export function SettingsForm({ initial }: { initial: Settings }) {
             hint="Lets a signed-out visitor open a model you have explicitly shared. Off means the instance is entirely private."
             checked={values.publicSharing}
             onChange={(value) => set('publicSharing', value)}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <h2 className="text-sm font-semibold">Updates</h2>
+
+          <UpdateStatusPanel initial={update} enabled={values.updateChecks} />
+
+          <Toggle
+            label="Check for new versions"
+            hint="Reads the public PrintBench release feed on GitHub every few hours and says so in the corner of the screen when a newer version is out. Sends nothing about this instance or its library. Turn it off to keep the instance from making any outbound request."
+            checked={values.updateChecks}
+            onChange={(value) => set('updateChecks', value)}
           />
         </CardContent>
       </Card>

@@ -6,7 +6,7 @@ import path from 'node:path'
 import { finished } from 'node:stream/promises'
 import { ZipArchive } from 'archiver'
 import pg from 'pg'
-import { decryptSecret, encryptSecret } from '@pb/core'
+import { decryptSecret, encryptSecret, getPhotoStore, photoKey } from '@pb/core'
 import { applyMigrations, readMigrationSteps } from '@pb/db/migrations'
 import { writeBackup } from './export'
 import { BackupError, MANIFEST_ENTRY, tableEntry, type BackupManifest } from './manifest'
@@ -109,6 +109,9 @@ describe('backup and restore', { tags: ['integration'] }, () => {
   beforeAll(async () => {
     admin = new pg.Pool({ connectionString: url, max: 2 })
     work = await mkdtemp(path.join(tmpdir(), 'pb-backup-'))
+    // The photo store resolves DATA_DIR once, on first use. Set it before any
+    // export or restore runs, or these tests would write into the checkout.
+    process.env.DATA_DIR = work
     process.env.BETTER_AUTH_SECRET = 'source-instance-secret'
   })
 
@@ -116,14 +119,32 @@ describe('backup and restore', { tags: ['integration'] }, () => {
     process.env.BETTER_AUTH_SECRET = 'source-instance-secret'
   })
 
+  /*
+   * WITH (FORCE), and a budget of its own.
+   *
+   * This suite leaves a dozen or more scratch databases behind, and a plain
+   * DROP DATABASE does not fail when something is still connected — it waits,
+   * indefinitely, for that backend to go away. pool.end() above closes the
+   * clients this file owns, but a restore opens and releases connections of
+   * its own, and on a loaded runner one of them can still be shutting down
+   * when the loop reaches its database. The teardown then hangs on the first
+   * such drop and the whole file fails on a hook timeout, naming no test and
+   * pointing at nothing that is actually broken.
+   *
+   * FORCE terminates the stragglers instead of queueing behind them
+   * (Postgres 13 and later; this project requires 18). The explicit timeout is
+   * belt and braces for the honest case where fifteen drops are merely slow.
+   */
   afterAll(async () => {
     await Promise.all(pools.map((pool) => pool.end()))
-    for (const name of databases) await admin.query(`DROP DATABASE IF EXISTS ${name}`)
+    for (const name of databases) {
+      await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`)
+    }
     await admin.end()
     await rm(work, { recursive: true, force: true })
     if (originalSecret === undefined) delete process.env.BETTER_AUTH_SECRET
     else process.env.BETTER_AUTH_SECRET = originalSecret
-  })
+  }, 120_000)
 
   it('lists every column that holds an encrypted credential', async () => {
     // A new `…_encrypted` or credentials column that is not in SECRET_COLUMNS
@@ -318,6 +339,7 @@ describe('backup and restore', { tags: ['integration'] }, () => {
         ],
         libraries: [],
         files: { included: false, count: 0, bytes: 0 },
+        photos: { count: 0, bytes: 0 },
         secrets: null,
       },
       {
@@ -346,6 +368,7 @@ describe('backup and restore', { tags: ['integration'] }, () => {
       tables: [],
       libraries: [],
       files: { included: false, count: 0, bytes: 0 },
+      photos: { count: 0, bytes: 0 },
       secrets: null,
     })
     await expect(openBackup(file)).rejects.toThrow(/newer PrintBench/)
@@ -361,6 +384,7 @@ describe('backup and restore', { tags: ['integration'] }, () => {
       tables: [],
       libraries: [{ id: LIBRARY, name: 'Uploads', kind: 'managed', backend: 'local', path: '/x' }],
       files: { included: true, count: 1, bytes: 1 },
+      photos: { count: 0, bytes: 0 },
       secrets: null,
     }
 
@@ -382,6 +406,74 @@ describe('backup and restore', { tags: ['integration'] }, () => {
   })
 
   /** Builds an archive by hand, to test what a hostile or damaged upload does. */
+  /*
+   * Photographs are the one kind of file a backup must carry whatever
+   * includeFiles says: a generated thumbnail can be rendered again, and a
+   * picture of a finished print cannot. Losing them on restore would be
+   * silent data loss, which is the one thing a backup may not do.
+   */
+  it('carries photographs across and puts their files back', async () => {
+    const source = await seeded(path.join(work, 'managed-p', 'uploads'))
+    const store = getPhotoStore()
+
+    const image = Buffer.from('an image')
+    const thumb = Buffer.from('a thumbnail')
+    const imageKey = photoKey(image, 'image')
+    const thumbKey = photoKey(thumb, 'thumb')
+    await store.write(imageKey, image)
+    await store.write(thumbKey, thumb)
+
+    await source.query(
+      `INSERT INTO model_photos (model_id, caption, image_key, thumb_key, width, height, byte_size)
+       VALUES ($1, 'Came out clean', $2, $3, 800, 600, $4)`,
+      [MODEL, imageKey, thumbKey, image.byteLength],
+    )
+
+    // includeFiles stays false: photographs are not covered by that flag.
+    const { file, manifest } = await exportTo(source)
+    expect(manifest.photos.count).toBe(2)
+    expect(manifest.photos.bytes).toBe(image.byteLength + thumb.byteLength)
+
+    // As though restoring onto a different machine.
+    await store.delete(imageKey)
+    await store.delete(thumbKey)
+
+    const target = await scratch()
+    const result = await restoreBackup({
+      pool: target,
+      file,
+      managedRoot: path.join(work, 'managed-p'),
+    })
+
+    expect(result.photosRestored).toBe(2)
+    expect(await store.read(imageKey)).toEqual(image)
+    expect(await store.read(thumbKey)).toEqual(thumb)
+
+    const row = await target.query(`SELECT caption, image_key FROM model_photos`)
+    expect(row.rows).toEqual([{ caption: 'Came out clean', image_key: imageKey }])
+  })
+
+  it('refuses a photo entry that is not a generated key', async () => {
+    const steps = readMigrationSteps()
+    const manifest: BackupManifest = {
+      formatVersion: 1,
+      appVersion: 'test',
+      createdAt: new Date().toISOString(),
+      migration: { when: steps.at(-1)!.when, index: steps.length - 1 },
+      tables: [],
+      libraries: [],
+      files: { included: false, count: 0, bytes: 0 },
+      photos: { count: 1, bytes: 1 },
+      secrets: null,
+    }
+
+    for (const name of ['photos/../../escape.webp', 'photos/aa/bb/short.webp']) {
+      await expect(openBackup(await craft(manifest, { [name]: 'x' }))).rejects.toBeInstanceOf(
+        BackupError,
+      )
+    }
+  })
+
   async function craft(
     manifest: BackupManifest,
     entries: Record<string, string> = {},

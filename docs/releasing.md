@@ -68,6 +68,29 @@ update stable rolling tags. Ship stable versions in increasing version order;
 the workflow serialises release runs but does not compare against the previous
 published version.
 
+## Browser clipper release assets
+
+`npm run build:clipper` creates the Chrome/Edge ZIP and unsigned Firefox package
+in `apps/clipper/dist/`. Test the unpacked builds by loading `dist/chromium` in
+Chrome or Edge and temporarily loading `dist/firefox/manifest.json` through
+Firefox’s `about:debugging`. Firefox signing is only needed for distribution.
+
+Tagged releases attach the Chrome/Edge ZIP. For stable tags the release workflow
+also signs and attaches the Firefox XPI when `AMO_JWT_ISSUER` and
+`AMO_JWT_SECRET` are configured as GitHub Actions secrets. Use a Mozilla Add-ons
+maintainer account with access to the unlisted `clipper@printbench.app` add-on.
+The first submission may require account or add-on setup in the Mozilla developer
+hub. Provide the clipper privacy documentation and a way for reviewers to test
+the extension. Prerelease builds use the base manifest version and can be loaded
+temporarily in Firefox.
+
+If signing credentials were unavailable during the run, build the exact stable
+tag, submit `printbench-clipper-firefox-unsigned.zip` to Mozilla for unlisted
+signing, download the signed XPI, then attach it to that GitHub release as
+`printbench-clipper-firefox.xpi`. Keep a copy of the signed XPI if retrying a
+partially published release. Mozilla accepts each add-on version only once.
+See [Mozilla’s signing and distribution guide](https://extensionworkshop.com/documentation/publish/signing-and-distribution-overview/).
+
 ## After publication
 
 - Check that the workflow completed, the GitHub body matches the authored notes,

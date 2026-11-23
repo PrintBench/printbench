@@ -13,11 +13,17 @@ import { BackupError, IDENTIFIER } from './manifest'
 /**
  * Left out of every backup, and so empty after a restore.
  *
- * Sessions and verification tokens belong to browsers and emails that have no
+ * Sessions and connection or verification tokens belong to browsers and emails that have no
  * business working against a different instance. Logs and process heartbeats
  * describe the machine the backup was taken on, not the data.
  */
-export const EXCLUDED_TABLES = new Set(['session', 'verification', 'app_logs', 'process_status'])
+export const EXCLUDED_TABLES = new Set([
+  'session',
+  'verification',
+  'clipper_tokens',
+  'app_logs',
+  'process_status',
+])
 
 /**
  * Columns encrypted under BETTER_AUTH_SECRET.

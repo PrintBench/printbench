@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { ImportProviderError } from './makerworld'
+import { ImportProviderError } from './provider-error'
+import { parsePrintablesUrl } from './source-router'
 import { requestSourceJson, validateSourceRemoteUrl, type SourceResponse } from './source-network'
 import {
   sourcePlainText,
@@ -8,28 +9,8 @@ import {
   type ExternalSourceDependencies,
 } from './source-provider-types'
 
-export function parsePrintablesUrl(value: string): { sourceUrl: string; externalId: string } {
-  let url: URL
-  try {
-    url = new URL(value)
-  } catch {
-    throw new ImportProviderError('INVALID_URL', 'Enter a Printables model URL')
-  }
-  const match = url.pathname.match(/^\/(?:[a-z]{2}\/)?model\/([1-9]\d{0,15})(?:-[^/]*)?\/?$/)
-  if (
-    url.protocol !== 'https:' ||
-    !['printables.com', 'www.printables.com'].includes(url.hostname) ||
-    url.port ||
-    url.username ||
-    url.password ||
-    !match
-  )
-    throw new ImportProviderError(
-      'INVALID_URL',
-      'Only https://www.printables.com/model/ID model URLs are supported',
-    )
-  return { sourceUrl: `https://www.printables.com/model/${match[1]}`, externalId: match[1]! }
-}
+export { parsePrintablesUrl }
+
 const id = z.union([z.number().int().positive().safe(), z.string().regex(/^[1-9]\d{0,15}$/)])
 const image = z.object({ filePath: z.string().max(16384) })
 const file = z.object({ id, name: z.string().max(4096) })

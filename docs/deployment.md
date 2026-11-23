@@ -306,6 +306,24 @@ docker compose pull && docker compose up -d
 Migrations run automatically at startup, before the app accepts traffic. They
 are forward-only — take a database backup before a major version bump.
 
+### Knowing when to upgrade
+
+**System settings → Updates** shows the version this instance runs and whether a
+newer one has been released, with a **Check now** button. When a newer release
+exists, admins also see a notice in the corner of the screen, next to the usual
+scan and processing activity; dismissing it stays dismissed until the next
+release.
+
+The check reads one public, unauthenticated URL
+(`api.github.com/repos/PrintBench/printbench/releases/latest`) at most every six
+hours, and sends nothing about the instance, its library or its users — not even
+the installed version. Prereleases and drafts are ignored, and a version string
+PrintBench cannot parse (a fork, or a local build) is never reported as out of
+date.
+
+Turn **Check for new versions** off if the instance must make no outbound
+requests at all. Nothing else in the app depends on it.
+
 ---
 
 ## Health and troubleshooting

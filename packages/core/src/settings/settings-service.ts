@@ -36,6 +36,15 @@ export interface Settings {
   auditRetentionDays: number
   /** Days captured application logs are kept. */
   logRetentionDays: number
+  /**
+   * Ask GitHub whether a newer PrintBench has been released.
+   *
+   * On by default: an instance nobody tells about a security release is worse
+   * than one that reads a public release feed every few hours. It sends
+   * nothing about this instance, and an admin who wants it talking to nothing
+   * at all can turn it off here.
+   */
+  updateChecks: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -48,6 +57,7 @@ export const DEFAULT_SETTINGS: Settings = {
   writeSidecars: true,
   auditRetentionDays: 365,
   logRetentionDays: 14,
+  updateChecks: true,
 }
 
 export class SettingsValidationError extends Error {
@@ -76,6 +86,7 @@ export function validate<K extends keyof Settings>(key: K, value: unknown): Sett
     case 'publicSharing':
     case 'trackMetadataProblems':
     case 'writeSidecars':
+    case 'updateChecks':
       return Boolean(value) as Settings[K]
 
     case 'defaultRole': {

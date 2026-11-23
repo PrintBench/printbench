@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@pb/auth'
-import { getSettings } from '@pb/core'
+import { can, getSettings, queueStats } from '@pb/core'
 import { getDb } from '@pb/db'
 import { needsFirstRunSetup } from '@/lib/setup'
 import { Sidebar } from '@/components/shell/sidebar'
@@ -20,19 +20,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const { siteName } = await getSettings(getDb())
+  const db = getDb()
+  const policyUser = { id: user.id, role: user.role ?? 'viewer', banned: user.banned ?? false }
+
+  /*
+   * The queue count is read here rather than inside the nav so the pill is
+   * right on first paint and costs one query per page view, not one per nav
+   * item. It is skipped for a user who cannot see the queue link at all, and
+   * runs alongside the settings read rather than after it.
+   */
+  const [{ siteName }, queue] = await Promise.all([
+    getSettings(db),
+    can(policyUser, 'request:create') ? queueStats(db) : null,
+  ])
+
+  // Incomplete is requested plus printing: what is still to come off a
+  // printer. Done and cancelled are finished with.
+  const counts = queue ? { '/queue': queue.waiting + queue.printing } : {}
 
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
       <Sidebar
         siteName={siteName}
-        user={{
-          id: user.id,
-          role: user.role ?? 'viewer',
-          banned: user.banned ?? false,
-          name: user.name,
-          email: user.email,
-        }}
+        counts={counts}
+        user={{ ...policyUser, name: user.name, email: user.email }}
       />
       <main className="min-w-0 flex-1">
         <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">

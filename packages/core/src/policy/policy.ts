@@ -34,6 +34,10 @@ export type Action =
   | 'creator:edit'
   | 'file:upload'
   | 'print:log'
+  | 'note:create'
+  | 'note:manage'
+  | 'photo:create'
+  | 'photo:manage'
   | 'request:manage'
   // Personal, available to anyone signed in
   | 'list:manage'
@@ -74,6 +78,17 @@ const MINIMUM: Record<Action, Role> = {
   'creator:edit': ROLES.member,
   'file:upload': ROLES.member,
   'print:log': ROLES.member,
+  /*
+   * Writing a note about a shared model is curation, like logging a print, so
+   * it needs a member. Editing one is further scoped to its author below: a
+   * member may correct their own note, and only an admin may touch someone
+   * else's.
+   */
+  'note:create': ROLES.member,
+  'note:manage': ROLES.member,
+  // Photographs are authored the same way, and scoped the same way.
+  'photo:create': ROLES.member,
+  'photo:manage': ROLES.member,
   'request:manage': ROLES.member,
   'scan:trigger': ROLES.member,
   'problem:resolve': ROLES.member,
@@ -102,6 +117,17 @@ export interface OwnedResource {
   userId?: string | null
 }
 
+/**
+ * Actions where the row's owner matters as much as the role. Anyone below
+ * admin may act on their own row and no one else's.
+ */
+const OWNED: ReadonlySet<Action> = new Set([
+  'list:manage',
+  'like:toggle',
+  'note:manage',
+  'photo:manage',
+])
+
 export function can(
   user: PolicyUser | null | undefined,
   action: Action,
@@ -114,10 +140,11 @@ export function can(
   const role = normalizeRole(user.role)
   if (!role) return false
 
-  // Personal collections belong to their owner regardless of role.
-  if ((action === 'list:manage' || action === 'like:toggle') && resource) {
+  // Personal collections and authored notes belong to whoever made them,
+  // regardless of role.
+  if (OWNED.has(action) && resource) {
     if (resource.userId && resource.userId !== user.id) {
-      // Only an admin may touch someone else's list.
+      // Only an admin may touch someone else's.
       return role === ROLES.admin
     }
   }

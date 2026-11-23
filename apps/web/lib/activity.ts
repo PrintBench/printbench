@@ -1,17 +1,44 @@
 import { sql } from 'drizzle-orm'
 import type { Database } from '@pb/db'
+import type { UpdateStatus } from '@pb/core'
 import { activityJobs, JOB } from '@pb/jobs'
 import type { Db as IDatabase } from 'pg-boss'
 
 export interface Activity {
   id: string
-  kind: 'processing' | 'scan' | 'health'
-  state: 'queued' | 'running' | 'completed' | 'failed'
+  kind: 'processing' | 'scan' | 'health' | 'update'
+  /** `available` is a standing notice, not work: it has no end of its own. */
+  state: 'queued' | 'running' | 'completed' | 'failed' | 'available'
   label: string
-  href: '/models' | '/admin/libraries' | '/admin/health'
+  href: '/models' | '/admin/libraries' | '/admin/health' | '/admin/settings'
   count?: number
   failures?: number
   createdAt?: string
+  /** The release being announced, so a dismissal survives a reload. */
+  version?: string
+}
+
+/** The id is stable so one notice is reused as releases come and go. */
+export const UPDATE_ACTIVITY_ID = 'update-available'
+
+/**
+ * The "a new version is out" notice, or nothing at all.
+ *
+ * Only an upgrade someone can act on is announced: a failed check, an
+ * unreadable version and an up-to-date instance are all silence. The activity
+ * feed is read every few seconds, and a row that says nothing new would be a
+ * permanent fixture in the corner of the screen.
+ */
+export function updateActivity(status: UpdateStatus | null): Activity | null {
+  if (!status?.updateAvailable || !status.latestVersion) return null
+  return {
+    id: UPDATE_ACTIVITY_ID,
+    kind: 'update',
+    state: 'available',
+    label: `PrintBench ${status.latestVersion} is available`,
+    href: '/admin/settings',
+    version: status.latestVersion,
+  }
 }
 
 /** Model counts include every library, even when none of its cards are mounted. */

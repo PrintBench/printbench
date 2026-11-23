@@ -15,6 +15,13 @@ import { formatLogLines, listLogs, pruneLogs } from './log-service'
 import { redactSecrets } from './redact'
 
 describe('redactSecrets', () => {
+  it('scrubs clipper tokens even without an Authorization header', () => {
+    const token = 'pb_clip_' + 'a'.repeat(42) + '-'
+    expect(redactSecrets('received ' + token + ' from browser')).toBe(
+      'received [redacted] from browser',
+    )
+  })
+
   it('removes the password from a connection string', () => {
     const out = redactSecrets('connect ECONNREFUSED postgres://printbench:hunter2secret@db:5432/pb')
     expect(out).not.toContain('hunter2secret')
