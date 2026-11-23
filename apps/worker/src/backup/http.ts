@@ -189,6 +189,7 @@ export function createBackupHandler(options: BackupHttpOptions) {
         detail: {
           rows: summary.rows,
           files: summary.files.included ? summary.files.count : 'not included',
+          photos: summary.photos.count,
           credentials: summary.hasSecrets ? summary.secretCount : 'not included',
         },
       })
@@ -318,13 +319,14 @@ export function createBackupHandler(options: BackupHttpOptions) {
           backupVersion: summary.appVersion,
           rows: summary.rows,
           files: result.filesRestored,
+          photos: result.photosRestored,
           credentials: result.secretsRestored,
           thumbnailsQueued: stale.length,
         },
       })
       console.log(
         `[backup] restore finished: ${summary.rows} rows, ${result.filesRestored} files, ` +
-          `${stale.length} thumbnails queued`,
+          `${result.photosRestored} photos, ${stale.length} thumbnails queued`,
       )
       setState({ ...started, status: 'done', summary, finishedAt: new Date().toISOString() })
       await rm(file, { force: true })

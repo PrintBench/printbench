@@ -103,6 +103,14 @@ describe('can', () => {
       expect(can(member, 'note:create')).toBe(true)
     })
 
+    it('scopes an uploaded photo to whoever uploaded it', () => {
+      expect(can(member, 'photo:manage', { userId: member.id })).toBe(true)
+      expect(can(member, 'photo:manage', { userId: 'someone-else' })).toBe(false)
+      expect(can(admin, 'photo:manage', { userId: 'someone-else' })).toBe(true)
+      expect(can(viewer, 'photo:create')).toBe(false)
+      expect(can(member, 'photo:create')).toBe(true)
+    })
+
     /*
      * An orphaned note (its author's account is gone) has no owner to defer
      * to, so the role decides on its own.

@@ -14,6 +14,7 @@ import {
   isLiked,
   listCollections,
   listNotes,
+  listPhotos,
   listPrints,
   listSpools,
   modelGeometrySql,
@@ -21,6 +22,7 @@ import {
   printStats,
   printSuggestions,
   slicersFor,
+  MAX_PHOTOS_PER_MODEL,
 } from '@pb/core'
 import { PageHeader } from '@/components/shell/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,6 +41,7 @@ import { CollectionPicker } from './collection-picker'
 import { QueueButton } from './queue-button'
 import { OpenInSlicer } from './open-in-slicer'
 import { ModelNotes } from './notes'
+import { ModelPhotos } from './photos'
 
 export const dynamic = 'force-dynamic'
 
@@ -239,7 +242,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
 
   const canQueue = can(policyUser, 'request:create')
 
-  const [prints, stats, suggestions, settings, memberships, liked, queued, spools, notes] =
+  const [prints, stats, suggestions, settings, memberships, liked, queued, spools, notes, photos] =
     await Promise.all([
       listPrints(db, { modelId: model.id, limit: 50 }),
       printStats(db, model.id),
@@ -250,6 +253,7 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
       canQueue ? openRequestsForModel(db, model.id) : Promise.resolve([]),
       canLogPrints ? listSpools(db) : Promise.resolve([]),
       listNotes(db, model.id),
+      listPhotos(db, model.id),
     ])
 
   /*
@@ -278,6 +282,19 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
     label: `${PRINT_OUTCOME[print.status] ?? 'Print'} · ${NOTE_DATE.format(
       print.startedAt ?? print.createdAt,
     )}`,
+  }))
+
+  // Same ownership rule as notes: the uploader may change their own, and only
+  // an admin may change someone else's.
+  const photoViews = photos.map((photo) => ({
+    id: photo.id,
+    caption: photo.caption,
+    printRunId: photo.printRunId,
+    uploaderName: photo.uploaderName,
+    width: photo.width,
+    height: photo.height,
+    createdAt: photo.createdAt.toISOString(),
+    canManage: can(policyUser, 'photo:manage', { userId: photo.userId }),
   }))
 
   const canCollect = can(policyUser, 'collection:edit')
@@ -606,6 +623,14 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
               }))}
             />
           )}
+
+          <ModelPhotos
+            publicId={model.public_id}
+            photos={photoViews}
+            prints={notePrintOptions}
+            canUpload={can(policyUser, 'photo:create')}
+            full={photos.length >= MAX_PHOTOS_PER_MODEL}
+          />
 
           <ModelNotes
             publicId={model.public_id}

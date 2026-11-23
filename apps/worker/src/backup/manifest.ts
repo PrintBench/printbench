@@ -16,6 +16,14 @@ export const MANIFEST_ENTRY = 'manifest.json'
 export const SECRETS_ENTRY = 'secrets.json'
 export const tableEntry = (table: string) => `db/${table}.copy`
 export const FILES_PREFIX = 'files/'
+/**
+ * Uploaded photographs.
+ *
+ * Separate from FILES_PREFIX because these are not library files and are not
+ * optional: generated thumbnails are left out of a backup because they can be
+ * rendered again, and a photograph of a finished print cannot.
+ */
+export const PHOTOS_PREFIX = 'photos/'
 
 /** Lower-case SQL identifiers only, which is all this schema has ever used. */
 export const IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/
@@ -53,6 +61,13 @@ export const manifestSchema = z.object({
     count: z.number().int().nonnegative(),
     bytes: z.number().nonnegative(),
   }),
+  /* Optional so a backup taken before photographs existed still parses. */
+  photos: z
+    .object({
+      count: z.number().int().nonnegative(),
+      bytes: z.number().nonnegative(),
+    })
+    .default({ count: 0, bytes: 0 }),
   /** Present only when a passphrase was given; otherwise credentials were left out. */
   secrets: z
     .object({
@@ -85,6 +100,7 @@ export interface BackupSummary {
   rows: number
   counts: { users: number; models: number; libraries: number }
   files: BackupManifest['files']
+  photos: BackupManifest['photos']
   /** Managed libraries whose uploads are in a backup, or would need copying across. */
   managedLibraries: number
   hasSecrets: boolean
@@ -99,6 +115,7 @@ export function summarize(manifest: BackupManifest): BackupSummary {
     rows: manifest.tables.reduce((total, table) => total + table.rows, 0),
     counts: { users: rowsOf('user'), models: rowsOf('models'), libraries: rowsOf('libraries') },
     files: manifest.files,
+    photos: manifest.photos,
     managedLibraries: manifest.libraries.filter(
       (library) => library.kind === 'managed' && library.backend === 'local',
     ).length,

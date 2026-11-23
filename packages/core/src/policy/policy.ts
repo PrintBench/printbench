@@ -36,6 +36,8 @@ export type Action =
   | 'print:log'
   | 'note:create'
   | 'note:manage'
+  | 'photo:create'
+  | 'photo:manage'
   | 'request:manage'
   // Personal, available to anyone signed in
   | 'list:manage'
@@ -84,6 +86,9 @@ const MINIMUM: Record<Action, Role> = {
    */
   'note:create': ROLES.member,
   'note:manage': ROLES.member,
+  // Photographs are authored the same way, and scoped the same way.
+  'photo:create': ROLES.member,
+  'photo:manage': ROLES.member,
   'request:manage': ROLES.member,
   'scan:trigger': ROLES.member,
   'problem:resolve': ROLES.member,
@@ -116,7 +121,12 @@ export interface OwnedResource {
  * Actions where the row's owner matters as much as the role. Anyone below
  * admin may act on their own row and no one else's.
  */
-const OWNED: ReadonlySet<Action> = new Set(['list:manage', 'like:toggle', 'note:manage'])
+const OWNED: ReadonlySet<Action> = new Set([
+  'list:manage',
+  'like:toggle',
+  'note:manage',
+  'photo:manage',
+])
 
 export function can(
   user: PolicyUser | null | undefined,

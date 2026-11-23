@@ -15,6 +15,8 @@ interface Summary {
   rows: number
   counts: { users: number; models: number; libraries: number }
   files: { included: boolean; count: number; bytes: number }
+  /** Absent from a backup taken before photographs existed. */
+  photos?: { count: number; bytes: number }
   managedLibraries: number
   hasSecrets: boolean
   secretCount: number
@@ -221,6 +223,12 @@ export function RestorePanel({
               : summary.managedLibraries > 0
                 ? 'Not included. Copy the upload folders across yourself, or those models will show as missing.'
                 : 'None to include'}
+          </dd>
+          <dt className="text-[var(--color-ink-muted)]">Photos</dt>
+          <dd>
+            {summary.photos && summary.photos.count > 0
+              ? `${plural(summary.photos.count, 'image')} (${formatBytes(summary.photos.bytes)})`
+              : 'None to include'}
           </dd>
           <dt className="text-[var(--color-ink-muted)]">Credentials</dt>
           <dd>
