@@ -569,10 +569,18 @@ export default async function ModelPage({ params }: { params: Promise<{ publicId
                 <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
                   Library
                 </p>
-                <p className="mt-0.5 flex items-center gap-1.5">
+                {/*
+                 * A library has no page of its own: search filtered by library
+                 * id is the library, with every facet and sort already there.
+                 * The same route the library facet checkbox builds.
+                 */}
+                <Link
+                  href={`/search?library=${encodeURIComponent(model.library_id)}` as Route}
+                  className="mt-0.5 flex items-center gap-1.5 text-[var(--color-accent)] hover:underline"
+                >
                   <HardDrive className="size-3.5 text-[var(--color-ink-faint)]" />
                   {model.library_name}
-                </p>
+                </Link>
               </div>
 
               <div>
