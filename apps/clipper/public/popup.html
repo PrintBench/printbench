@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Send to PrintBench</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="popup.js" defer></script>
+  </head>
+  <body class="popup">
+    <main>
+      <header>
+        <h1>Send to PrintBench</h1>
+        <button id="settings" class="secondary" type="button">Settings</button>
+      </header>
+      <p id="page-note" role="status">Checking the current page…</p>
+      <form id="send-form" hidden>
+        <label for="library">Save to library</label>
+        <select id="library" required></select>
+        <button id="send" type="submit">Send to PrintBench</button>
+      </form>
+      <p id="request-error" role="alert" hidden></p>
+      <section id="latest" aria-labelledby="latest-title" hidden>
+        <h2 id="latest-title">Latest import</h2>
+        <p id="status" role="status"></p>
+        <p id="status-detail" hidden></p>
+        <div class="actions">
+          <a id="open-model" class="model-action" target="_blank" rel="noopener" hidden
+            >Open model</a
+          >
+          <a id="account-settings" target="_blank" rel="noopener" hidden>Account settings</a>
+          <button id="retry" class="secondary" type="button" hidden>Retry import</button>
+          <button id="refresh" class="secondary" type="button" hidden>Check status</button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

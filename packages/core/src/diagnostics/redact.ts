@@ -30,6 +30,7 @@ function knownSecrets(): string[] {
 
 const URL_CREDENTIALS = /([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*):([^\s@/]+)@/gi
 const BEARER = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/-]{8,}=*/g
+const CLIPPER_TOKEN = /\bpb_clip_[A-Za-z0-9_-]{43}/g
 const KEYED_VALUE =
   /((?:pass(?:word|wd)?|secret|token|cookie|authorization|api[_-]?key|access[_-]?key|signature)\w*["']?\s*[:=]\s*["']?)([^\s"',;&)}\]]{3,})/gi
 
@@ -39,5 +40,6 @@ export function redactSecrets(text: string): string {
   return out
     .replace(URL_CREDENTIALS, '$1:[redacted]@')
     .replace(BEARER, '$1 [redacted]')
+    .replace(CLIPPER_TOKEN, '[redacted]')
     .replace(KEYED_VALUE, '$1[redacted]')
 }

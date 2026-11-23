@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { ImportProviderError } from './makerworld'
+import { ImportProviderError } from './provider-error'
+import { parseThingiverseUrl } from './source-router'
 import { requestSourceJson, validateSourceRemoteUrl, type SourceResponse } from './source-network'
 import {
   sourcePlainText,
@@ -8,28 +9,7 @@ import {
   type ExternalSourceDependencies,
 } from './source-provider-types'
 
-export function parseThingiverseUrl(value: string): { sourceUrl: string; externalId: string } {
-  let url: URL
-  try {
-    url = new URL(value)
-  } catch {
-    throw new ImportProviderError('INVALID_URL', 'Enter a Thingiverse model URL')
-  }
-  const match = url.pathname.match(/^\/thing:([1-9]\d{0,15})\/?$/)
-  if (
-    url.protocol !== 'https:' ||
-    !['thingiverse.com', 'www.thingiverse.com'].includes(url.hostname) ||
-    url.port ||
-    url.username ||
-    url.password ||
-    !match
-  )
-    throw new ImportProviderError(
-      'INVALID_URL',
-      'Only https://www.thingiverse.com/thing:ID model URLs are supported',
-    )
-  return { sourceUrl: `https://www.thingiverse.com/thing:${match[1]}`, externalId: match[1]! }
-}
+export { parseThingiverseUrl }
 
 /** A user-supplied OAuth access token; never reuse a third party application's key. */
 export function normalizeThingiverseToken(value: string): string {

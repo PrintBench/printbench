@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PrintBench Clipper Settings</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="options.js" defer></script>
+  </head>
+  <body class="options">
+    <main>
+      <h1>PrintBench Clipper</h1>
+      <p id="connection-help" hidden>
+        Open <strong>Account settings → Browser clipper</strong> in PrintBench and generate a
+        connection token for this browser profile.
+      </p>
+      <form id="connect-form" hidden>
+        <label for="address">PrintBench server address</label>
+        <input id="address" type="url" placeholder="http://localhost:8080" required />
+        <label for="token">Connection token</label>
+        <input id="token" type="password" autocomplete="off" spellcheck="false" required />
+        <div class="actions">
+          <button id="connect" type="submit">Connect</button>
+        </div>
+      </form>
+      <p id="connection-status" role="status"></p>
+      <button id="disconnect" class="secondary" type="button" hidden>Disconnect</button>
+      <p id="connection-error" role="alert" hidden></p>
+      <p id="extension-version" class="extension-version"></p>
+    </main>
+  </body>
+</html>

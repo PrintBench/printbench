@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import type { Readable } from 'node:stream'
 import type { Database } from '@pb/db'
@@ -132,6 +132,33 @@ export async function saveThingiverseToken(
     })
 }
 
+function importTargetHasStorage(
+  library: Pick<typeof schema.libraries.$inferSelect, 'backend' | 'path' | 's3Bucket'>,
+): boolean {
+  return Boolean(library.backend === 'local' ? library.path : library.s3Bucket)
+}
+
+export async function listModelSourceImportTargets(db: Database) {
+  const { libraries } = schema
+  const rows = await db
+    .select({
+      id: libraries.id,
+      name: libraries.name,
+      backend: libraries.backend,
+      path: libraries.path,
+      s3Bucket: libraries.s3Bucket,
+    })
+    .from(libraries)
+    .where(
+      and(
+        eq(libraries.scanEnabled, true),
+        or(eq(libraries.kind, 'managed'), eq(libraries.allowWrites, true)),
+      ),
+    )
+    .orderBy(asc(libraries.name), asc(libraries.id))
+  return rows.filter(importTargetHasStorage).map(({ id, name, backend }) => ({ id, name, backend }))
+}
+
 export async function createMakerWorldImport(
   db: Database,
   input: { userId: string; libraryId: string; url: string },
@@ -172,7 +199,7 @@ export async function createModelSourceImport(
   if (!library || (library.kind !== 'managed' && !library.allowWrites)) {
     throw new MakerWorldImportError('That library is read-only or no longer exists.')
   }
-  if (!library.scanEnabled || (library.backend === 'local' ? !library.path : !library.s3Bucket)) {
+  if (!library.scanEnabled || !importTargetHasStorage(library)) {
     throw new MakerWorldImportError('That library needs working storage and scanning enabled.')
   }
   if (parsed.provider === 'makerworld' && !(await getMakerWorldCookieStatus(db, input.userId))) {

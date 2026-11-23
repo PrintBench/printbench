@@ -5,24 +5,10 @@ import {
   type MakerWorldRequest,
   type MakerWorldResponse,
 } from './makerworld-network'
+import { ImportProviderError } from './provider-error'
+import { parseMakerWorldUrl } from './source-router'
 
-export class ImportProviderError extends Error {
-  constructor(
-    public readonly code:
-      | 'INVALID_URL'
-      | 'INVALID_CREDENTIAL'
-      | 'AUTH_REQUIRED'
-      | 'FORBIDDEN'
-      | 'NOT_FOUND'
-      | 'RATE_LIMITED'
-      | 'UNAVAILABLE'
-      | 'INVALID_RESPONSE',
-    message: string,
-  ) {
-    super(message)
-    this.name = 'ImportProviderError'
-  }
-}
+export { ImportProviderError, parseMakerWorldUrl }
 
 export interface MakerWorldModel {
   sourceUrl: string
@@ -46,40 +32,6 @@ export interface MakerWorldDependencies {
   profileIds?: string[]
   /** Internal identity expected when resolving a downloaded project. */
   expectedModelId?: string
-}
-
-export function parseMakerWorldUrl(value: string): {
-  sourceUrl: string
-  externalId: string
-  profileId: string | null
-} {
-  let url: URL
-  try {
-    url = new URL(value)
-  } catch {
-    throw new ImportProviderError('INVALID_URL', 'Enter a MakerWorld model URL')
-  }
-  const match = url.pathname.match(
-    /^\/(?:[a-z]{2}(?:-[A-Z]{2})?\/)?models\/([1-9]\d*)(?:-[^/]*)?\/?$/,
-  )
-  if (
-    url.protocol !== 'https:' ||
-    url.hostname !== 'makerworld.com' ||
-    url.port ||
-    url.username ||
-    url.password ||
-    !match
-  ) {
-    throw new ImportProviderError(
-      'INVALID_URL',
-      'Only https://makerworld.com model URLs are supported',
-    )
-  }
-  const externalId = match[1]!
-  if (externalId.length > 16)
-    throw new ImportProviderError('INVALID_URL', 'Invalid MakerWorld model ID')
-  const profileId = url.hash.match(/^#profileId-([1-9]\d{0,15})$/)?.[1] ?? null
-  return { sourceUrl: `https://makerworld.com/en/models/${externalId}`, externalId, profileId }
 }
 
 /** Accept a user-entered token or Cookie header, discarding unrelated cookies. */
@@ -110,6 +62,7 @@ const designSchema = z.object({
   id: numericId,
   modelId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
   title: z.string().trim().min(1).max(1000),
+  titleTranslated: z.string().max(1000).nullish().catch(undefined),
   summary: z.string().max(1_000_000).nullish(),
   license: z.string().max(256).nullish(),
   tags: z.array(z.string().max(256)).max(200).default([]),
@@ -156,6 +109,11 @@ function plainText(value: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
+
+const downloadSchema = z.object({
+  url: z.string().max(16_384),
+  name: z.string().max(4096).optional(),
+})
 
 function filename(value: string | undefined, profileId: string): string {
   let decoded = value ?? ''
@@ -223,7 +181,7 @@ export async function fetchMakerWorldModel(
   const model: MakerWorldModel = {
     sourceUrl: parsedUrl.sourceUrl,
     externalId: parsedUrl.externalId,
-    title: plainText(design.title),
+    title: plainText(design.titleTranslated ?? '') || plainText(design.title),
     description: design.summary ? plainText(design.summary) : null,
     license: design.license ?? null,
     creator: design.designCreator
@@ -265,18 +223,33 @@ export async function fetchMakerWorldModel(
         'INVALID_RESPONSE',
         'MakerWorld did not provide a download profile ID',
       )
-    const response = await getMakerWorldJson(
-      `/v1/iot-service/api/user/profile/${internalId}?model_id=${encodeURIComponent(design.modelId)}`,
-      request,
-      token,
+    const cloudDownload = downloadSchema.safeParse(
+      await getMakerWorldJson(
+        `/v1/iot-service/api/user/profile/${internalId}?model_id=${encodeURIComponent(design.modelId)}`,
+        request,
+        token,
+      ),
     )
-    const download = z
-      .object({ url: z.string().max(16_384), name: z.string().max(4096).optional() })
-      .safeParse(response)
-    if (!download.success)
+    if (!cloudDownload.success)
       throw new ImportProviderError(
         'INVALID_RESPONSE',
         'MakerWorld returned an unsupported download response',
+      )
+    // Some public profiles have metadata here but only offer the 3MF through the
+    // design instance. That endpoint takes the page profile ID, not the cloud ID.
+    const download = cloudDownload.data.url.trim()
+      ? cloudDownload
+      : downloadSchema.safeParse(
+          await getMakerWorldJson(
+            `/v1/design-service/instance/${profileId}/f3mf?type=download`,
+            request,
+            token,
+          ),
+        )
+    if (!download.success || !download.data.url.trim())
+      throw new ImportProviderError(
+        'INVALID_RESPONSE',
+        'MakerWorld did not provide a 3MF download link for this print profile',
       )
     try {
       validateMakerWorldRemoteUrl(download.data.url)

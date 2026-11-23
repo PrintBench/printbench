@@ -44,9 +44,45 @@ jobs:
     permissions:
       contents: read
 
-  publish:
-    name: Publish container images and quick start
+  package-clipper:
+    name: Package browser clipper
     needs: [prepare, verify]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Build browser clipper
+        run: |
+          npm ci
+          npm run build:clipper
+          mkdir -p "$RUNNER_TEMP/browser-clipper"
+          cp apps/clipper/dist/printbench-clipper-chrome-edge.zip "$RUNNER_TEMP/browser-clipper/"
+      - name: Sign Firefox clipper for self-distribution
+        if: needs.prepare.outputs.prerelease != 'true'
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          if [[ -z "$AMO_JWT_ISSUER" || -z "$AMO_JWT_SECRET" ]]; then
+            echo "::warning::Firefox signing credentials are missing. See docs/releasing.md to attach the signed XPI."
+            exit 0
+          fi
+          npx --yes web-ext@10.8.0 sign --channel=unlisted \
+            --source-dir apps/clipper/dist/firefox \
+            --artifacts-dir "$RUNNER_TEMP/clipper-signed" \
+            --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
+          mv "$RUNNER_TEMP"/clipper-signed/*.xpi "$RUNNER_TEMP/browser-clipper/printbench-clipper-firefox.xpi"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: browser-clipper
+          path: ${{ runner.temp }}/browser-clipper/
+          if-no-files-found: error
+
+  publish:
+    name: Publish container images and release assets
+    needs: [prepare, verify, package-clipper]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the GitHub Release
@@ -55,6 +91,11 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: browser-clipper
+          path: ${{ runner.temp }}/browser-clipper
 
       - uses: docker/setup-qemu-action@v4
 
@@ -159,7 +200,11 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then
             flags=(--prerelease --latest=false)
           fi
-          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/compose.yaml" \
+          assets=("$RUNNER_TEMP/compose.yaml" "$RUNNER_TEMP/browser-clipper/printbench-clipper-chrome-edge.zip")
+          if [[ -f "$RUNNER_TEMP/browser-clipper/printbench-clipper-firefox.xpi" ]]; then
+            assets+=("$RUNNER_TEMP/browser-clipper/printbench-clipper-firefox.xpi")
+          fi
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
             --title "$GITHUB_REF_NAME" \
             --notes-file "$RELEASE_NOTES" \
             --verify-tag \

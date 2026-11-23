@@ -141,6 +141,13 @@
       "when": 1795349642284,
       "tag": "0019_daffy_ghost_rider",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795416882579,
+      "tag": "0020_perfect_sauron",
+      "breakpoints": true
     }
   ]
 }
