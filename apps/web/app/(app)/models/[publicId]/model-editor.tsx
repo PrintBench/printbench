@@ -192,7 +192,9 @@ export function ModelEditor({ publicId, initial, canEdit }: ModelEditorProps) {
               <Input value={name} onChange={(event) => setName(event.target.value)} />
             </Field>
 
-            <Field label="Notes" htmlFor="model-notes">
+            {/* The model's description. Named so since notes became a
+                separate, dated log of their own; the column stays `notes`. */}
+            <Field label="Description" htmlFor="model-notes">
               <textarea
                 id="model-notes"
                 value={notes}

@@ -57,6 +57,10 @@ export const AUDIT_ACTIONS = {
   'collection.updated': 'Renamed a collection',
   'collection.deleted': 'Deleted a collection',
 
+  'note.created': 'Wrote a note on a model',
+  'note.updated': 'Edited a note on a model',
+  'note.deleted': 'Deleted a note on a model',
+
   'print.logged': 'Logged a print',
   'print.completed': 'Print completed',
   'print.updated': 'Edited a print',

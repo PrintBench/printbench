@@ -87,6 +87,30 @@ describe('can', () => {
     it("lets an admin manage anyone's list", () => {
       expect(can(admin, 'list:manage', { userId: 'someone-else' })).toBe(true)
     })
+
+    /*
+     * A note is somebody's account of what they did. A member may correct
+     * their own; rewriting a colleague's is an administrator's call.
+     */
+    it("lets a member edit their own note but not another member's", () => {
+      expect(can(member, 'note:manage', { userId: member.id })).toBe(true)
+      expect(can(member, 'note:manage', { userId: 'someone-else' })).toBe(false)
+      expect(can(admin, 'note:manage', { userId: 'someone-else' })).toBe(true)
+    })
+
+    it("keeps note writing out of a viewer's hands", () => {
+      expect(can(viewer, 'note:create')).toBe(false)
+      expect(can(member, 'note:create')).toBe(true)
+    })
+
+    /*
+     * An orphaned note (its author's account is gone) has no owner to defer
+     * to, so the role decides on its own.
+     */
+    it('falls back to the role when a note has no author left', () => {
+      expect(can(member, 'note:manage', { userId: null })).toBe(true)
+      expect(can(viewer, 'note:manage', { userId: null })).toBe(false)
+    })
   })
 })
 
