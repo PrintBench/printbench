@@ -5,10 +5,20 @@ const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
   getPool: vi.fn(),
   readActivity: vi.fn(),
+  getSettings: vi.fn(),
+  peekUpdateStatus: vi.fn(),
 }))
 vi.mock('@pb/auth', () => ({ getSessionUser: mocks.getSessionUser }))
 vi.mock('@pb/db', () => ({ getDb: mocks.getDb, getPool: mocks.getPool }))
-vi.mock('@/lib/activity', () => ({ readActivity: mocks.readActivity }))
+vi.mock('@pb/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@pb/core')>()),
+  getSettings: mocks.getSettings,
+  peekUpdateStatus: mocks.peekUpdateStatus,
+}))
+vi.mock('@/lib/activity', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/activity')>()),
+  readActivity: mocks.readActivity,
+}))
 import { GET } from './route'
 const get = (query = '') => GET(new Request(`http://localhost/api/activity${query}`))
 
@@ -17,6 +27,8 @@ describe('global activity endpoint', () => {
     vi.clearAllMocks()
     mocks.getSessionUser.mockResolvedValue({ id: 'user', role: 'viewer' })
     mocks.readActivity.mockResolvedValue([])
+    mocks.getSettings.mockResolvedValue({ updateChecks: true })
+    mocks.peekUpdateStatus.mockReturnValue(null)
   })
   it.each([null, { id: 'user', role: 'viewer', banned: true }])(
     'rejects unauthorized users before reading work: %s',
@@ -62,5 +74,37 @@ describe('global activity endpoint', () => {
     const response = await get()
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ error: 'Could not read activity' })
+  })
+
+  /*
+   * Only the people who can act on an upgrade hear about one, and only while
+   * the instance is configured to look. Everything else is a release feed
+   * being read on behalf of someone who cannot do anything about it.
+   */
+  it('announces a new version to admins only', async () => {
+    mocks.peekUpdateStatus.mockReturnValue({
+      currentVersion: '0.7.6',
+      latestVersion: '0.9.0',
+      releaseUrl: 'https://github.com/PrintBench/printbench/releases/latest',
+      checkedAt: new Date(0).toISOString(),
+      updateAvailable: true,
+      failed: false,
+    })
+
+    mocks.getSessionUser.mockResolvedValue({ id: 'user', role: 'member' })
+    expect((await (await get()).json()).activities).toEqual([])
+    expect(mocks.peekUpdateStatus).not.toHaveBeenCalled()
+
+    mocks.getSessionUser.mockResolvedValue({ id: 'user', role: 'admin' })
+    expect((await (await get()).json()).activities).toEqual([
+      expect.objectContaining({ kind: 'update', state: 'available', version: '0.9.0' }),
+    ])
+  })
+
+  it('reads nothing when version checks are turned off', async () => {
+    mocks.getSessionUser.mockResolvedValue({ id: 'user', role: 'admin' })
+    mocks.getSettings.mockResolvedValue({ updateChecks: false })
+    expect((await (await get()).json()).activities).toEqual([])
+    expect(mocks.peekUpdateStatus).not.toHaveBeenCalled()
   })
 })

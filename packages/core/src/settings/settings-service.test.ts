@@ -57,6 +57,15 @@ describe('validation', () => {
   it('coerces truthiness for the switches', () => {
     expect(validate('publicSharing', 'on')).toBe(true)
     expect(validate('publicSharing', undefined)).toBe(false)
+    expect(validate('updateChecks', false)).toBe(false)
+  })
+
+  /*
+   * An instance that is never told about a security release is the worse
+   * failure, so the check is on until an admin decides otherwise.
+   */
+  it('checks for new versions by default', () => {
+    expect(DEFAULT_SETTINGS.updateChecks).toBe(true)
   })
 })
 

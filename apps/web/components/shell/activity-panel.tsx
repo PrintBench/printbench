@@ -3,10 +3,36 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Check, CircleAlert, LoaderCircle, X } from 'lucide-react'
+import { ArrowUpCircle, Check, CircleAlert, LoaderCircle, X } from 'lucide-react'
 import type { Activity } from '@/lib/activity'
 import { reconcileActivity, SUCCESS_HOLD_MS, type ActivityRow } from './activity-state'
 import { cn } from '@/lib/cn'
+
+/**
+ * Dismissing a new-version notice has to outlive the page.
+ *
+ * Unlike a finished scan, the notice is true until someone upgrades, so an
+ * in-memory dismissal would put it straight back on the next navigation. It is
+ * keyed by version, so the next release speaks up again.
+ */
+const UPDATE_DISMISSED_KEY = 'printbench.update-dismissed'
+
+function readDismissedUpdate(): string | null {
+  try {
+    return window.localStorage.getItem(UPDATE_DISMISSED_KEY)
+  } catch {
+    // Private mode, or storage disabled. The notice simply stays.
+    return null
+  }
+}
+
+function rememberDismissedUpdate(version: string): void {
+  try {
+    window.localStorage.setItem(UPDATE_DISMISSED_KEY, version)
+  } catch {
+    // Nothing to do: the dismissal lasts as long as this page does.
+  }
+}
 
 export function ActivityPanel() {
   const pathname = usePathname()
@@ -49,15 +75,30 @@ export function ActivityPanel() {
           return
         }
         if (!response.ok) throw new Error('Activity unavailable')
-        const { activities } = (await response.json()) as { activities: Activity[] }
+        const { activities: reported } = (await response.json()) as { activities: Activity[] }
         if (stopped) return
+        const hiddenUpdate = readDismissedUpdate()
+        const activities = reported.filter(
+          (activity) => activity.kind !== 'update' || activity.version !== hiddenUpdate,
+        )
         busy = activities.some(
           (activity) => activity.state === 'running' || activity.state === 'queued',
         )
         const time = Date.now()
         setNow(time)
         setRows((current) =>
-          reconcileActivity(current, activities, dismissed.current, startedAt.current, time),
+          reconcileActivity(
+            // A standing notice is withdrawn as soon as the server stops
+            // reporting it - once upgraded, there is nothing to announce. Work
+            // is never dropped this way: its result has to be shown.
+            activities.some((activity) => activity.kind === 'update')
+              ? current
+              : current.filter((row) => row.kind !== 'update'),
+            activities,
+            dismissed.current,
+            startedAt.current,
+            time,
+          ),
         )
         setStale(false)
       } catch {
@@ -108,6 +149,7 @@ export function ActivityPanel() {
         {rows.map((row) => {
           const failed = row.state === 'failed'
           const complete = row.state === 'completed'
+          const notice = row.state === 'available'
           const leaving = row.finishedAt !== undefined && now >= row.finishedAt + SUCCESS_HOLD_MS
           return (
             <div
@@ -121,6 +163,8 @@ export function ActivityPanel() {
                 <CircleAlert className="h-4 w-4 shrink-0 text-danger" aria-hidden="true" />
               ) : complete ? (
                 <Check className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+              ) : notice ? (
+                <ArrowUpCircle className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
               ) : (
                 <LoaderCircle
                   className="h-4 w-4 shrink-0 animate-spin text-accent motion-reduce:animate-none"
@@ -133,12 +177,13 @@ export function ActivityPanel() {
               >
                 {row.label}
               </Link>
-              {(failed || complete) && (
+              {(failed || complete || notice) && (
                 <button
                   type="button"
                   aria-label={`Dismiss: ${row.label}`}
                   className="rounded-control p-1 text-ink-muted hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent"
                   onClick={() => {
+                    if (row.kind === 'update' && row.version) rememberDismissedUpdate(row.version)
                     dismissed.current.add(row.id)
                     setRows((current) => current.filter((item) => item.id !== row.id))
                   }}

@@ -2,7 +2,40 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { sql } from 'drizzle-orm'
 import { createDb } from '@pb/db'
 import { activityJobs, JOB, JobQueue } from '@pb/jobs'
-import { readActivity } from './activity'
+import type { UpdateStatus } from '@pb/core'
+import { UPDATE_ACTIVITY_ID, readActivity, updateActivity } from './activity'
+
+const UPDATE: UpdateStatus = {
+  currentVersion: '0.7.6',
+  latestVersion: '0.9.0',
+  releaseUrl: 'https://github.com/PrintBench/printbench/releases/tag/v0.9.0',
+  checkedAt: new Date(0).toISOString(),
+  updateAvailable: true,
+  failed: false,
+}
+
+describe('the new-version notice', () => {
+  it('names the release and points at the settings page', () => {
+    expect(updateActivity(UPDATE)).toEqual({
+      id: UPDATE_ACTIVITY_ID,
+      kind: 'update',
+      state: 'available',
+      label: 'PrintBench 0.9.0 is available',
+      href: '/admin/settings',
+      version: '0.9.0',
+    })
+  })
+
+  /*
+   * The feed is polled every few seconds, so anything other than an upgrade
+   * someone can act on would become a permanent fixture on screen.
+   */
+  it('says nothing when there is nothing to do', () => {
+    expect(updateActivity(null)).toBeNull()
+    expect(updateActivity({ ...UPDATE, updateAvailable: false })).toBeNull()
+    expect(updateActivity({ ...UPDATE, latestVersion: null })).toBeNull()
+  })
+})
 
 const LIBRARY = 'ac710000-0000-4000-8000-000000000001'
 const MODEL = 'ac710000-0000-4000-8000-000000000002'

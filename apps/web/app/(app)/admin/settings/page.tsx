@@ -1,4 +1,4 @@
-import { can, getSettings } from '@pb/core'
+import { can, checkForUpdate, getSettings } from '@pb/core'
 import { getSessionUser } from '@pb/auth'
 import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
@@ -15,6 +15,13 @@ export default async function SettingsPage() {
   }
 
   const settings = await getSettings(getDb())
+  /*
+   * Cached for hours, so this is normally free; the first load after a restart
+   * waits on one bounded request. Nothing is read when the check is off.
+   */
+  const update = settings.updateChecks
+    ? await checkForUpdate({ currentVersion: process.env.PB_VERSION })
+    : null
 
   return (
     <>
@@ -22,7 +29,7 @@ export default async function SettingsPage() {
         title="System settings"
         description="Instance-wide options. Anything that belongs to one library is on that library instead."
       />
-      <SettingsForm initial={settings} />
+      <SettingsForm initial={settings} update={update} />
     </>
   )
 }

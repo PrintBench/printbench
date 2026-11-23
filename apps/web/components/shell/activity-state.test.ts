@@ -9,6 +9,14 @@ const scan: Activity = {
   label: 'Scanning…',
   href: '/admin/libraries',
 }
+const updateNotice: Activity = {
+  id: 'update-available',
+  kind: 'update',
+  state: 'available',
+  label: 'PrintBench 0.9.0 is available',
+  href: '/admin/settings',
+  version: '0.9.0',
+}
 const processing: Activity = {
   id: 'model-processing',
   kind: 'processing',
@@ -112,5 +120,25 @@ describe('global activity lifecycle', () => {
       200,
     )
     expect(finished[0]?.state).toBe('completed')
+  })
+})
+
+describe('standing notices', () => {
+  /*
+   * A new release is true until someone upgrades, so unlike a finished job the
+   * notice must not time itself out of the corner of the screen.
+   */
+  it('keeps a new-version notice indefinitely', () => {
+    const dismissed = new Set<string>()
+    const rows = reconcileActivity([], [updateNotice], dismissed, 0, 100)
+    expect(rows[0]).toMatchObject({ state: 'available', finishedAt: undefined })
+    expect(
+      reconcileActivity(rows, [updateNotice], dismissed, 0, 100 + SUCCESS_HOLD_MS + EXIT_MS),
+    ).toHaveLength(1)
+  })
+
+  it('does not bring back a notice the user dismissed', () => {
+    const dismissed = new Set(['update-available'])
+    expect(reconcileActivity([], [updateNotice], dismissed, 0, 100)).toEqual([])
   })
 })
