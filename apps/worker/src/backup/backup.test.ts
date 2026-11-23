@@ -119,14 +119,32 @@ describe('backup and restore', { tags: ['integration'] }, () => {
     process.env.BETTER_AUTH_SECRET = 'source-instance-secret'
   })
 
+  /*
+   * WITH (FORCE), and a budget of its own.
+   *
+   * This suite leaves a dozen or more scratch databases behind, and a plain
+   * DROP DATABASE does not fail when something is still connected — it waits,
+   * indefinitely, for that backend to go away. pool.end() above closes the
+   * clients this file owns, but a restore opens and releases connections of
+   * its own, and on a loaded runner one of them can still be shutting down
+   * when the loop reaches its database. The teardown then hangs on the first
+   * such drop and the whole file fails on a hook timeout, naming no test and
+   * pointing at nothing that is actually broken.
+   *
+   * FORCE terminates the stragglers instead of queueing behind them
+   * (Postgres 13 and later; this project requires 18). The explicit timeout is
+   * belt and braces for the honest case where fifteen drops are merely slow.
+   */
   afterAll(async () => {
     await Promise.all(pools.map((pool) => pool.end()))
-    for (const name of databases) await admin.query(`DROP DATABASE IF EXISTS ${name}`)
+    for (const name of databases) {
+      await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`)
+    }
     await admin.end()
     await rm(work, { recursive: true, force: true })
     if (originalSecret === undefined) delete process.env.BETTER_AUTH_SECRET
     else process.env.BETTER_AUTH_SECRET = originalSecret
-  })
+  }, 120_000)
 
   it('lists every column that holds an encrypted credential', async () => {
     // A new `…_encrypted` or credentials column that is not in SECRET_COLUMNS
