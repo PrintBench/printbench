@@ -61,6 +61,7 @@
     "verify:phase9": "tsx scripts/verify-phase9.mts",
     "verify:s3": "tsx scripts/verify-s3.mts",
     "backup": "tsx scripts/backup.mts",
+    "filaments:update": "tsx scripts/filament-catalog/update.mts",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:release && npm test",
     "test:unit": "vitest run --mode unit",
     "test:integration": "vitest run --mode integration",

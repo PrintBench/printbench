@@ -24,6 +24,8 @@ desktop.ini
 /reference/
 demo-library/
 data/
+# Except the bundled filament catalogue, which ships in the image (docs/filament-catalog.md).
+!packages/filament-catalog/data/
 
 # Local metadata backups (scripts/backup.mts). Your data, not the project.
 backups/
