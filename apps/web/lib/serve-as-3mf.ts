@@ -6,7 +6,7 @@ import {
   canOpenInSlicer,
   contentDisposition,
   createStorageAdapter,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   verifyToken,
 } from '@pb/core'
 import { readObj, readPly, readStl, writeThreeMf } from '@pb/mesh/parse'
@@ -66,7 +66,7 @@ export async function serveAs3mf(
    * exactly the illegal-Windows-filename bug this hand-off was already fixed
    * for once (see createSlicerLinks in print-actions.ts).
    */
-  const storage = createStorageAdapter(libraryLocationFromRow(row.library))
+  const storage = createStorageAdapter(await resolveLibraryLocation(getDb(), row.library))
 
   const relativePath = row.model.isFileModel
     ? row.model.path

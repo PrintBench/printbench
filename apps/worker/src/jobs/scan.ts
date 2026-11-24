@@ -3,7 +3,7 @@ import { getDb, schema } from '@pb/db'
 import {
   SYSTEM_ACTOR,
   createStorageAdapter,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   recordAudit,
   scanLibrary,
   type LibraryLocation,
@@ -43,7 +43,7 @@ export async function handleLibraryScan(
     return
   }
 
-  const location = libraryLocationFromRow(library)
+  const location = await resolveLibraryLocation(getDb(), library)
   const storage = createStorageAdapter(location)
 
   console.log(`[scan] starting ${payload.mode} scan of "${library.name}"`)

@@ -26,7 +26,7 @@ import {
   type S3Config,
 } from '../actions'
 import { FolderPicker } from './folder-picker'
-import { S3Fields } from './s3-fields'
+import { S3Fields, type ConnectionOption } from './s3-fields'
 
 type GroupingMode = 'deepest' | 'top_level' | 'flat'
 type Kind = 'in_place' | 'managed'
@@ -62,14 +62,25 @@ const MODES: { value: GroupingMode; label: string; description: string }[] = [
  * Second, only for existing files: which folder — chosen by looking at what is
  * there, not by typing a path that depends on how the container is mounted.
  */
-export function NewLibraryForm() {
+export function NewLibraryForm({
+  connections,
+  initialConnectionId,
+}: {
+  connections: ConnectionOption[]
+  /** Arriving from a connection's "Add library" goes straight to that bucket. */
+  initialConnectionId?: string
+}) {
   const router = useRouter()
 
   const [kind, setKind] = useState<Kind | null>(null)
   const [backend, setBackend] = useState<Backend | null>(null)
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
-  const [s3, setS3] = useState<S3Config>({ bucket: '' })
+  const [s3, setS3] = useState<S3Config>({
+    connectionId:
+      connections.find((connection) => connection.id === initialConnectionId)?.id ??
+      (connections.length === 1 ? connections[0]!.id : ''),
+  })
   const [mode, setMode] = useState<GroupingMode>('deepest')
   const [depth, setDepth] = useState(1)
   const [writeSidecar, setWriteSidecar] = useState(true)
@@ -87,8 +98,8 @@ export function NewLibraryForm() {
 
   async function runPreview(nextMode: GroupingMode = mode, nextDepth: number = depth) {
     if (backend === 's3') {
-      if (!s3.bucket.trim()) {
-        setError('Give the bucket a name first.')
+      if (!s3.connectionId) {
+        setError('Choose an S3 connection first.')
         return
       }
     } else if (!path) {
@@ -110,7 +121,8 @@ export function NewLibraryForm() {
       if (result.ok && !name.trim()) {
         const seed =
           backend === 's3'
-            ? s3.bucket
+            ? s3.prefix?.replace(/\/+$/, '').split('/').pop() ||
+              connections.find((connection) => connection.id === s3.connectionId)?.name
             : path
                 .replace(/[\\/]+$/, '')
                 .split(/[\\/]/)
@@ -247,7 +259,7 @@ export function NewLibraryForm() {
   /* ------------------------------------- step 2a: a library for uploads */
 
   if (kind === 'managed') {
-    const readyToCreate = name.trim() !== '' && (backend !== 's3' || s3.bucket.trim() !== '')
+    const readyToCreate = name.trim() !== '' && (backend !== 's3' || s3.connectionId !== '')
 
     return (
       <div className="max-w-3xl space-y-4">
@@ -276,6 +288,7 @@ export function NewLibraryForm() {
 
             {backend === 's3' ? (
               <S3Fields
+                connections={connections}
                 value={s3}
                 onChange={(next) => {
                   setS3(next)
@@ -312,7 +325,7 @@ export function NewLibraryForm() {
 
   /* ------------------ step 2b: point at an existing folder, or a bucket */
 
-  const ready = backend === 's3' ? Boolean(s3.bucket.trim()) : Boolean(path)
+  const ready = backend === 's3' ? Boolean(s3.connectionId) : Boolean(path)
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -329,6 +342,7 @@ export function NewLibraryForm() {
 
           {backend === 's3' ? (
             <S3Fields
+              connections={connections}
               value={s3}
               onChange={(next) => {
                 setS3(next)

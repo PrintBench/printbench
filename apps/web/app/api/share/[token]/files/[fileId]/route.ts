@@ -8,7 +8,7 @@ import {
   createStorageAdapter,
   getPreviewStore,
   getSettings,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   parseRange,
   shareTokenCoversFile,
 } from '@pb/core'
@@ -92,7 +92,7 @@ export async function GET(
   const row = rows[0]
   if (!row) return notFound()
 
-  const location = libraryLocationFromRow(row.library)
+  const location = await resolveLibraryLocation(getDb(), row.library)
   const storage = createStorageAdapter(location)
 
   const relativePath = row.model.isFileModel

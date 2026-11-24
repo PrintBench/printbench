@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { desc, sql } from 'drizzle-orm'
-import { FolderPlus, HardDrive, Lock } from 'lucide-react'
+import { desc, eq, sql } from 'drizzle-orm'
+import { Cloud, FolderPlus, HardDrive, Lock, Pencil, Upload } from 'lucide-react'
 import { getSessionUser } from '@pb/auth'
-import { can, listExclusions, nextRun } from '@pb/core'
+import { can, libraryLocationLabel, listExclusions, nextRun } from '@pb/core'
 import { getDb, schema } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
@@ -50,9 +50,14 @@ export default async function LibrariesPage() {
       scanCron: schema.libraries.scanCron,
       watchEnabled: schema.libraries.watchEnabled,
       writeSidecar: schema.libraries.writeSidecar,
+      s3Prefix: schema.libraries.s3Prefix,
+      s3ConnectionName: schema.s3Connections.name,
+      s3Bucket: schema.s3Connections.bucket,
+      s3Endpoint: schema.s3Connections.endpoint,
       createdAt: schema.libraries.createdAt,
     })
     .from(schema.libraries)
+    .leftJoin(schema.s3Connections, eq(schema.s3Connections.id, schema.libraries.s3ConnectionId))
     .orderBy(desc(schema.libraries.createdAt))
 
   // One aggregate for all libraries rather than a query per row.
@@ -121,17 +126,36 @@ export default async function LibrariesPage() {
             const stat = statsById.get(library.id)
             const run = runById.get(library.id)
             const aborted = run?.status === 'aborted'
+            /*
+             * One icon and one phrase for where the files are and what the
+             * library is for, because a path or a bucket name alone does not
+             * say whether PrintBench writes there or whose service it is.
+             */
+            const LocationIcon =
+              library.backend === 's3' ? Cloud : library.kind === 'managed' ? Upload : HardDrive
+            const location = libraryLocationLabel({
+              backend: library.backend,
+              kind: library.kind,
+              s3Endpoint: library.s3Endpoint,
+              hasS3Connection: library.s3Bucket !== null,
+            })
 
             return (
               <Card key={library.id}>
                 <CardContent className="flex flex-wrap items-start gap-4 p-5">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-surface-2)] text-[var(--color-ink-faint)]">
-                    <HardDrive className="size-5" />
+                    <LocationIcon className="size-5" />
                   </span>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="font-semibold">{library.name}</h2>
+                      <Badge
+                        tone={library.backend === 's3' && !library.s3Bucket ? 'danger' : 'accent'}
+                      >
+                        <LocationIcon className="size-3" />
+                        {location}
+                      </Badge>
                       {library.kind === 'in_place' && (
                         <Badge tone="neutral">
                           <Lock className="size-3" />
@@ -142,7 +166,11 @@ export default async function LibrariesPage() {
                     </div>
 
                     <p className="mt-0.5 truncate font-mono text-xs text-[var(--color-ink-faint)]">
-                      {library.path}
+                      {library.backend === 's3'
+                        ? library.s3Bucket
+                          ? `s3://${library.s3Bucket}/${library.s3Prefix ? `${library.s3Prefix.replace(/^\/+|\/+$/g, '')}/` : ''} · ${library.s3ConnectionName}`
+                          : 'No S3 connection. Edit the library to choose one.'
+                        : library.path}
                     </p>
 
                     <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
@@ -219,6 +247,12 @@ export default async function LibrariesPage() {
 
                   <div className="flex flex-col items-end gap-1.5">
                     <ScanButton libraryId={library.id} needsConfirmation={aborted} />
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/admin/libraries/${library.id}`}>
+                        <Pencil />
+                        Edit
+                      </Link>
+                    </Button>
                     <DeleteLibraryButton
                       libraryId={library.id}
                       name={library.name}

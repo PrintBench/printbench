@@ -3,7 +3,7 @@ import { getDb, schema } from '@pb/db'
 import {
   MoveError,
   createStorageAdapter,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   moveModelToLibrary,
 } from '@pb/core'
 import type { JobPayload } from '@pb/jobs'
@@ -64,8 +64,8 @@ export async function handleModelMove(payload: JobPayload<typeof JOB.modelMove>)
     return
   }
 
-  const source = createStorageAdapter(libraryLocationFromRow(sourceRow))
-  const destination = createStorageAdapter(libraryLocationFromRow(destinationRow))
+  const source = createStorageAdapter(await resolveLibraryLocation(getDb(), sourceRow))
+  const destination = createStorageAdapter(await resolveLibraryLocation(getDb(), destinationRow))
 
   const started = Date.now()
 

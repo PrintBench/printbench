@@ -5,7 +5,8 @@ import type { Database } from '@pb/db'
 import { schema } from '@pb/db'
 import { assertCan } from '../policy/policy'
 import { decryptSecret, encryptSecret } from '../security/secret-box'
-import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
+import { createStorageAdapter } from '../storage/factory'
+import { resolveLibraryLocation } from '../services/s3-connection-service'
 import { scanLibraryUnderLock } from '../scan/scan-service'
 import { withLibraryScanLock } from '../scan/library-scan-lock'
 import { updateModel, syncSidecar } from '../services/model-service'
@@ -133,9 +134,9 @@ export async function saveThingiverseToken(
 }
 
 function importTargetHasStorage(
-  library: Pick<typeof schema.libraries.$inferSelect, 'backend' | 'path' | 's3Bucket'>,
+  library: Pick<typeof schema.libraries.$inferSelect, 'backend' | 'path' | 's3ConnectionId'>,
 ): boolean {
-  return Boolean(library.backend === 'local' ? library.path : library.s3Bucket)
+  return Boolean(library.backend === 'local' ? library.path : library.s3ConnectionId)
 }
 
 export async function listModelSourceImportTargets(db: Database) {
@@ -146,7 +147,7 @@ export async function listModelSourceImportTargets(db: Database) {
       name: libraries.name,
       backend: libraries.backend,
       path: libraries.path,
-      s3Bucket: libraries.s3Bucket,
+      s3ConnectionId: libraries.s3ConnectionId,
     })
     .from(libraries)
     .where(
@@ -366,7 +367,7 @@ async function runMakerWorldImport(
         'This model has no supported printable files, or too many files to import.',
       )
     }
-    const storage = createStorageAdapter(libraryLocationFromRow(library))
+    const storage = createStorageAdapter(await resolveLibraryLocation(db, library))
     importStorage = storage
     // The request's UUID reserves its own folder. A retry never overwrites an
     // existing library model or treats someone else's folder as staging space.
@@ -414,7 +415,7 @@ async function runMakerWorldImport(
           published.push(file.to)
         }
         const derived: string[] = []
-        const location = { ...libraryLocationFromRow(library), groupingMode: library.groupingMode }
+        const location = { ...storage.library, groupingMode: library.groupingMode }
         const outcome = await scanLibraryUnderLock(
           { db, storage, library: location },
           {

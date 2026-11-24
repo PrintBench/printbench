@@ -28,17 +28,29 @@ export interface LibraryRow {
   backend: 'local' | 's3'
   allowWrites: boolean
   path: string | null
-  s3Bucket?: string | null
+  s3ConnectionId?: string | null
   s3Prefix?: string | null
-  s3Endpoint?: string | null
-  s3Region?: string | null
-  s3AccessKeyId?: string | null
-  s3SecretAccessKey?: string | null
-  s3ForcePathStyle?: boolean | null
+}
+
+/** The `s3_connections` columns needed to build a `LibraryLocation`. */
+export interface S3ConnectionRow {
+  bucket: string
+  endpoint: string | null
+  region: string | null
+  accessKeyId: string | null
+  /** Still encrypted, exactly as stored. */
+  secretAccessKey: string | null
+  forcePathStyle: boolean
 }
 
 /**
- * Builds a `LibraryLocation` from a `libraries` row, decrypting the S3 secret.
+ * Builds a `LibraryLocation` from a `libraries` row and, for S3, the
+ * connection it uses, decrypting the S3 secret.
+ *
+ * The connection is a required argument rather than an optional field so that
+ * every caller has to say where it comes from: a query that forgot to join
+ * `s3_connections` fails to compile instead of producing a library with no
+ * bucket that only fails once a file is asked for.
  *
  * The one place that decryption happens, so every caller reads the same
  * ciphertext the same way rather than five copies of `decryptSecret` drifting
@@ -47,19 +59,23 @@ export interface LibraryRow {
  * "work" right up until a request is actually signed, and then every call
  * fails with SignatureDoesNotMatch.
  */
-export function libraryLocationFromRow(row: LibraryRow): LibraryLocation {
+export function libraryLocationFromRow(
+  row: LibraryRow,
+  connection: S3ConnectionRow | null,
+): LibraryLocation {
+  const s3 = row.backend === 's3' ? connection : null
   return {
     id: row.id,
     kind: row.kind,
     backend: row.backend,
     allowWrites: row.allowWrites,
     path: row.path,
-    s3Bucket: row.s3Bucket,
-    s3Prefix: row.s3Prefix,
-    s3Endpoint: row.s3Endpoint,
-    s3Region: row.s3Region,
-    s3AccessKeyId: row.s3AccessKeyId,
-    s3SecretAccessKey: decryptSecret(row.s3SecretAccessKey ?? null),
-    s3ForcePathStyle: row.s3ForcePathStyle,
+    s3Bucket: s3?.bucket ?? null,
+    s3Prefix: row.s3Prefix ?? null,
+    s3Endpoint: s3?.endpoint ?? null,
+    s3Region: s3?.region ?? null,
+    s3AccessKeyId: s3?.accessKeyId ?? null,
+    s3SecretAccessKey: decryptSecret(s3?.secretAccessKey ?? null),
+    s3ForcePathStyle: s3?.forcePathStyle ?? null,
   }
 }

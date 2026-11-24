@@ -4,7 +4,8 @@ import { schema } from '@pb/db'
 import { parseMakerWorldUrl, type MakerWorldModel } from '../import/makerworld'
 import { basename, humanizeName } from '../library/paths'
 import { readPackageSidecar, readSidecar } from '../sidecar/sidecar'
-import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
+import { createStorageAdapter } from '../storage/factory'
+import { resolveLibraryLocation } from './s3-connection-service'
 import { syncSidecar, updateModel, type ModelPatch } from './model-service'
 
 /** Structural contract: core does not depend on the mesh/image decoder package. */
@@ -79,7 +80,7 @@ export async function applyEmbeddedModelMetadata(
       .limit(1)
     const row = rows[0]!
     if (!row.model.isFileModel) {
-      const storage = createStorageAdapter(libraryLocationFromRow(row.library))
+      const storage = createStorageAdapter(await resolveLibraryLocation(tx, row.library))
       const sidecar = row.model.isPackage
         ? await readPackageSidecar(storage, row.model.path)
         : await readSidecar(storage, row.model.path)

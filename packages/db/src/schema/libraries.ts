@@ -8,9 +8,41 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
 import { groupingMode, libraryKind, storageBackend } from './enums'
+
+/**
+ * One bucket and the credentials that reach it, shared by any number of
+ * libraries.
+ *
+ * Held apart from `libraries` so that one bucket carved into several libraries
+ * (by prefix) is configured once, and a key that is rotated or revoked changes
+ * in one row rather than in every library that happened to copy it.
+ *
+ * The bucket lives here rather than on the library because a connection is
+ * what an admin hands out: "this key, for that bucket". A library only picks a
+ * prefix within it.
+ */
+export const s3Connections = pgTable(
+  's3_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    bucket: text('bucket').notNull(),
+    endpoint: text('endpoint'),
+    region: text('region'),
+    /** Null for both means the SDK's own credential chain (an instance role, say). */
+    accessKeyId: text('access_key_id'),
+    /** Encrypted at rest by packages/core/security/secret-box. */
+    secretAccessKey: text('secret_access_key'),
+    forcePathStyle: boolean('force_path_style').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('s3_connections_name_idx').on(t.name)],
+)
 
 /**
  * A storage root that gets indexed. Either a directory the user already owns
@@ -28,14 +60,15 @@ export const libraries = pgTable(
     /** Absolute root path, as seen by the container. Local backend only. */
     path: text('path'),
 
-    // S3 backend. Credentials are encrypted at rest by packages/core/crypto.
-    s3Bucket: text('s3_bucket'),
+    /**
+     * S3 backend: the bucket and credentials. Restrict, not cascade or set
+     * null — removing a connection must never silently orphan a library.
+     */
+    s3ConnectionId: uuid('s3_connection_id').references(() => s3Connections.id, {
+      onDelete: 'restrict',
+    }),
+    /** S3 backend: the folder within the connection's bucket that is indexed. */
     s3Prefix: text('s3_prefix'),
-    s3Endpoint: text('s3_endpoint'),
-    s3Region: text('s3_region'),
-    s3AccessKeyId: text('s3_access_key_id'),
-    s3SecretAccessKey: text('s3_secret_access_key'),
-    s3ForcePathStyle: boolean('s3_force_path_style').notNull().default(true),
 
     /**
      * Escape hatch allowing writes into an in-place library. Off by default:
@@ -67,7 +100,10 @@ export const libraries = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('libraries_path_idx').on(t.path)],
+  (t) => [
+    index('libraries_path_idx').on(t.path),
+    index('libraries_s3_connection_idx').on(t.s3ConnectionId),
+  ],
 )
 
 /**

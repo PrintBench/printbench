@@ -13,7 +13,8 @@ import {
   writePackageSidecar,
   type SidecarContent,
 } from '../sidecar/sidecar'
-import { createStorageAdapter, libraryLocationFromRow } from '../storage/factory'
+import { createStorageAdapter } from '../storage/factory'
+import { resolveLibraryLocation } from './s3-connection-service'
 
 /**
  * Editing a model's metadata.
@@ -369,7 +370,7 @@ export async function syncSidecar(db: Database, modelId: string): Promise<boolea
   const content = await buildSidecarContent(db, modelId)
 
   const storage = createStorageAdapter({
-    ...libraryLocationFromRow(row.library),
+    ...(await resolveLibraryLocation(db, row.library)),
     // The sidecar is the one permitted exception to an in-place library being
     // read-only. It never touches the user's model files.
     allowWrites: true,

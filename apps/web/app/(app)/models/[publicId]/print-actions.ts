@@ -10,7 +10,7 @@ import {
   createStorageAdapter,
   deletePrint,
   isParsableSlicerFile,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   logPrint,
   printBelongsToModel,
   readGcodeMetadata,
@@ -274,7 +274,7 @@ export async function readSlicerSettings(
       ? row.model.path
       : `${row.model.path}/${row.file.filename}`
 
-    const storage = createStorageAdapter(libraryLocationFromRow(row.library))
+    const storage = createStorageAdapter(await resolveLibraryLocation(getDb(), row.library))
     const settings = await readGcodeMetadata(storage, relativePath, row.file.size)
 
     if (Object.keys(settings).length === 0) {

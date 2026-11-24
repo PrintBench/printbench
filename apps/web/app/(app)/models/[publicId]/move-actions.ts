@@ -8,7 +8,7 @@ import {
   assertCan,
   assertMoveAllowed,
   createStorageAdapter,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
 } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
@@ -74,7 +74,7 @@ export async function listMoveTargets(publicId: string): Promise<MoveTarget[]> {
       name: schema.libraries.name,
       backend: schema.libraries.backend,
       path: schema.libraries.path,
-      s3Bucket: schema.libraries.s3Bucket,
+      s3ConnectionId: schema.libraries.s3ConnectionId,
     })
     .from(schema.libraries)
     .where(or(eq(schema.libraries.kind, 'managed'), eq(schema.libraries.allowWrites, true)))
@@ -82,7 +82,7 @@ export async function listMoveTargets(publicId: string): Promise<MoveTarget[]> {
   const candidates = rows.filter(
     (row) =>
       row.id !== found.model.libraryId &&
-      (row.backend === 's3' ? Boolean(row.s3Bucket) : Boolean(row.path)),
+      (row.backend === 's3' ? Boolean(row.s3ConnectionId) : Boolean(row.path)),
   )
 
   if (candidates.length === 0) return []
@@ -141,8 +141,8 @@ export async function moveToLibrary(
 
     await assertMoveAllowed(
       db,
-      createStorageAdapter(libraryLocationFromRow(found.library)),
-      createStorageAdapter(libraryLocationFromRow(destinationRow)),
+      createStorageAdapter(await resolveLibraryLocation(getDb(), found.library)),
+      createStorageAdapter(await resolveLibraryLocation(getDb(), destinationRow)),
       found.model.id,
       { destinationPath },
     )

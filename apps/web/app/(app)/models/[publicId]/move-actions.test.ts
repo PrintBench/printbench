@@ -19,7 +19,7 @@ vi.mock('@pb/core', () => ({
   PolicyError: class PolicyError extends Error {},
   assertCan: vi.fn(),
   assertMoveAllowed: mocks.assertMoveAllowed,
-  libraryLocationFromRow: (row: unknown) => row,
+  resolveLibraryLocation: async (_db: unknown, row: unknown) => row,
   createStorageAdapter: (location: unknown) => location,
 }))
 vi.mock('@pb/db', async (importOriginal) => {

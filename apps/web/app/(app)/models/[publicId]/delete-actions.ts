@@ -9,7 +9,7 @@ import {
   assertCan,
   createStorageAdapter,
   deleteModelFiles,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   removeModel,
   restoreExclusion,
 } from '@pb/core'
@@ -89,7 +89,7 @@ export async function deleteFiles(publicId: string): Promise<Result> {
 
     const result = await deleteModelFiles(
       getDb(),
-      createStorageAdapter(libraryLocationFromRow(found.library)),
+      createStorageAdapter(await resolveLibraryLocation(getDb(), found.library)),
       found.model.id,
     )
 
