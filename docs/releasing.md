@@ -28,10 +28,10 @@ does not publish anything. Prepare and finish one release at a time.
    The app release note is also the source for the GitHub release body.
 5. With a migrated development/test database, run `npm run check`. Run relevant
    verification scripts and `npm run build` for changes affecting builds.
-6. Run `npm run release:check -- v<version>`. This validates the version and notes
+6. Run `npm run release:check -- v<version>`. This validates the version and notes,
    checks the bundled filament catalogue, and prints the intended image tags
-   without publishing. On a fork, set
-   `GITHUB_REPOSITORY=owner/repository` to inspect that image name.
+   without publishing. On a fork, set `GITHUB_REPOSITORY=owner/repository` to
+   inspect that image name.
 7. Commit the version, lockfile and notes together, land them on `main`, and wait
    for CI to pass. Review the release note as operator-facing documentation.
 
