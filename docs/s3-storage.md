@@ -303,8 +303,14 @@ A library's own **Edit** page changes its name, its sidecar setting and which
 connection it uses. Its bucket, prefix and grouping are fixed: every indexed
 model is recorded relative to them, so changing them would make the whole
 library look missing at the next scan. To index somewhere else, add a new
-library. **Deleting a library removes the index only**: nothing in the bucket is
-touched.
+library.
+
+When removing a library, **Keep the files** removes the index and leaves the
+bucket untouched. Uploads libraries can also use **Delete the files too** to
+delete objects under their prefix after reviewing the preview, or **Move the
+models to another library** to keep their model records in a different uploads
+library. Deletion includes unindexed objects under the prefix and preserves
+nested libraries.
 
 ### Upgrading from per-library settings
 
