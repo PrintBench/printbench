@@ -12,12 +12,17 @@ import {
   libraryRoots,
   managedRoot,
   slugify,
+  libraryRemovalOptions,
+  previewLibraryDeletion,
+  requestLibraryRemoval,
   resolveS3LibraryLocation,
   updateLibrarySettings,
   validateLibraryPath,
   walkLibrary,
   type BrowseResult,
+  type LibraryDeletionPreview,
   type LibraryLocation,
+  type LibraryRemovalRequest,
 } from '@pb/core'
 import { assertCan, assertCanTriggerScan, cronProblem, PolicyError } from '@pb/core'
 import { requireUser } from '@pb/auth'
@@ -534,30 +539,110 @@ export async function updateLibrary(
   }
 }
 
-export async function deleteLibrary(libraryId: string): Promise<Result> {
+export interface RemovalChoices {
+  canDeleteFiles: boolean
+  canMove: boolean
+  reason: string | null
+  destinations: { id: string; name: string }[]
+}
+
+/** What the remove dialog may offer for this library. */
+export async function libraryRemovalChoices(libraryId: string): Promise<RemovalChoices> {
+  try {
+    await assertAdmin()
+    return await libraryRemovalOptions(getDb(), libraryId)
+  } catch {
+    return { canDeleteFiles: false, canMove: false, reason: 'Not permitted.', destinations: [] }
+  }
+}
+
+type PreviewResponse = { ok: true; data: LibraryDeletionPreview } | { ok: false; error: string }
+
+/**
+ * What "delete the files too" would delete, counted before anything is.
+ *
+ * A listing, not a read of any file's bytes, and bounded, so it is fine here
+ * rather than in the worker; the deletion itself is not.
+ */
+export async function previewLibraryFileDeletion(libraryId: string): Promise<PreviewResponse> {
+  try {
+    await assertAdmin()
+    return await previewLibraryDeletion(getDb(), libraryId)
+  } catch (error) {
+    if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
+    console.error('[libraries] deletion preview failed:', error)
+    return {
+      ok: false,
+      error: (error instanceof Error && error.message.trim()) || 'Could not list the files.',
+    }
+  }
+}
+
+/**
+ * Removes a library: forgets it straight away, or queues the worker to delete
+ * its files or move its models first.
+ */
+export async function removeLibrary(
+  libraryId: string,
+  request: LibraryRemovalRequest,
+): Promise<Result<{ queued: boolean }>> {
   try {
     const actor = await assertAdmin()
-    // Removes the index only. The user's files are never touched.
-    const [removed] = await getDb()
-      .delete(schema.libraries)
-      .where(eq(schema.libraries.id, libraryId))
-      .returning({ name: schema.libraries.name, backend: schema.libraries.backend })
+    const db = getDb()
 
-    if (!removed) return { ok: false, error: 'That library no longer exists.' }
+    const requested = await requestLibraryRemoval(db, libraryId, request)
+    if (!requested.ok) return requested
+    const { name, backend, queued } = requested.data
 
+    if (!queued) {
+      await audit(
+        actor,
+        'library.deleted',
+        { type: 'library', id: libraryId, label: name },
+        {
+          backend,
+          files: 'kept',
+        },
+      )
+      revalidatePath('/admin/libraries')
+      revalidatePath('/admin/storage')
+      return { ok: true, data: { queued: false } }
+    }
+
+    try {
+      const queue = await getStartedQueue()
+      await queue.send(JOB.libraryRemove, { libraryId }, { singletonKey: `remove:${libraryId}` })
+    } catch (error) {
+      // Recorded on the row and then not queued would leave the library stuck
+      // as "being removed" with nothing running. Undo the mark instead.
+      console.error('[libraries] could not queue removal:', error)
+      await db
+        .update(schema.libraries)
+        .set({ removalMode: null, removalDestinationId: null, removalRequestedAt: null })
+        .where(eq(schema.libraries.id, libraryId))
+      return { ok: false, error: 'Could not queue the removal. Check the worker logs.' }
+    }
+
+    let destination: string | undefined
+    if (request.mode === 'move') {
+      const [row] = await db
+        .select({ name: schema.libraries.name })
+        .from(schema.libraries)
+        .where(eq(schema.libraries.id, request.destinationLibraryId))
+      destination = row?.name
+    }
     await audit(
       actor,
-      'library.deleted',
-      { type: 'library', id: libraryId, label: removed.name },
-      {
-        backend: removed.backend,
-      },
+      'library.removal_requested',
+      { type: 'library', id: libraryId, label: name },
+      { backend, mode: request.mode, ...(destination && { destination }) },
     )
 
     revalidatePath('/admin/libraries')
-    return { ok: true }
+    return { ok: true, data: { queued: true } }
   } catch (error) {
     if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
+    console.error('[libraries] remove failed:', error)
     return { ok: false, error: 'Could not remove the library.' }
   }
 }

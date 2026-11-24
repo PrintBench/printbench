@@ -38,6 +38,13 @@ export async function handleLibraryScan(
     return
   }
 
+  // Being removed: its files are being deleted or moved away under the scan
+  // lock, and a scan afterwards would only record them as missing.
+  if (library.removalMode) {
+    console.log(`[scan] library "${library.name}" is being removed, skipping`)
+    return
+  }
+
   if (!library.scanEnabled) {
     console.log(`[scan] library "${library.name}" has scanning disabled, skipping`)
     return

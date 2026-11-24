@@ -154,6 +154,7 @@ export async function listModelSourceImportTargets(db: Database) {
       and(
         eq(libraries.scanEnabled, true),
         or(eq(libraries.kind, 'managed'), eq(libraries.allowWrites, true)),
+        isNull(libraries.removalMode),
       ),
     )
     .orderBy(asc(libraries.name), asc(libraries.id))

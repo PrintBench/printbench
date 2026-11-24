@@ -42,6 +42,8 @@ export const AUDIT_ACTIONS = {
   'library.created': 'Added a library',
   'library.updated': 'Changed a library',
   'library.deleted': 'Deleted a library',
+  'library.removal_requested': 'Started removing a library',
+  'library.removal_stopped': 'Removing a library stopped part-way',
   'library.scan_requested': 'Requested a scan',
   'library.scan_completed': 'Scan finished',
   'library.scan_aborted': 'Scan aborted',

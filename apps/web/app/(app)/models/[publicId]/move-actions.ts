@@ -1,6 +1,6 @@
 'use server'
 
-import { eq, or } from 'drizzle-orm'
+import { and, eq, isNull, or } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import {
   MoveError,
@@ -77,7 +77,13 @@ export async function listMoveTargets(publicId: string): Promise<MoveTarget[]> {
       s3ConnectionId: schema.libraries.s3ConnectionId,
     })
     .from(schema.libraries)
-    .where(or(eq(schema.libraries.kind, 'managed'), eq(schema.libraries.allowWrites, true)))
+    .where(
+      and(
+        or(eq(schema.libraries.kind, 'managed'), eq(schema.libraries.allowWrites, true)),
+        // A library being removed takes nothing new.
+        isNull(schema.libraries.removalMode),
+      ),
+    )
 
   const candidates = rows.filter(
     (row) =>

@@ -10,6 +10,7 @@ import { z } from 'zod'
 
 export const JOB = {
   libraryScan: 'library.scan',
+  libraryRemove: 'library.remove',
   makerWorldImport: 'model.import-makerworld',
   modelIndex: 'model.index',
   modelMove: 'model.move',
@@ -38,6 +39,8 @@ export const payloads = {
      */
     restoreSidecars: z.boolean().optional(),
   }),
+  /** What to do is recorded on the library row, so the payload only names it. */
+  [JOB.libraryRemove]: z.object({ libraryId: z.string().uuid() }),
   [JOB.modelIndex]: z.object({ modelId: z.string().uuid() }),
   [JOB.modelMove]: z.object({
     modelId: z.string().uuid(),
@@ -91,6 +94,12 @@ export const JOB_OPTIONS: Record<
 > = {
   [JOB.makerWorldImport]: { concurrency: 1, priority: 9, policy: 'stately' },
   [JOB.libraryScan]: { concurrency: 1, priority: 10, policy: 'stately' },
+  /*
+   * One at a time and `stately`, like a move, and for the same reason: a
+   * replayed removal is not harmless. Deleting a bucket's contents or moving
+   * hundreds of models is also not something to run two of side by side.
+   */
+  [JOB.libraryRemove]: { concurrency: 1, priority: 11, policy: 'stately' },
   [JOB.modelIndex]: { concurrency: 4, priority: 8, policy: 'standard' },
   /*
    * One move at a time, and the highest priority of anything here.

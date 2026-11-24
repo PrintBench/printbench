@@ -215,6 +215,13 @@ async function ingest(
     console.warn(`[upload] library ${libraryId} cannot receive uploads`)
     return
   }
+  if (library.removalMode) {
+    // Its files are being deleted or moved away; anything written now would
+    // be deleted with them, or stranded once the library is gone.
+    console.warn(`[upload] refusing to write into ${library.name}, which is being removed`)
+    await rm(path.join(stagingDir, uploadId), { force: true })
+    return
+  }
   if (library.kind !== 'managed' && !library.allowWrites) {
     // The promise that in-place libraries are read-only holds for uploads too.
     console.warn(`[upload] refusing to write into read-only library ${library.name}`)

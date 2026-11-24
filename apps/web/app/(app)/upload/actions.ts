@@ -1,7 +1,7 @@
 'use server'
 
 import { createHmac } from 'node:crypto'
-import { eq, or } from 'drizzle-orm'
+import { and, eq, isNull, or } from 'drizzle-orm'
 import { PolicyError, assertCan } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
@@ -45,7 +45,13 @@ export async function listUploadTargets(): Promise<UploadTarget[]> {
       s3ConnectionId: schema.libraries.s3ConnectionId,
     })
     .from(schema.libraries)
-    .where(or(eq(schema.libraries.kind, 'managed'), eq(schema.libraries.allowWrites, true)))
+    .where(
+      and(
+        or(eq(schema.libraries.kind, 'managed'), eq(schema.libraries.allowWrites, true)),
+        // A library being removed takes nothing new.
+        isNull(schema.libraries.removalMode),
+      ),
+    )
 
   return rows
     .filter((row) => (row.backend === 's3' ? Boolean(row.s3ConnectionId) : Boolean(row.path)))

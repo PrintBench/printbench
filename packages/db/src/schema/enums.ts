@@ -10,6 +10,13 @@ export const storageBackend = pgEnum('storage_backend', ['local', 's3'])
  */
 export const libraryKind = pgEnum('library_kind', ['in_place', 'managed'])
 
+/**
+ * A removal that does more than forget the index, carried out by the worker:
+ * deleting everything under the library's folder or prefix, or moving its
+ * models into another library first.
+ */
+export const libraryRemovalMode = pgEnum('library_removal_mode', ['delete_files', 'move'])
+
 /** How a directory tree is carved into models. See packages/core/grouping.ts. */
 export const groupingMode = pgEnum('grouping_mode', ['deepest', 'top_level', 'flat'])
 
