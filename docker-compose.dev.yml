@@ -21,26 +21,29 @@ services:
   # S3-compatible storage, for exercising the S3 backend locally. Not started
   # by default — bring it up with:
   #   docker compose -f docker-compose.dev.yml --profile s3 up -d
-  # then run `npm run verify:s3`.
-  minio:
-    image: minio/minio:latest
-    container_name: printbench-dev-minio
+  # then run `npm run verify:s3`, which creates its bucket if it is missing.
+  #
+  # SeaweedFS rather than MinIO: MinIO no longer publishes images that can be
+  # pulled without an account, so that service stopped starting for anyone.
+  # Its S3 API listens on 8333 and is published on 9000, where MinIO used to
+  # be, so the verify script's default endpoint and the docs did not change.
+  # The access key and secret are both `printbench` (docker/dev-s3.json).
+  s3:
+    image: chrislusf/seaweedfs:4.55
+    container_name: printbench-dev-s3
     profiles: ['s3']
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: printbench
-      MINIO_ROOT_PASSWORD: printbench
+    command: server -dir=/data -s3 -s3.config=/etc/seaweedfs/s3.json
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '9000:8333'
     volumes:
-      - miniodata-dev:/data
+      - s3data-dev:/data
+      - ./docker/dev-s3.json:/etc/seaweedfs/s3.json:ro
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8333/healthz']
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
 volumes:
   pgdata-dev:
-  miniodata-dev:
+  s3data-dev:
