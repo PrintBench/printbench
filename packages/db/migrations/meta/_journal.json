@@ -169,6 +169,13 @@
       "when": 1795518656580,
       "tag": "0023_drop_library_s3_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795523351932,
+      "tag": "0024_library_removal",
+      "breakpoints": true
     }
   ]
 }

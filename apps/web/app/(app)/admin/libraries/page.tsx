@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { desc, eq, sql } from 'drizzle-orm'
-import { Cloud, FolderPlus, HardDrive, Lock, Pencil, Upload } from 'lucide-react'
+import { alias } from 'drizzle-orm/pg-core'
+import { Cloud, FolderPlus, HardDrive, Loader2, Lock, Pencil, Upload } from 'lucide-react'
 import { getSessionUser } from '@pb/auth'
 import { can, libraryLocationLabel, listExclusions, nextRun } from '@pb/core'
 import { getDb, schema } from '@pb/db'
@@ -38,6 +39,9 @@ export default async function LibrariesPage() {
 
   const removed = await listExclusions(db)
 
+  // The library a `move` removal is sending models into, by name.
+  const removalDestination = alias(schema.libraries, 'removal_destination')
+
   const libraries = await db
     .select({
       id: schema.libraries.id,
@@ -54,10 +58,14 @@ export default async function LibrariesPage() {
       s3ConnectionName: schema.s3Connections.name,
       s3Bucket: schema.s3Connections.bucket,
       s3Endpoint: schema.s3Connections.endpoint,
+      removalMode: schema.libraries.removalMode,
+      removalError: schema.libraries.removalError,
+      removalDestinationName: removalDestination.name,
       createdAt: schema.libraries.createdAt,
     })
     .from(schema.libraries)
     .leftJoin(schema.s3Connections, eq(schema.s3Connections.id, schema.libraries.s3ConnectionId))
+    .leftJoin(removalDestination, eq(removalDestination.id, schema.libraries.removalDestinationId))
     .orderBy(desc(schema.libraries.createdAt))
 
   // One aggregate for all libraries rather than a query per row.
@@ -218,6 +226,12 @@ export default async function LibrariesPage() {
                       />
                     </div>
 
+                    {library.removalError && (
+                      <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+                        {library.removalError}
+                      </p>
+                    )}
+
                     {run && (
                       <p
                         className={
@@ -245,21 +259,35 @@ export default async function LibrariesPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-col items-end gap-1.5">
-                    <ScanButton libraryId={library.id} needsConfirmation={aborted} />
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/admin/libraries/${library.id}`}>
-                        <Pencil />
-                        Edit
-                      </Link>
-                    </Button>
-                    <DeleteLibraryButton
-                      libraryId={library.id}
-                      name={library.name}
-                      modelCount={stat?.models ?? 0}
-                      writesSidecars={library.writeSidecar}
-                    />
-                  </div>
+                  {library.removalMode ? (
+                    /*
+                     * The worker is deleting or moving everything; scanning,
+                     * editing or removing it again meanwhile would only race
+                     * that. The model count above falls as models move out.
+                     */
+                    <p className="flex max-w-56 items-start gap-2 text-sm text-[var(--color-ink-muted)]">
+                      <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+                      {library.removalMode === 'delete_files'
+                        ? 'Deleting its files, then removing it.'
+                        : `Moving its models into ${library.removalDestinationName ?? 'another library'}, then removing it.`}
+                    </p>
+                  ) : (
+                    <div className="flex flex-col items-end gap-1.5">
+                      <ScanButton libraryId={library.id} needsConfirmation={aborted} />
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/admin/libraries/${library.id}`}>
+                          <Pencil />
+                          Edit
+                        </Link>
+                      </Button>
+                      <DeleteLibraryButton
+                        libraryId={library.id}
+                        name={library.name}
+                        modelCount={stat?.models ?? 0}
+                        writesSidecars={library.writeSidecar}
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )

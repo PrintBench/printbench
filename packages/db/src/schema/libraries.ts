@@ -10,8 +10,9 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
-import { groupingMode, libraryKind, storageBackend } from './enums'
+import { groupingMode, libraryKind, libraryRemovalMode, storageBackend } from './enums'
 
 /**
  * One bucket and the credentials that reach it, shared by any number of
@@ -93,6 +94,22 @@ export const libraries = pgTable(
 
     groupingMode: groupingMode('grouping_mode').notNull().default('deepest'),
     groupingDepth: integer('grouping_depth'),
+
+    /**
+     * Set while the worker is removing this library: deleting its files, or
+     * moving its models elsewhere first. Scans, uploads and moves skip a
+     * library in this state. Cleared again if the removal stops part-way,
+     * with the reason in `removalError`; the row itself goes once it succeeds.
+     */
+    removalMode: libraryRemovalMode('removal_mode'),
+    /** Where a `move` removal sends the models. */
+    removalDestinationId: uuid('removal_destination_id').references(
+      (): AnyPgColumn => libraries.id,
+      { onDelete: 'set null' },
+    ),
+    removalRequestedAt: timestamp('removal_requested_at', { withTimezone: true }),
+    /** Why the last removal stopped before finishing, for the admin to act on. */
+    removalError: text('removal_error'),
 
     /** Meshes are Z-up by convention; some sources are Y-up. Per-file overridable. */
     defaultYUp: boolean('default_y_up').notNull().default(false),

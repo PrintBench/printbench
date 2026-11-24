@@ -64,6 +64,14 @@ export async function handleModelMove(payload: JobPayload<typeof JOB.modelMove>)
     return
   }
 
+  if (sourceRow.removalMode || destinationRow.removalMode) {
+    // The library's own removal moves its models; a separate move racing it
+    // would be moving files out from under the deletion or into a library
+    // that is about to go.
+    console.warn(`[move] skipping ${payload.modelId}: a library involved is being removed`)
+    return
+  }
+
   const source = createStorageAdapter(await resolveLibraryLocation(getDb(), sourceRow))
   const destination = createStorageAdapter(await resolveLibraryLocation(getDb(), destinationRow))
 
