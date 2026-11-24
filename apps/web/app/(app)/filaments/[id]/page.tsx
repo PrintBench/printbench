@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getSessionUser } from '@pb/auth'
-import { can, listFilaments, listSpools, spoolHistory, spoolPrints } from '@pb/core'
+import { can, catalogPicks, listFilaments, listSpools, spoolHistory, spoolPrints } from '@pb/core'
 import { getDb } from '@pb/db'
 import { NotPermitted } from '@/components/shell/not-permitted'
 import { PageHeader } from '@/components/shell/page-header'
@@ -15,10 +15,13 @@ export default async function SpoolPage({ params }: { params: Promise<{ id: stri
   const spools = await listSpools(getDb())
   const spool = spools.find((s) => s.id === id)
   if (!spool) notFound()
-  const [history, filaments, prints] = await Promise.all([
+  const [history, filaments, prints, catalogEntry] = await Promise.all([
     spoolHistory(getDb(), id),
     listFilaments(getDb()),
     spoolPrints(getDb(), id),
+    spool.filament.catalogVariantUuid
+      ? catalogPicks(getDb(), [spool.filament.catalogVariantUuid]).then((p) => p[0] ?? null)
+      : null,
   ])
   return (
     <>
@@ -36,6 +39,7 @@ export default async function SpoolPage({ params }: { params: Promise<{ id: stri
         filaments={filaments}
         history={history}
         prints={prints}
+        catalogEntry={catalogEntry}
         canManage={can(user, 'filament:manage')}
       />
     </>

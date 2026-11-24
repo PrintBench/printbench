@@ -8,7 +8,10 @@ import {
   editFilament,
   editSpool,
   measureSpool,
+  pickerSearch,
+  refreshFilamentFromCatalog,
   remainingFromMeasurement,
+  type CatalogPick,
   type FilamentInput,
   type SpoolInput,
 } from '@pb/core'
@@ -40,6 +43,15 @@ export async function saveSpool(id: string, input: SpoolInput): Promise<Result> 
 }
 export async function saveFilament(id: string, input: FilamentInput): Promise<Result> {
   return manage(() => editFilament(getDb(), id, input))
+}
+export async function refreshFromCatalog(filamentId: string): Promise<Result> {
+  return manage(() => refreshFilamentFromCatalog(getDb(), filamentId))
+}
+/** The spool form's "find in catalogue" box. Reads Postgres only; never leaves the server. */
+export async function findInCatalog(query: string): Promise<CatalogPick[]> {
+  const user = await requireUser()
+  assertCan(user, 'filament:view')
+  return pickerSearch(getDb(), String(query ?? ''))
 }
 export async function setSpoolArchived(id: string, archived: boolean): Promise<Result> {
   return manage(() => archiveSpool(getDb(), id, archived))
