@@ -4,6 +4,8 @@
 # Debian slim rather than Alpine — sharp's prebuilt binaries are glibc-linked,
 # and fighting musl to save a few MB is a false economy.
 
+FROM golang:1.26.11-alpine AS go-toolchain
+
 # ---- deps ------------------------------------------------------------------
 FROM node:26-slim AS deps
 WORKDIR /app
@@ -17,6 +19,33 @@ COPY packages/mesh/package.json packages/mesh/
 COPY packages/jobs/package.json packages/jobs/
 COPY packages/auth/package.json packages/auth/
 RUN --mount=type=cache,target=/root/.npm npm ci
+
+# tsx and development tools bring their own esbuild versions. Rebuild each
+# one with the patched Go standard library and keep the JS wrapper versions.
+RUN --mount=type=bind,from=go-toolchain,source=/usr/local/go,target=/usr/local/go \
+    --mount=type=bind,from=go-toolchain,source=/etc/ssl/certs/ca-certificates.crt,target=/tmp/go-ca-certificates.crt \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/root/go/pkg/mod <<'SH'
+set -eu
+export PATH="/usr/local/go/bin:$PATH" GOTOOLCHAIN=local CGO_ENABLED=0
+export SSL_CERT_FILE=/tmp/go-ca-certificates.crt
+build_dir=$(mktemp -d)
+trap 'rm -rf "$build_dir"' EXIT
+
+# npm installs both a CLI and a platform-specific binary beneath node_modules.
+find node_modules -type f -path '*/bin/esbuild' -exec sh -ec '
+  build_dir=$1
+  shift
+  for binary do
+    version=$("$binary" --version)
+    rebuilt="$build_dir/$version/esbuild"
+    if [ ! -x "$rebuilt" ]; then
+      GOBIN="$build_dir/$version" go install -trimpath -ldflags="-s -w" "github.com/evanw/esbuild/cmd/esbuild@v$version"
+    fi
+    install -m 0755 "$rebuilt" "$binary"
+  done
+' sh "$build_dir" {} +
+SH
 
 # ---- build -----------------------------------------------------------------
 FROM node:26-slim AS build
