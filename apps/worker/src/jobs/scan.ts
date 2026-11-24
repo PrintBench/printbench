@@ -3,7 +3,7 @@ import { getDb, schema } from '@pb/db'
 import {
   SYSTEM_ACTOR,
   createStorageAdapter,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   recordAudit,
   scanLibrary,
   type LibraryLocation,
@@ -38,12 +38,19 @@ export async function handleLibraryScan(
     return
   }
 
+  // Being removed: its files are being deleted or moved away under the scan
+  // lock, and a scan afterwards would only record them as missing.
+  if (library.removalMode) {
+    console.log(`[scan] library "${library.name}" is being removed, skipping`)
+    return
+  }
+
   if (!library.scanEnabled) {
     console.log(`[scan] library "${library.name}" has scanning disabled, skipping`)
     return
   }
 
-  const location = libraryLocationFromRow(library)
+  const location = await resolveLibraryLocation(getDb(), library)
   const storage = createStorageAdapter(location)
 
   console.log(`[scan] starting ${payload.mode} scan of "${library.name}"`)

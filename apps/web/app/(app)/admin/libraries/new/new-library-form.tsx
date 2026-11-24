@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
+  ArrowLeft,
   Boxes,
   Check,
   Cloud,
@@ -26,7 +28,33 @@ import {
   type S3Config,
 } from '../actions'
 import { FolderPicker } from './folder-picker'
-import { S3Fields } from './s3-fields'
+import { S3Fields, type ConnectionOption } from './s3-fields'
+
+/**
+ * The top of every step: what it asks on the left, and how to leave it on the
+ * right. Kept identical at each step so Back and Cancel never have to be
+ * looked for. They used to sit above the options on one step, below them on
+ * another, and beside the submit button on a third. The step's own action
+ * (Create, Add) stays at the end of its form, where filling it in finishes.
+ */
+function StepHeader({ title, onBack }: { title: string; onBack?: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <h2 className="text-sm font-medium">{title}</h2>
+      <div className="flex gap-1">
+        {onBack && (
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft />
+            Back
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/admin/libraries">Cancel</Link>
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 type GroupingMode = 'deepest' | 'top_level' | 'flat'
 type Kind = 'in_place' | 'managed'
@@ -62,14 +90,25 @@ const MODES: { value: GroupingMode; label: string; description: string }[] = [
  * Second, only for existing files: which folder — chosen by looking at what is
  * there, not by typing a path that depends on how the container is mounted.
  */
-export function NewLibraryForm() {
+export function NewLibraryForm({
+  connections,
+  initialConnectionId,
+}: {
+  connections: ConnectionOption[]
+  /** Arriving from a connection's "Add library" goes straight to that bucket. */
+  initialConnectionId?: string
+}) {
   const router = useRouter()
 
   const [kind, setKind] = useState<Kind | null>(null)
   const [backend, setBackend] = useState<Backend | null>(null)
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
-  const [s3, setS3] = useState<S3Config>({ bucket: '' })
+  const [s3, setS3] = useState<S3Config>({
+    connectionId:
+      connections.find((connection) => connection.id === initialConnectionId)?.id ??
+      (connections.length === 1 ? connections[0]!.id : ''),
+  })
   const [mode, setMode] = useState<GroupingMode>('deepest')
   const [depth, setDepth] = useState(1)
   const [writeSidecar, setWriteSidecar] = useState(true)
@@ -87,8 +126,8 @@ export function NewLibraryForm() {
 
   async function runPreview(nextMode: GroupingMode = mode, nextDepth: number = depth) {
     if (backend === 's3') {
-      if (!s3.bucket.trim()) {
-        setError('Give the bucket a name first.')
+      if (!s3.connectionId) {
+        setError('Choose an S3 connection first.')
         return
       }
     } else if (!path) {
@@ -110,7 +149,8 @@ export function NewLibraryForm() {
       if (result.ok && !name.trim()) {
         const seed =
           backend === 's3'
-            ? s3.bucket
+            ? s3.prefix?.replace(/\/+$/, '').split('/').pop() ||
+              connections.find((connection) => connection.id === s3.connectionId)?.name
             : path
                 .replace(/[\\/]+$/, '')
                 .split(/[\\/]/)
@@ -154,7 +194,7 @@ export function NewLibraryForm() {
   if (kind === null) {
     return (
       <div className="max-w-3xl space-y-4">
-        <p className="text-sm text-[var(--color-ink-muted)]">What is this library for?</p>
+        <StepHeader title="What is this library for?" />
 
         <div className="grid gap-3 sm:grid-cols-2">
           <button
@@ -189,10 +229,6 @@ export function NewLibraryForm() {
             </p>
           </button>
         </div>
-
-        <Button variant="ghost" onClick={() => router.push('/admin/libraries')}>
-          Cancel
-        </Button>
       </div>
     )
   }
@@ -202,14 +238,10 @@ export function NewLibraryForm() {
   if (backend === null) {
     return (
       <div className="max-w-3xl space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-[var(--color-ink-muted)]">
-            {kind === 'managed' ? 'Where should uploads be stored?' : 'Where are these files?'}
-          </p>
-          <Button variant="ghost" size="sm" onClick={() => setKind(null)}>
-            Back
-          </Button>
-        </div>
+        <StepHeader
+          title={kind === 'managed' ? 'Where should uploads be stored?' : 'Where are these files?'}
+          onBack={() => setKind(null)}
+        />
 
         <div className="grid gap-3 sm:grid-cols-2">
           <button
@@ -247,10 +279,15 @@ export function NewLibraryForm() {
   /* ------------------------------------- step 2a: a library for uploads */
 
   if (kind === 'managed') {
-    const readyToCreate = name.trim() !== '' && (backend !== 's3' || s3.bucket.trim() !== '')
+    const readyToCreate = name.trim() !== '' && (backend !== 's3' || s3.connectionId !== '')
 
     return (
       <div className="max-w-3xl space-y-4">
+        <StepHeader
+          title={backend === 's3' ? 'Choose the bucket for uploads' : 'Name the uploads library'}
+          onBack={() => setBackend(null)}
+        />
+
         <Card>
           <CardContent className="space-y-4 p-5">
             <p className="flex items-start gap-2 text-sm text-[var(--color-ink-muted)]">
@@ -276,6 +313,7 @@ export function NewLibraryForm() {
 
             {backend === 's3' ? (
               <S3Fields
+                connections={connections}
                 value={s3}
                 onChange={(next) => {
                   setS3(next)
@@ -296,10 +334,7 @@ export function NewLibraryForm() {
               </p>
             )}
 
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={() => setBackend(null)}>
-                Back
-              </Button>
+            <div className="flex justify-end pt-1">
               <Button disabled={saving || !readyToCreate} onClick={save}>
                 {saving ? 'Creating…' : 'Create library'}
               </Button>
@@ -312,23 +347,20 @@ export function NewLibraryForm() {
 
   /* ------------------ step 2b: point at an existing folder, or a bucket */
 
-  const ready = backend === 's3' ? Boolean(s3.bucket.trim()) : Boolean(path)
+  const ready = backend === 's3' ? Boolean(s3.connectionId) : Boolean(path)
 
   return (
     <div className="max-w-3xl space-y-6">
+      <StepHeader
+        title={backend === 's3' ? 'Connect the bucket' : 'Choose the folder holding your models'}
+        onBack={() => setBackend(null)}
+      />
+
       <Card>
         <CardContent className="space-y-4 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">
-              {backend === 's3' ? 'Connect the bucket' : 'Choose the folder holding your models'}
-            </p>
-            <Button variant="ghost" size="sm" onClick={() => setBackend(null)}>
-              Back
-            </Button>
-          </div>
-
           {backend === 's3' ? (
             <S3Fields
+              connections={connections}
               value={s3}
               onChange={(next) => {
                 setS3(next)
@@ -504,10 +536,7 @@ export function NewLibraryForm() {
               </span>
             </label>
 
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={() => router.push('/admin/libraries')}>
-                Cancel
-              </Button>
+            <div className="flex justify-end pt-1">
               <Button disabled={saving || !name.trim()} onClick={save}>
                 {saving ? 'Adding…' : 'Add library'}
               </Button>

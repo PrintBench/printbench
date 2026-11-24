@@ -49,34 +49,80 @@ describe('createStorageAdapter', () => {
 })
 
 describe('libraryLocationFromRow', () => {
+  const connection = {
+    bucket: 'prints',
+    endpoint: 'https://minio.example.com',
+    region: 'eu-west-2',
+    accessKeyId: 'AKIA',
+    secretAccessKey: null as string | null,
+    forcePathStyle: true,
+  }
+
   it('never hands the ciphertext to the S3 client', () => {
     process.env.BETTER_AUTH_SECRET ??= SECRET
     const secret = process.env.BETTER_AUTH_SECRET
 
     const ciphertext = encryptSecret('shh-its-a-secret', secret)
-    const location = libraryLocationFromRow({
-      id: 'lib-1',
-      kind: 'in_place',
-      backend: 's3',
-      allowWrites: false,
-      path: null,
-      s3Bucket: 'prints',
-      s3SecretAccessKey: ciphertext,
-    })
+    const location = libraryLocationFromRow(
+      {
+        id: 'lib-1',
+        kind: 'in_place',
+        backend: 's3',
+        allowWrites: false,
+        path: null,
+      },
+      { ...connection, secretAccessKey: ciphertext },
+    )
 
     expect(location.s3SecretAccessKey).toBe('shh-its-a-secret')
     expect(location.s3SecretAccessKey).not.toBe(ciphertext)
   })
 
-  it('passes local libraries through untouched', () => {
-    const location = libraryLocationFromRow({
-      id: 'lib-1',
-      kind: 'in_place',
-      backend: 'local',
-      allowWrites: false,
-      path: '/libraries/prints',
+  it('takes the bucket and credentials from the connection and the prefix from the library', () => {
+    const location = libraryLocationFromRow(
+      {
+        id: 'lib-1',
+        kind: 'managed',
+        backend: 's3',
+        allowWrites: true,
+        path: null,
+        s3Prefix: 'models',
+      },
+      connection,
+    )
+
+    expect(location).toMatchObject({
+      s3Bucket: 'prints',
+      s3Prefix: 'models',
+      s3Endpoint: 'https://minio.example.com',
+      s3Region: 'eu-west-2',
+      s3AccessKeyId: 'AKIA',
+      s3ForcePathStyle: true,
     })
+  })
+
+  it('leaves an S3 library with no connection without a bucket, so the adapter refuses it', () => {
+    const location = libraryLocationFromRow(
+      { id: 'lib-1', kind: 'in_place', backend: 's3', allowWrites: false, path: null },
+      null,
+    )
+    expect(location.s3Bucket).toBeNull()
+    expect(() => createStorageAdapter(location)).toThrow(/no bucket/i)
+  })
+
+  it('passes local libraries through untouched, ignoring any connection', () => {
+    const location = libraryLocationFromRow(
+      {
+        id: 'lib-1',
+        kind: 'in_place',
+        backend: 'local',
+        allowWrites: false,
+        path: '/libraries/prints',
+      },
+      connection,
+    )
     expect(location.path).toBe('/libraries/prints')
+    expect(location.s3Bucket).toBeNull()
     expect(location.s3SecretAccessKey).toBeNull()
   })
 })

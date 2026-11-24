@@ -3,7 +3,7 @@ import { getDb, schema } from '@pb/db'
 import {
   MoveError,
   createStorageAdapter,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   moveModelToLibrary,
 } from '@pb/core'
 import type { JobPayload } from '@pb/jobs'
@@ -64,8 +64,16 @@ export async function handleModelMove(payload: JobPayload<typeof JOB.modelMove>)
     return
   }
 
-  const source = createStorageAdapter(libraryLocationFromRow(sourceRow))
-  const destination = createStorageAdapter(libraryLocationFromRow(destinationRow))
+  if (sourceRow.removalMode || destinationRow.removalMode) {
+    // The library's own removal moves its models; a separate move racing it
+    // would be moving files out from under the deletion or into a library
+    // that is about to go.
+    console.warn(`[move] skipping ${payload.modelId}: a library involved is being removed`)
+    return
+  }
+
+  const source = createStorageAdapter(await resolveLibraryLocation(getDb(), sourceRow))
+  const destination = createStorageAdapter(await resolveLibraryLocation(getDb(), destinationRow))
 
   const started = Date.now()
 

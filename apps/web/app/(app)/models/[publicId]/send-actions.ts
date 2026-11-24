@@ -7,7 +7,7 @@ import {
   canSendToPrinter,
   createStorageAdapter,
   decryptSecret,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   sendToPrinter,
   type StorageAdapter,
 } from '@pb/core'
@@ -91,7 +91,7 @@ export async function sendFileToPrinter(
       }
     }
 
-    const storage = createStorageAdapter(libraryLocationFromRow(row.library))
+    const storage = createStorageAdapter(await resolveLibraryLocation(getDb(), row.library))
 
     // A model that is a single loose file has no folder of its own.
     const relativePath = row.model.isFileModel

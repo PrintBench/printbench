@@ -9,13 +9,15 @@
  * S3 is in the round trip: whether a multipart upload of a large stream
  * completes, whether the bytes come back identical, whether a scan of a
  * bucket produces the same models a folder would. None of that is provable
- * without a bucket, which is what MinIO is here for.
+ * without a bucket, which is what the s3 profile's SeaweedFS is here for.
+ * The bucket is created if it is missing, since a fresh server has none.
  */
 import { createReadStream } from 'node:fs'
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { BucketAlreadyOwnedByYou, CreateBucketCommand, S3Client } from '@aws-sdk/client-s3'
 import { sql } from 'drizzle-orm'
 import { zipSync } from 'fflate'
 import {
@@ -24,7 +26,7 @@ import {
   S3Adapter,
   createStorageAdapter,
   encryptSecret,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   loadRootEnv,
   scanLibrary,
   type LibraryLocation,
@@ -78,8 +80,32 @@ async function readAll(storage: S3Adapter, key: string): Promise<Buffer> {
 
 let workDir = ''
 
+/**
+ * Creates the bucket on a fresh server. Only the bucket: everything this
+ * script writes inside it goes under its own prefix and is removed again.
+ */
+async function ensureBucket() {
+  const client = new S3Client({
+    endpoint: ENDPOINT,
+    region: 'us-east-1',
+    forcePathStyle: true,
+    credentials: { accessKeyId: ACCESS_KEY, secretAccessKey: SECRET_KEY },
+  })
+  try {
+    await client.send(new CreateBucketCommand({ Bucket: BUCKET }))
+    console.log(`  created bucket ${BUCKET}`)
+  } catch (error) {
+    // Some servers answer BucketAlreadyExists to the owner as well.
+    const name = (error as { name?: string }).name
+    if (!(error instanceof BucketAlreadyOwnedByYou) && name !== 'BucketAlreadyExists') throw error
+  } finally {
+    client.destroy()
+  }
+}
+
 async function cleanup() {
   await db.execute(sql`DELETE FROM libraries WHERE id = ${LIBRARY_ID}`)
+  await db.execute(sql`DELETE FROM s3_connections WHERE id = ${LIBRARY_ID}`)
   if (workDir) await rm(workDir, { recursive: true, force: true })
 }
 
@@ -88,10 +114,11 @@ try {
   workDir = await mkdtemp(path.join(tmpdir(), 'pb-s3-'))
 
   section('Reachability')
+  await ensureBucket()
   const storage = new S3Adapter(managed)
   const health = await storage.healthCheck()
   check('bucket reachable', health.ok, health.reason ?? `${health.entryCount} entries`)
-  if (!health.ok) throw new Error('MinIO is not reachable; is the s3 profile up?')
+  if (!health.ok) throw new Error('The S3 server is not reachable; is the s3 profile up?')
 
   section('Small writes')
   await storage.write('Widget/notes.txt', 'hello from print manager')
@@ -202,18 +229,21 @@ try {
   check('refuses to extract over an existing folder', refusedSecond)
 
   section('Scanning a bucket')
+  // The connection reuses the library's id, so cleanup is one id for both.
   await db.execute(sql`
-    INSERT INTO libraries (id, name, kind, backend, allow_writes, s3_bucket, s3_prefix,
-                           s3_endpoint, s3_region, s3_access_key_id, s3_secret_access_key,
-                           s3_force_path_style)
-    VALUES (${LIBRARY_ID}, 'S3 Verify', 'managed', 's3', true, ${BUCKET}, ${PREFIX},
-            ${ENDPOINT}, 'us-east-1', ${ACCESS_KEY}, ${encryptSecret(SECRET_KEY)}, true)`)
+    INSERT INTO s3_connections (id, name, bucket, endpoint, region, access_key_id,
+                                secret_access_key, force_path_style)
+    VALUES (${LIBRARY_ID}, ${`S3 Verify ${PREFIX}`}, ${BUCKET}, ${ENDPOINT}, 'us-east-1',
+            ${ACCESS_KEY}, ${encryptSecret(SECRET_KEY)}, true)`)
+  await db.execute(sql`
+    INSERT INTO libraries (id, name, kind, backend, allow_writes, s3_connection_id, s3_prefix)
+    VALUES (${LIBRARY_ID}, 'S3 Verify', 'managed', 's3', true, ${LIBRARY_ID}, ${PREFIX})`)
 
   const rows = await db
     .select()
     .from(schema.libraries)
     .where(sql`id = ${LIBRARY_ID}`)
-  const location = libraryLocationFromRow(rows[0]!)
+  const location = await resolveLibraryLocation(db, rows[0]!)
   check('credentials decrypt out of the database', location.s3SecretAccessKey === SECRET_KEY)
 
   const scanStorage = createStorageAdapter(location)

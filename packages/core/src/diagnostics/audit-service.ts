@@ -42,10 +42,16 @@ export const AUDIT_ACTIONS = {
   'library.created': 'Added a library',
   'library.updated': 'Changed a library',
   'library.deleted': 'Deleted a library',
+  'library.removal_requested': 'Started removing a library',
+  'library.removal_stopped': 'Removing a library stopped part-way',
   'library.scan_requested': 'Requested a scan',
   'library.scan_completed': 'Scan finished',
   'library.scan_aborted': 'Scan aborted',
   'library.scan_failed': 'Scan failed',
+
+  'storage.created': 'Added an S3 connection',
+  'storage.updated': 'Changed an S3 connection',
+  'storage.deleted': 'Removed an S3 connection',
 
   'creator.created': 'Added a creator',
 
@@ -103,6 +109,7 @@ export const AUDIT_CATEGORIES = {
   user: 'Users',
   model: 'Models',
   library: 'Libraries',
+  storage: 'Storage',
   creator: 'Creators',
   tag: 'Tags',
   collection: 'Collections',

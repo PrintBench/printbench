@@ -156,7 +156,9 @@ describe('backup and restore', { tags: ['integration'] }, () => {
         AND (column_name ~ '(encrypted|credentials|secret_access_key)')
       ORDER BY 1`)
     expect(found.rows.map((row) => row.name)).toEqual(
-      SECRET_COLUMNS.map((entry) => `${entry.table}.${entry.column}`).sort(),
+      SECRET_COLUMNS.filter((entry) => !('legacy' in entry))
+        .map((entry) => `${entry.table}.${entry.column}`)
+        .sort(),
     )
   })
 
@@ -258,6 +260,63 @@ describe('backup and restore', { tags: ['integration'] }, () => {
     const stored = (await target.query(`SELECT credentials FROM print_hosts`)).rows[0].credentials
     expect(decryptSecret(stored)).toBe('printer-api-key')
     expect(decryptSecret(stored, 'source-instance-secret')).toBeNull()
+  })
+
+  /*
+   * S3 keys used to live on each library. A backup from then holds the key
+   * under libraries.s3_secret_access_key, a column this build no longer has.
+   * The restore writes it back at the backup's own schema version and the
+   * migrations that follow move it to a connection, so the library comes
+   * back able to reach its bucket rather than silently without a key.
+   */
+  it('restores the S3 key from a backup taken before connections existed', async () => {
+    const steps = readMigrationSteps()
+    const introduced = steps.findIndex((step) =>
+      step.statements.some((statement) => statement.includes('CREATE TABLE "s3_connections"')),
+    )
+    expect(introduced).toBeGreaterThan(0)
+
+    const source = await scratch()
+    const client = await source.connect()
+    try {
+      await replayMigrations(client, steps.slice(0, introduced))
+    } finally {
+      client.release()
+    }
+    await source.query(
+      `INSERT INTO libraries (id, name, kind, backend, allow_writes, s3_bucket, s3_prefix,
+                             s3_endpoint, s3_region, s3_access_key_id, s3_secret_access_key)
+       VALUES ($1, 'Bucket', 'managed', 's3', true, 'prints', 'models',
+               'https://minio.example.com', 'eu-west-2', 'AKIA', $2)`,
+      [LIBRARY, encryptSecret('s3-secret')],
+    )
+
+    const { file, manifest } = await exportTo(source, { passphrase: 'correct horse' })
+    expect(manifest.secrets?.count).toBe(1)
+
+    process.env.BETTER_AUTH_SECRET = 'a-completely-different-secret'
+    const target = await scratch()
+    const result = await restoreBackup({
+      pool: target,
+      file,
+      passphrase: 'correct horse',
+      managedRoot: path.join(work, 'managed-s3'),
+    })
+    expect(result.secretsRestored).toBe(1)
+
+    const restored = await target.query(`
+      SELECT l.s3_prefix, c.bucket, c.endpoint, c.region, c.access_key_id, c.secret_access_key
+      FROM libraries l JOIN s3_connections c ON c.id = l.s3_connection_id`)
+    expect(restored.rows).toHaveLength(1)
+    const [row] = restored.rows
+    expect(row).toMatchObject({
+      s3_prefix: 'models',
+      bucket: 'prints',
+      endpoint: 'https://minio.example.com',
+      region: 'eu-west-2',
+      access_key_id: 'AKIA',
+    })
+    expect(decryptSecret(row.secret_access_key)).toBe('s3-secret')
   })
 
   it('refuses a wrong passphrase before changing anything', async () => {

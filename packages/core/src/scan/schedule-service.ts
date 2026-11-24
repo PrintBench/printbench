@@ -29,7 +29,8 @@ export async function librariesDue(db: Database, now: Date = new Date()): Promis
            (SELECT max(coalesce(s.started_at, s.created_at))
               FROM scan_runs s WHERE s.library_id = l.id) AS last_scan_at
     FROM libraries l
-    WHERE l.scan_enabled AND l.scan_cron IS NOT NULL AND l.scan_cron <> ''`)
+    WHERE l.scan_enabled AND l.scan_cron IS NOT NULL AND l.scan_cron <> ''
+      AND l.removal_mode IS NULL`)
 
   return rows.rows
     .map((row) => ({

@@ -35,7 +35,15 @@ export const EXCLUDED_TABLES = new Set([
  * schema so that cannot happen quietly.
  */
 export const SECRET_COLUMNS = [
-  { table: 'libraries', column: 's3_secret_access_key', key: 'id' },
+  /*
+   * Gone from the current schema — S3 keys moved to s3_connections — but kept
+   * so that a backup taken before the move can still be restored with its
+   * key. The restore loads rows at the backup's own schema version, writes
+   * the key back here, and the migration that follows carries it across. An
+   * export simply skips it, because the column is not there.
+   */
+  { table: 'libraries', column: 's3_secret_access_key', key: 'id', legacy: true },
+  { table: 's3_connections', column: 'secret_access_key', key: 'id' },
   { table: 'print_hosts', column: 'credentials', key: 'id' },
   { table: 'provider_credentials', column: 'makerworld_cookie_encrypted', key: 'user_id' },
   { table: 'provider_credentials', column: 'thingiverse_token_encrypted', key: 'user_id' },

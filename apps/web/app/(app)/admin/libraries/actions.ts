@@ -1,21 +1,28 @@
 'use server'
 
-import { and, eq, isNull } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import {
   LocalAdapter,
   RootError,
   browseDirectories,
+  createS3Library,
   createStorageAdapter,
-  encryptSecret,
   groupModels,
   libraryRoots,
   managedRoot,
   slugify,
+  libraryRemovalOptions,
+  previewLibraryDeletion,
+  requestLibraryRemoval,
+  resolveS3LibraryLocation,
+  updateLibrarySettings,
   validateLibraryPath,
   walkLibrary,
   type BrowseResult,
+  type LibraryDeletionPreview,
   type LibraryLocation,
+  type LibraryRemovalRequest,
 } from '@pb/core'
 import { assertCan, assertCanTriggerScan, cronProblem, PolicyError } from '@pb/core'
 import { requireUser } from '@pb/auth'
@@ -65,31 +72,13 @@ export async function uploadLocation(): Promise<{ root: string; browsable: strin
   }
 }
 
+/**
+ * Where an S3 library's files are: a shared connection (bucket and
+ * credentials, managed under Storage) and a prefix within that bucket.
+ */
 export interface S3Config {
-  bucket: string
+  connectionId: string
   prefix?: string
-  region?: string
-  endpoint?: string
-  accessKeyId?: string
-  secretAccessKey?: string
-  forcePathStyle?: boolean
-}
-
-/** Builds the location the storage layer needs from the form's S3 fields. */
-function s3Location(id: string, kind: 'in_place' | 'managed', s3: S3Config): LibraryLocation {
-  return {
-    id,
-    kind,
-    backend: 's3',
-    allowWrites: kind === 'managed',
-    s3Bucket: s3.bucket,
-    s3Prefix: s3.prefix || null,
-    s3Region: s3.region || null,
-    s3Endpoint: s3.endpoint || null,
-    s3AccessKeyId: s3.accessKeyId || null,
-    s3SecretAccessKey: s3.secretAccessKey || null,
-    s3ForcePathStyle: s3.forcePathStyle ?? Boolean(s3.endpoint),
-  }
 }
 
 export interface PreviewSample {
@@ -145,8 +134,14 @@ export async function previewLibrary(input: {
   let location: LibraryLocation
 
   if (input.s3) {
-    if (!input.s3.bucket.trim()) return { ...empty, error: 'Give the bucket a name.' }
-    location = s3Location('preview', 'in_place', input.s3)
+    // Checks the bucket answers at this prefix and nothing indexes it yet.
+    const resolved = await resolveS3LibraryLocation(getDb(), {
+      connectionId: input.s3.connectionId,
+      prefix: input.s3.prefix,
+      kind: 'in_place',
+    })
+    if (!resolved.ok) return { ...empty, error: resolved.error }
+    location = { ...resolved.data.location, id: 'preview' }
   } else {
     /*
      * Validated against the roots for the same reason createLibrary is: this
@@ -237,56 +232,21 @@ export async function createLibrary(input: {
     if (!name) return { ok: false, error: 'Give the library a name.' }
 
     if (input.s3) {
-      if (!input.s3.bucket.trim()) return { ok: false, error: 'Give the bucket a name.' }
-
-      const storage = createStorageAdapter(s3Location('validate', input.kind, input.s3))
-      const health = await storage.healthCheck()
-      if (!health.ok) return { ok: false, error: health.reason ?? 'That bucket is not readable.' }
-
-      const db = getDb()
-      const prefix = input.s3.prefix?.trim() || null
-      const existing = await db
-        .select({ id: schema.libraries.id })
-        .from(schema.libraries)
-        .where(
-          and(
-            eq(schema.libraries.backend, 's3'),
-            eq(schema.libraries.s3Bucket, input.s3.bucket.trim()),
-            prefix ? eq(schema.libraries.s3Prefix, prefix) : isNull(schema.libraries.s3Prefix),
-          ),
-        )
-        .limit(1)
-      if (existing[0]) return { ok: false, error: 'A library already points at that bucket.' }
-
-      const [created] = await db
-        .insert(schema.libraries)
-        .values({
-          name,
-          kind: input.kind,
-          backend: 's3',
-          // An uploads library exists to be written to; a bucket of files the
-          // user already had keeps the same read-only promise as a folder.
-          allowWrites: input.kind === 'managed',
-          s3Bucket: input.s3.bucket.trim(),
-          s3Prefix: prefix,
-          s3Region: input.s3.region?.trim() || null,
-          s3Endpoint: input.s3.endpoint?.trim() || null,
-          s3AccessKeyId: input.s3.accessKeyId?.trim() || null,
-          // Encrypted at rest, like every other stored credential — see printers.
-          s3SecretAccessKey: input.s3.secretAccessKey
-            ? encryptSecret(input.s3.secretAccessKey)
-            : null,
-          s3ForcePathStyle: input.s3.forcePathStyle ?? Boolean(input.s3.endpoint),
-          groupingMode: input.groupingMode,
-          groupingDepth: input.groupingDepth ?? null,
-          writeSidecar: input.writeSidecar,
-        })
-        .returning({ id: schema.libraries.id })
+      const created = await createS3Library(getDb(), {
+        name,
+        kind: input.kind,
+        connectionId: input.s3.connectionId,
+        prefix: input.s3.prefix,
+        groupingMode: input.groupingMode,
+        groupingDepth: input.groupingDepth,
+        writeSidecar: input.writeSidecar,
+      })
+      if (!created.ok) return created
 
       await audit(
         actor,
         'library.created',
-        { type: 'library', id: created!.id, label: name },
+        { type: 'library', id: created.data.id, label: name },
         {
           backend: 's3',
           kind: input.kind,
@@ -294,7 +254,8 @@ export async function createLibrary(input: {
         },
       )
       revalidatePath('/admin/libraries')
-      return { ok: true, data: { id: created!.id } }
+      revalidatePath('/admin/storage')
+      return { ok: true, data: { id: created.data.id } }
     }
 
     let path: string
@@ -541,30 +502,147 @@ export async function updateLibraryWatch(
   }
 }
 
-export async function deleteLibrary(libraryId: string): Promise<Result> {
+/**
+ * Changes what can safely change about a library after it exists: its name,
+ * whether sidecars are written, and — for S3 — which connection reaches its
+ * bucket. Where the files are is fixed; see library-settings-service.
+ */
+export async function updateLibrary(
+  libraryId: string,
+  input: { name: string; writeSidecar: boolean; s3ConnectionId?: string | null },
+): Promise<Result> {
   try {
     const actor = await assertAdmin()
-    // Removes the index only. The user's files are never touched.
-    const [removed] = await getDb()
-      .delete(schema.libraries)
-      .where(eq(schema.libraries.id, libraryId))
-      .returning({ name: schema.libraries.name, backend: schema.libraries.backend })
 
-    if (!removed) return { ok: false, error: 'That library no longer exists.' }
+    const updated = await updateLibrarySettings(getDb(), libraryId, input)
+    if (!updated.ok) return updated
 
-    await audit(
-      actor,
-      'library.deleted',
-      { type: 'library', id: libraryId, label: removed.name },
-      {
-        backend: removed.backend,
-      },
-    )
+    if (updated.data.changed.length > 0) {
+      await audit(
+        actor,
+        'library.updated',
+        { type: 'library', id: libraryId, label: updated.data.name },
+        {
+          changed: updated.data.changed.join(', '),
+          ...(updated.data.changed.includes('name') && { previousName: updated.data.previousName }),
+        },
+      )
+    }
 
     revalidatePath('/admin/libraries')
+    revalidatePath('/admin/storage')
     return { ok: true }
   } catch (error) {
     if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
+    console.error('[libraries] update failed:', error)
+    return { ok: false, error: 'Could not save the library.' }
+  }
+}
+
+export interface RemovalChoices {
+  canDeleteFiles: boolean
+  canMove: boolean
+  reason: string | null
+  destinations: { id: string; name: string }[]
+}
+
+/** What the remove dialog may offer for this library. */
+export async function libraryRemovalChoices(libraryId: string): Promise<RemovalChoices> {
+  try {
+    await assertAdmin()
+    return await libraryRemovalOptions(getDb(), libraryId)
+  } catch {
+    return { canDeleteFiles: false, canMove: false, reason: 'Not permitted.', destinations: [] }
+  }
+}
+
+type PreviewResponse = { ok: true; data: LibraryDeletionPreview } | { ok: false; error: string }
+
+/**
+ * What "delete the files too" would delete, counted before anything is.
+ *
+ * A listing, not a read of any file's bytes, and bounded, so it is fine here
+ * rather than in the worker; the deletion itself is not.
+ */
+export async function previewLibraryFileDeletion(libraryId: string): Promise<PreviewResponse> {
+  try {
+    await assertAdmin()
+    return await previewLibraryDeletion(getDb(), libraryId)
+  } catch (error) {
+    if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
+    console.error('[libraries] deletion preview failed:', error)
+    return {
+      ok: false,
+      error: (error instanceof Error && error.message.trim()) || 'Could not list the files.',
+    }
+  }
+}
+
+/**
+ * Removes a library: forgets it straight away, or queues the worker to delete
+ * its files or move its models first.
+ */
+export async function removeLibrary(
+  libraryId: string,
+  request: LibraryRemovalRequest,
+): Promise<Result<{ queued: boolean }>> {
+  try {
+    const actor = await assertAdmin()
+    const db = getDb()
+
+    const requested = await requestLibraryRemoval(db, libraryId, request)
+    if (!requested.ok) return requested
+    const { name, backend, queued } = requested.data
+
+    if (!queued) {
+      await audit(
+        actor,
+        'library.deleted',
+        { type: 'library', id: libraryId, label: name },
+        {
+          backend,
+          files: 'kept',
+        },
+      )
+      revalidatePath('/admin/libraries')
+      revalidatePath('/admin/storage')
+      return { ok: true, data: { queued: false } }
+    }
+
+    try {
+      const queue = await getStartedQueue()
+      await queue.send(JOB.libraryRemove, { libraryId }, { singletonKey: `remove:${libraryId}` })
+    } catch (error) {
+      // Recorded on the row and then not queued would leave the library stuck
+      // as "being removed" with nothing running. Undo the mark instead.
+      console.error('[libraries] could not queue removal:', error)
+      await db
+        .update(schema.libraries)
+        .set({ removalMode: null, removalDestinationId: null, removalRequestedAt: null })
+        .where(eq(schema.libraries.id, libraryId))
+      return { ok: false, error: 'Could not queue the removal. Check the worker logs.' }
+    }
+
+    let destination: string | undefined
+    if (request.mode === 'move') {
+      const [row] = await db
+        .select({ name: schema.libraries.name })
+        .from(schema.libraries)
+        .where(eq(schema.libraries.id, request.destinationLibraryId))
+      destination = row?.name
+    }
+    await audit(
+      actor,
+      'library.removal_requested',
+      { type: 'library', id: libraryId, label: name },
+      { backend, mode: request.mode, ...(destination && { destination }) },
+    )
+
+    revalidatePath('/admin/libraries')
+    return { ok: true, data: { queued: true } }
+  } catch (error) {
+    if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
+    console.error('[libraries] remove failed:', error)
     return { ok: false, error: 'Could not remove the library.' }
   }
 }

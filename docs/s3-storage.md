@@ -11,8 +11,10 @@ What _does_ need setting up is on the storage side: a bucket, a key pair scoped
 to it, and — if you want the in-page 3D viewer to work — a CORS rule. That is
 what this page covers.
 
-S3 is configured **per library**, not globally. One installation can index a NAS
-mount, a local folder and three buckets at once, and the rest of the app is
+S3 is set up in two parts. A **connection** (Admin → Storage) holds a bucket and
+the key that reaches it, and is entered once. Each **library** then picks a
+connection and a prefix within its bucket. One installation can index a NAS
+mount, a local folder and several buckets at once, and the rest of the app is
 unaware of the difference.
 
 ---
@@ -39,8 +41,10 @@ Two layout choices:
 
 - **One bucket per library** is the simplest thing that works.
 - **One bucket, several libraries** works too, as long as each library uses a
-  different prefix. The app enforces uniqueness on bucket _and_ prefix together,
-  so two libraries pointed at the same pair are refused.
+  different prefix. Add one connection for the bucket and create every library
+  on it, so the key is entered (and later rotated or withdrawn) in one place.
+  The app enforces uniqueness on bucket _and_ prefix together, across all
+  connections, so two libraries pointed at the same pair are refused.
 
 A prefix (`models/`, say) also lets a bucket hold things this application should
 not index — only keys under the prefix are ever listed.
@@ -93,7 +97,7 @@ If the library is scoped to a prefix, narrow the object resource to
 
 ### Or no credentials at all
 
-Leave **Access key ID** and **Secret access key** blank and the AWS SDK's own
+Leave the connection's **Access key ID** and **Secret access key** blank and the AWS SDK's own
 credential chain applies — an EC2 instance role, an ECS task role, IRSA on
 Kubernetes, `AWS_*` environment variables, or a mounted `~/.aws/credentials`.
 This is the better option wherever it is available, because nothing sensitive is
@@ -108,10 +112,11 @@ The secret access key is encrypted with AES-256-GCM under a key derived from
 `BETTER_AUTH_SECRET` before it is written, so a database dump alone does not
 hand over your bucket. Two consequences:
 
-- `BETTER_AUTH_SECRET` must be set before you add an S3 library.
+- `BETTER_AUTH_SECRET` must be set before you add an S3 connection.
 - **Rotating `BETTER_AUTH_SECRET` makes every stored key undecryptable.** The
-  library then falls back to the SDK credential chain and typically starts
-  failing with a permissions error. See
+  libraries on that connection then fall back to the SDK credential chain and
+  typically start failing with a permissions error. Admin → Storage flags the
+  connection so you know to re-enter the secret. See
   [Rotating or fixing credentials](#rotating-or-fixing-credentials).
 
 ---
@@ -152,24 +157,38 @@ takes the identical JSON under the bucket's settings.
 
 ---
 
-## Step 4 — add the library
+## Step 4 — add the connection
 
-**Admin → Libraries → New**, then three questions:
+**Admin → Storage → Add an S3 connection**:
+
+| Field                 | Notes                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Name**              | How the connection is shown when choosing storage for a library. Unique.                                      |
+| **Bucket**            | Required. Name only, no `s3://` and no URL. Fixed once a library uses the connection.                         |
+| **Region**            | Blank means `us-east-1`. Getting this wrong on AWS produces a redirect error, not a hang.                     |
+| **Endpoint**          | Blank for real AWS. Set it for anything self-hosted or third-party, with scheme: `https://minio.example.com`. |
+| **Access key ID**     | Blank to use the server's own credentials (see above).                                                        |
+| **Secret access key** | Encrypted before storage and never shown again. On an edit, blank keeps the stored one.                       |
+
+Saving checks that the bucket answers with those settings, at the root of the
+bucket. A key restricted by IAM to one prefix can fail that check; add the
+connection with a key that can list the bucket, or with server credentials.
+
+## Step 5 — add the library
+
+**Admin → Libraries → Add library** (or **Add library** on the connection's row
+under Storage), then three questions:
 
 1. **Which kind** — files you already have (indexed, never modified) or somewhere
    to upload to (the app writes into it). This decides whether the library is
    read-only, and therefore which of the IAM policies above you need.
 2. **Where** — choose **S3-compatible storage**.
-3. **The bucket details:**
+3. **The connection and prefix:**
 
-| Field                 | Notes                                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Bucket**            | Required. Name only, no `s3://` and no URL.                                                                   |
-| **Prefix**            | Optional. Only keys under it are indexed. Leading and trailing slashes are normalised away.                   |
-| **Region**            | Blank means `us-east-1`. Getting this wrong on AWS produces a redirect error, not a hang.                     |
-| **Endpoint**          | Blank for real AWS. Set it for anything self-hosted or third-party, with scheme: `https://minio.example.com`. |
-| **Access key ID**     | Blank to use the server's own credentials (see above).                                                        |
-| **Secret access key** | Encrypted before storage.                                                                                     |
+| Field             | Notes                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| **S3 connection** | Required. The bucket and key, from Storage.                                                 |
+| **Prefix**        | Optional. Only keys under it are indexed. Leading and trailing slashes are normalised away. |
 
 Path-style addressing is switched on automatically whenever an endpoint is set,
 because virtual-host addressing needs a wildcard DNS entry per bucket that
@@ -244,7 +263,9 @@ bucket through the application, which on a metered provider means egress:
 
 `npm run verify:s3` exercises the whole S3 path against a real bucket —
 multipart upload, presigned download, ZIP extraction, scanning, deletion and the
-read-only guard. It defaults to the MinIO in `docker-compose.dev.yml`:
+read-only guard. It defaults to the S3 server in `docker-compose.dev.yml`
+(SeaweedFS, on `http://localhost:9000` with `printbench` as both the access key
+and the secret), and creates the bucket if it is missing:
 
 ```bash
 docker compose -f docker-compose.dev.yml --profile s3 up -d
@@ -262,13 +283,45 @@ Point it at any other endpoint with `VERIFY_S3_ENDPOINT`, `VERIFY_S3_BUCKET`,
 
 ## Rotating or fixing credentials
 
-There is no UI yet for editing an existing library's bucket settings. To change a
-key pair, delete the library and add it again with the same bucket and prefix.
-**Deleting a library removes the index only** — nothing in the bucket is touched,
-and the next scan rebuilds the index from the objects and their sidecar files.
+Edit the connection under **Admin → Storage**. Every library on it uses the new
+settings from its next request or job; nothing needs restarting. Before saving,
+the new settings are checked against every library on the connection at its own
+prefix, and nothing is saved if any of them cannot be read.
 
-The same applies after rotating `BETTER_AUTH_SECRET`: every stored secret key
-becomes undecryptable and has to be entered again.
+- **Rotate a key**: enter the new access key ID and secret together. A new
+  access key ID with the secret left blank is refused, rather than pairing the
+  new key with the old secret.
+- **Withdraw access**: move each library to another connection (Edit on the
+  library's row; only connections to the same bucket are offered), then remove
+  the connection. A connection still in use cannot be removed, so withdrawing a
+  key never silently takes libraries down with it.
+- **After rotating `BETTER_AUTH_SECRET`**: each connection with a stored secret
+  is flagged on the Storage page. Edit it and enter the secret again, once per
+  connection rather than once per library.
+
+A library's own **Edit** page changes its name, its sidecar setting and which
+connection it uses. Its bucket, prefix and grouping are fixed: every indexed
+model is recorded relative to them, so changing them would make the whole
+library look missing at the next scan. To index somewhere else, add a new
+library.
+
+When removing a library, **Keep the files** removes the index and leaves the
+bucket untouched. Uploads libraries can also use **Delete the files too** to
+delete objects under their prefix after reviewing the preview, or **Move the
+models to another library** to keep their model records in a different uploads
+library. Deletion includes unindexed objects under the prefix and preserves
+nested libraries.
+
+### Upgrading from per-library settings
+
+Before connections existed, each S3 library held its own bucket and key. The
+upgrade moves each one into a connection of its own, named after the library,
+with its encrypted secret carried across unchanged. Nothing has to be
+re-entered. Libraries that share a bucket and key end up with one connection
+each, because encrypted secrets cannot be compared to tell which are the same.
+To consolidate, edit each library onto one of them and remove the rest.
+
+Backups taken before the upgrade restore the same way, keys included.
 
 ---
 
@@ -280,13 +333,15 @@ The app translates SDK errors into plain statements. What each one means:
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | The bucket "x" does not exist, or the endpoint points somewhere else | Typo in the bucket name, or an endpoint aimed at the wrong service.                    |
 | That access key is not recognised                                    | Wrong or deleted access key ID.                                                        |
-| The secret key does not match the access key                         | Mistyped secret — or `BETTER_AUTH_SECRET` was rotated after the library was added.     |
+| The secret key does not match the access key                         | Mistyped secret — or `BETTER_AUTH_SECRET` was rotated after the connection was added.  |
 | The credentials are valid but not allowed to read "x"                | The policy is missing `ListBucket` on the bucket or `GetObject` on its objects.        |
 | The bucket is in a different region from the one configured          | Set the region to the bucket's real one. AWS reports this as a redirect, not a 404.    |
 | Could not resolve the storage endpoint                               | DNS. Inside Docker, use the container name rather than `localhost`.                    |
 | The storage endpoint refused the connection                          | Wrong port, wrong scheme, or the gateway is not running.                               |
 | That location is empty                                               | The preview found nothing under the prefix. Check for a leading slash or a typo in it. |
-| A library already points at that bucket                              | Bucket and prefix together must be unique across libraries.                            |
+| "x" already indexes … that bucket                                    | Bucket and prefix together must be unique across libraries and connections.            |
+| The bucket cannot change while a library uses this connection        | Add a new connection for the other bucket instead. Libraries' locations are fixed.     |
+| Still used by …                                                      | Move those libraries to another connection, or remove them, before removing this one.  |
 
 Two symptoms that produce no message at all:
 

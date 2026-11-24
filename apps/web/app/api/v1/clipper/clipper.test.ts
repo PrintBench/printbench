@@ -61,13 +61,17 @@ describe('browser clipper API', { tags: ['integration'] }, () => {
         role: 'member',
       })),
     )
+    // The connection reuses the library's id: unique per test, and one less to track.
+    await db
+      .insert(schema.s3Connections)
+      .values({ id: libraryId, name: 'Clipper ' + libraryId, bucket: 'test-bucket' })
     await db.insert(schema.libraries).values([
       {
         id: libraryId,
         name: 'Writable S3',
         kind: 'managed',
         backend: 's3',
-        s3Bucket: 'test-bucket',
+        s3ConnectionId: libraryId,
       },
       { id: excluded[0]!, name: 'Read-only', path: '/read-only' },
       {
@@ -89,6 +93,7 @@ describe('browser clipper API', { tags: ['integration'] }, () => {
     await getDb()
       .delete(schema.libraries)
       .where(inArray(schema.libraries.id, [libraryId, ...excluded]))
+    await getDb().delete(schema.s3Connections).where(eq(schema.s3Connections.id, libraryId))
     await getDb()
       .delete(schema.user)
       .where(inArray(schema.user.id, [owner, other]))

@@ -25,7 +25,7 @@ describe('extractZipIntoLibrary', () => {
   /**
    * A managed local library, which is what an upload target always is. The
    * extractor writes through this rather than touching `fs`, so the same code
-   * path serves an S3 bucket — see the MinIO checks in verify-s3.mts.
+   * path serves an S3 bucket — see the bucket checks in verify-s3.mts.
    */
   const storage = () =>
     new LocalAdapter({

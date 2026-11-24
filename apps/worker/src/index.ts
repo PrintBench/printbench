@@ -16,6 +16,7 @@ import { JOB, getQueue, type JobHandler, type JobName } from '@pb/jobs'
 import { withMemoryDiagnostics } from './memory-diagnostics'
 import { handleLibraryScan } from './jobs/scan'
 import { handleModelMove } from './jobs/move'
+import { handleLibraryRemove } from './jobs/remove-library'
 import { handleMakerWorldImport } from './jobs/import'
 import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs/analyze'
 import { handleHealthDetect } from './jobs/health'
@@ -137,6 +138,7 @@ async function startWork(): Promise<void> {
   await work(JOB.libraryScan, handleLibraryScan)
   await work(JOB.makerWorldImport, handleMakerWorldImport)
   await work(JOB.modelMove, handleModelMove)
+  await work(JOB.libraryRemove, handleLibraryRemove)
   await work(JOB.fileAnalyze, handleFileAnalyze)
   await work(JOB.fileThumbnail, handleFileThumbnail)
   await work(JOB.fileDigest, handleFileDigest)
@@ -145,7 +147,7 @@ async function startWork(): Promise<void> {
   await work(JOB.maintArchive, handleMaintArchive)
   await work(JOB.scheduleSweep, handleScheduleSweep)
   console.log(
-    '[worker] handlers: library.scan, model.move, file.analyze, file.thumbnail, file.digest, ' +
+    '[worker] handlers: library.scan, library.remove, model.move, file.analyze, file.thumbnail, file.digest, ' +
       'health.detect, library.schedule, maint.reconcile, maint.archive',
   )
 
