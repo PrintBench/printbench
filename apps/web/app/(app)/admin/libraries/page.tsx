@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { desc, eq, sql } from 'drizzle-orm'
-import { Cloud, FolderPlus, HardDrive, Lock, Pencil } from 'lucide-react'
+import { Cloud, FolderPlus, HardDrive, Lock, Pencil, Upload } from 'lucide-react'
 import { getSessionUser } from '@pb/auth'
-import { can, listExclusions, nextRun } from '@pb/core'
+import { can, libraryLocationLabel, listExclusions, nextRun } from '@pb/core'
 import { getDb, schema } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
@@ -53,6 +53,7 @@ export default async function LibrariesPage() {
       s3Prefix: schema.libraries.s3Prefix,
       s3ConnectionName: schema.s3Connections.name,
       s3Bucket: schema.s3Connections.bucket,
+      s3Endpoint: schema.s3Connections.endpoint,
       createdAt: schema.libraries.createdAt,
     })
     .from(schema.libraries)
@@ -125,21 +126,36 @@ export default async function LibrariesPage() {
             const stat = statsById.get(library.id)
             const run = runById.get(library.id)
             const aborted = run?.status === 'aborted'
+            /*
+             * One icon and one phrase for where the files are and what the
+             * library is for, because a path or a bucket name alone does not
+             * say whether PrintBench writes there or whose service it is.
+             */
+            const LocationIcon =
+              library.backend === 's3' ? Cloud : library.kind === 'managed' ? Upload : HardDrive
+            const location = libraryLocationLabel({
+              backend: library.backend,
+              kind: library.kind,
+              s3Endpoint: library.s3Endpoint,
+              hasS3Connection: library.s3Bucket !== null,
+            })
 
             return (
               <Card key={library.id}>
                 <CardContent className="flex flex-wrap items-start gap-4 p-5">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-surface-2)] text-[var(--color-ink-faint)]">
-                    {library.backend === 's3' ? (
-                      <Cloud className="size-5" />
-                    ) : (
-                      <HardDrive className="size-5" />
-                    )}
+                    <LocationIcon className="size-5" />
                   </span>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="font-semibold">{library.name}</h2>
+                      <Badge
+                        tone={library.backend === 's3' && !library.s3Bucket ? 'danger' : 'accent'}
+                      >
+                        <LocationIcon className="size-3" />
+                        {location}
+                      </Badge>
                       {library.kind === 'in_place' && (
                         <Badge tone="neutral">
                           <Lock className="size-3" />

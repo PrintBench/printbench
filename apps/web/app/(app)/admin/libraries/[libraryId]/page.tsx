@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { eq } from 'drizzle-orm'
 import { getSessionUser } from '@pb/auth'
-import { can, listS3Connections } from '@pb/core'
+import { can, libraryLocationLabel, listS3Connections } from '@pb/core'
 import { getDb, schema } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
 import { NotPermitted } from '@/components/shell/not-permitted'
@@ -64,6 +64,12 @@ export default async function EditLibraryPage({
           connectionId: library.s3ConnectionId,
           writeSidecar: library.writeSidecar,
           groupingMode: library.groupingMode,
+          location: libraryLocationLabel({
+            backend: library.backend,
+            kind: library.kind,
+            s3Endpoint: current?.endpoint,
+            hasS3Connection: Boolean(current),
+          }),
         }}
         /*
          * Only connections to the same bucket are offered: switching is for

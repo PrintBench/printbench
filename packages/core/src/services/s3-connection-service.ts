@@ -8,6 +8,7 @@ import {
   type LibraryRow,
   type S3ConnectionRow,
 } from '../storage/factory'
+import { detectS3Provider } from '../storage/provider'
 import type { LibraryLocation } from '../storage/types'
 
 /**
@@ -89,6 +90,8 @@ export interface S3ConnectionSummary {
   bucket: string
   endpoint: string | null
   region: string | null
+  /** Who runs the bucket, worked out from the endpoint: "Backblaze B2", "MinIO", or the host. */
+  provider: string
   accessKeyId: string | null
   /** Whether a secret is stored. The secret itself never leaves the server. */
   hasSecret: boolean
@@ -259,6 +262,7 @@ export async function listS3Connections(db: Database): Promise<S3ConnectionSumma
     bucket: connection.bucket,
     endpoint: connection.endpoint,
     region: connection.region,
+    provider: detectS3Provider(connection.endpoint).name,
     accessKeyId: connection.accessKeyId,
     hasSecret: connection.secretAccessKey !== null,
     secretUnreadable:

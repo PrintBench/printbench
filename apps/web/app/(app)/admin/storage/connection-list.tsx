@@ -81,6 +81,7 @@ export function ConnectionList({ connections }: { connections: S3ConnectionSumma
                 <div className="min-w-0 flex-1 basis-48">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                     {connection.name}
+                    <Badge tone="accent">{connection.provider}</Badge>
                     {connection.accessKeyId ? (
                       <Badge tone="neutral">key stored</Badge>
                     ) : (

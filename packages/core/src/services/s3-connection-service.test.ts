@@ -116,7 +116,12 @@ describe('S3 connections', { tags: ['integration'] }, () => {
     expect(decryptSecret(stored)).toBe('secret-one')
 
     const listed = (await listS3Connections(db)).find((entry) => entry.id === id)!
-    expect(listed).toMatchObject({ hasSecret: true, secretUnreadable: false, bucket: 'prints' })
+    expect(listed).toMatchObject({
+      hasSecret: true,
+      secretUnreadable: false,
+      bucket: 'prints',
+      provider: 'AWS',
+    })
     expect(JSON.stringify(listed)).not.toContain(stored!)
     expect(JSON.stringify(listed)).not.toContain('secret-one')
   })

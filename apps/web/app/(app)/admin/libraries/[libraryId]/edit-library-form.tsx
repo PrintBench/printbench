@@ -21,6 +21,8 @@ export interface EditableLibrary {
   connectionId: string | null
   writeSidecar: boolean
   groupingMode: 'deepest' | 'top_level' | 'flat'
+  /** "Existing folder", "Uploads on this server" or "S3 at <provider>". */
+  location: string
 }
 
 export interface ConnectionChoice {
@@ -156,7 +158,10 @@ export function EditLibraryForm({
           </p>
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
             <dt className="text-[var(--color-ink-muted)]">Type</dt>
-            <dd>{library.kind === 'managed' ? 'Uploads library' : 'Existing files (read-only)'}</dd>
+            <dd>
+              {library.location}
+              {library.kind === 'in_place' && ' (read-only)'}
+            </dd>
 
             {library.backend === 's3' ? (
               <>
