@@ -465,9 +465,18 @@ export function describeS3Error(error: unknown, bucket: string): string {
     return 'The storage endpoint did not respond.'
   }
 
-  const code = (error as { cause?: { code?: string } })?.cause?.code
+  /*
+   * A network failure can carry its code in three places: on the error, on its
+   * `cause`, or (when Node tried IPv4 and IPv6 and both failed) on each error
+   * inside an AggregateError. That AggregateError's own message is empty, so
+   * missing the code here used to mean an empty string as the reason.
+   */
+  const err = error as { code?: string; cause?: { code?: string }; errors?: { code?: string }[] }
+  const code = err?.code ?? err?.cause?.code ?? err?.errors?.find((inner) => inner?.code)?.code
   if (code === 'ENOTFOUND') return 'Could not resolve the storage endpoint. Check the address.'
   if (code === 'ECONNREFUSED') return 'The storage endpoint refused the connection.'
+  if (code === 'ETIMEDOUT' || code === 'ECONNRESET') return 'The storage endpoint did not respond.'
 
-  return error instanceof Error ? error.message : String(error)
+  const message = error instanceof Error ? error.message.trim() : String(error ?? '').trim()
+  return message || 'The storage endpoint could not be reached.'
 }

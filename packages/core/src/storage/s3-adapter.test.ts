@@ -332,6 +332,27 @@ describe('error messages', () => {
     expect(describeS3Error(new Error('something specific'), 'prints')).toBe('something specific')
   })
 
+  /*
+   * What a stopped S3 server actually produces: Node tries IPv6 and IPv4, both
+   * are refused, and the result is an AggregateError with an empty message and
+   * the code on the error itself. Missing it left the reason blank.
+   */
+  it('explains a refused connection reported as an AggregateError', () => {
+    const error = Object.assign(new AggregateError([], ''), {
+      code: 'ECONNREFUSED',
+      errors: [{ code: 'ECONNREFUSED' }, { code: 'ECONNREFUSED' }],
+    })
+    expect(describeS3Error(error, 'prints')).toMatch(/refused/i)
+    expect(describeS3Error(new AggregateError([{ code: 'ENOTFOUND' }], ''), 'prints')).toMatch(
+      /resolve/i,
+    )
+  })
+
+  it('never answers with an empty reason', () => {
+    expect(describeS3Error(new Error(''), 'prints')).toMatch(/could not be reached/i)
+    expect(describeS3Error(undefined, 'prints')).toMatch(/could not be reached/i)
+  })
+
   it('reads an HTTP status when there is no error name', () => {
     expect(describeS3Error({ $metadata: { httpStatusCode: 403 } }, 'prints')).toMatch(
       /not allowed/i,
