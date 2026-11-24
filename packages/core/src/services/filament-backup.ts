@@ -30,6 +30,8 @@ export const filamentBackupSchema = z.object({
       nozzleTempC: decimal.nullable(),
       bedTempC: decimal.nullable(),
       notes: z.string().nullable(),
+      // Optional: backups taken before the filament catalogue have no link.
+      catalogVariantUuid: id.nullable().optional(),
       archivedAt: date.nullable(),
       createdAt: date,
       updatedAt: date,
@@ -46,6 +48,7 @@ export const filamentBackupSchema = z.object({
       location: z.string().nullable(),
       notes: z.string().nullable(),
       lowStockG: decimal,
+      catalogSizeUuid: id.nullable().optional(),
       archivedAt: date.nullable(),
       createdAt: date,
       updatedAt: date,

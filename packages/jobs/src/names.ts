@@ -22,6 +22,7 @@ export const JOB = {
   scheduleSweep: 'library.schedule',
   maintReconcile: 'maint.reconcile',
   maintArchive: 'maint.archive',
+  filamentCatalogSync: 'filament-catalog.sync',
 } as const
 
 export type JobName = (typeof JOB)[keyof typeof JOB]
@@ -62,6 +63,7 @@ export const payloads = {
   [JOB.scheduleSweep]: z.object({}).default({}),
   [JOB.maintReconcile]: z.object({}).default({}),
   [JOB.maintArchive]: z.object({}).default({}),
+  [JOB.filamentCatalogSync]: z.object({}).default({}),
 } as const
 
 export type JobPayload<N extends JobName> = z.infer<(typeof payloads)[N]>
@@ -135,4 +137,10 @@ export const JOB_OPTIONS: Record<
   // Only ever one maintenance sweep in flight.
   [JOB.maintReconcile]: { concurrency: 1, policy: 'stately' },
   [JOB.maintArchive]: { concurrency: 1, policy: 'stately' },
+  /*
+   * Enqueued on every boot and after a restore; usually a no-op that reads one
+   * row. `short` collapses a second request while one is still queued, and the
+   * import itself takes an advisory lock, so overlapping runs are harmless.
+   */
+  [JOB.filamentCatalogSync]: { concurrency: 1, priority: 3, policy: 'short' },
 }

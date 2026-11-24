@@ -12,7 +12,8 @@
     "./schedule": "./src/scan/schedule-presets.ts",
     "./health": "./src/health/problem-kinds.ts",
     "./prints": "./src/services/print-fields.ts",
-    "./filaments": "./src/services/filament-fields.ts"
+    "./filaments": "./src/services/filament-fields.ts",
+    "./filament-catalog-sync": "./src/services/filament-catalog-sync.ts"
   },
   "scripts": {
     "build": "tsc --build",
@@ -23,6 +24,7 @@
     "@aws-sdk/lib-storage": "^3.1172.0",
     "@aws-sdk/s3-request-presigner": "^3.1172.0",
     "@pb/db": "*",
+    "@pb/filament-catalog": "*",
     "cron-parser": "^5.10.6",
     "drizzle-orm": "^0.45.4",
     "nanoid": "^6.0.2",

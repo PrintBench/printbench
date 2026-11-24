@@ -16,6 +16,12 @@ import { BackupError, IDENTIFIER } from './manifest'
  * Sessions and connection or verification tokens belong to browsers and emails that have no
  * business working against a different instance. Logs and process heartbeats
  * describe the machine the backup was taken on, not the data.
+ *
+ * The filament catalogue ships inside the release and is rebuilt from it: the
+ * worker re-imports it after a restore (its meta row is gone, so the import
+ * is not a no-op), and the restored instance gets the catalogue of the
+ * version it runs, not the one the backup was taken on. Backing it up would
+ * only add ~60k rows of reference data to every archive.
  */
 export const EXCLUDED_TABLES = new Set([
   'session',
@@ -23,6 +29,14 @@ export const EXCLUDED_TABLES = new Set([
   'clipper_tokens',
   'app_logs',
   'process_status',
+  'filament_catalog_brands',
+  'filament_catalog_stores',
+  'filament_catalog_materials',
+  'filament_catalog_filaments',
+  'filament_catalog_variants',
+  'filament_catalog_sizes',
+  'filament_catalog_purchase_links',
+  'filament_catalog_meta',
 ])
 
 /**
