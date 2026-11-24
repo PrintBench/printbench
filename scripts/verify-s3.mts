@@ -9,13 +9,15 @@
  * S3 is in the round trip: whether a multipart upload of a large stream
  * completes, whether the bytes come back identical, whether a scan of a
  * bucket produces the same models a folder would. None of that is provable
- * without a bucket, which is what MinIO is here for.
+ * without a bucket, which is what the s3 profile's SeaweedFS is here for.
+ * The bucket is created if it is missing, since a fresh server has none.
  */
 import { createReadStream } from 'node:fs'
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { BucketAlreadyOwnedByYou, CreateBucketCommand, S3Client } from '@aws-sdk/client-s3'
 import { sql } from 'drizzle-orm'
 import { zipSync } from 'fflate'
 import {
@@ -78,6 +80,29 @@ async function readAll(storage: S3Adapter, key: string): Promise<Buffer> {
 
 let workDir = ''
 
+/**
+ * Creates the bucket on a fresh server. Only the bucket: everything this
+ * script writes inside it goes under its own prefix and is removed again.
+ */
+async function ensureBucket() {
+  const client = new S3Client({
+    endpoint: ENDPOINT,
+    region: 'us-east-1',
+    forcePathStyle: true,
+    credentials: { accessKeyId: ACCESS_KEY, secretAccessKey: SECRET_KEY },
+  })
+  try {
+    await client.send(new CreateBucketCommand({ Bucket: BUCKET }))
+    console.log(`  created bucket ${BUCKET}`)
+  } catch (error) {
+    // Some servers answer BucketAlreadyExists to the owner as well.
+    const name = (error as { name?: string }).name
+    if (!(error instanceof BucketAlreadyOwnedByYou) && name !== 'BucketAlreadyExists') throw error
+  } finally {
+    client.destroy()
+  }
+}
+
 async function cleanup() {
   await db.execute(sql`DELETE FROM libraries WHERE id = ${LIBRARY_ID}`)
   await db.execute(sql`DELETE FROM s3_connections WHERE id = ${LIBRARY_ID}`)
@@ -89,10 +114,11 @@ try {
   workDir = await mkdtemp(path.join(tmpdir(), 'pb-s3-'))
 
   section('Reachability')
+  await ensureBucket()
   const storage = new S3Adapter(managed)
   const health = await storage.healthCheck()
   check('bucket reachable', health.ok, health.reason ?? `${health.entryCount} entries`)
-  if (!health.ok) throw new Error('MinIO is not reachable; is the s3 profile up?')
+  if (!health.ok) throw new Error('The S3 server is not reachable; is the s3 profile up?')
 
   section('Small writes')
   await storage.write('Widget/notes.txt', 'hello from print manager')

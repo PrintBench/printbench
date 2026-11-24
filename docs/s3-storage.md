@@ -263,7 +263,9 @@ bucket through the application, which on a metered provider means egress:
 
 `npm run verify:s3` exercises the whole S3 path against a real bucket —
 multipart upload, presigned download, ZIP extraction, scanning, deletion and the
-read-only guard. It defaults to the MinIO in `docker-compose.dev.yml`:
+read-only guard. It defaults to the S3 server in `docker-compose.dev.yml`
+(SeaweedFS, on `http://localhost:9000` with `printbench` as both the access key
+and the secret), and creates the bucket if it is missing:
 
 ```bash
 docker compose -f docker-compose.dev.yml --profile s3 up -d

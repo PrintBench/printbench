@@ -9,7 +9,7 @@ import type { LibraryLocation } from './types'
  *
  * Key construction and the read-only guard are the parts that can lose or
  * expose data, and both are pure. Talking to a real bucket is what
- * scripts/verify-phase8.mts does against MinIO when one is available.
+ * scripts/verify-s3.mts does against the s3 profile's dev server.
  */
 
 const base: LibraryLocation = {
