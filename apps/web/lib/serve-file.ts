@@ -8,7 +8,7 @@ import {
   accelRedirectPath,
   contentDisposition,
   createStorageAdapter,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   parseRange,
   verifyToken,
 } from '@pb/core'
@@ -48,7 +48,7 @@ export async function serveFile(request: Request, fileId: string): Promise<Respo
   const row = rows[0]
   if (!row || row.file.missingAt) return new Response('Not found', { status: 404 })
 
-  const location = libraryLocationFromRow(row.library)
+  const location = await resolveLibraryLocation(getDb(), row.library)
   const storage = createStorageAdapter(location)
 
   // A model that is a single loose file has no folder of its own.

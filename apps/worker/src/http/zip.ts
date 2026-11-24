@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { eq, isNull, and } from 'drizzle-orm'
 import { ZipArchive, type ArchiverError } from 'archiver'
 import { getDb, schema } from '@pb/db'
-import { contentDisposition, createStorageAdapter, libraryLocationFromRow } from '@pb/core'
+import { contentDisposition, createStorageAdapter, resolveLibraryLocation } from '@pb/core'
 
 /**
  * Streams a whole model as a ZIP.
@@ -97,7 +97,7 @@ export async function handleZipRequest(
     return
   }
 
-  const storage = createStorageAdapter(libraryLocationFromRow(row.library))
+  const storage = createStorageAdapter(await resolveLibraryLocation(getDb(), row.library))
 
   const safeName = row.model.name.replace(/[/\\]/g, '-') || 'model'
 

@@ -1,41 +1,88 @@
 'use client'
 
+import Link from 'next/link'
+import { Cloud } from 'lucide-react'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import type { S3Config } from '../actions'
 
+/** What the picker shows of a connection. Never its credentials. */
+export interface ConnectionOption {
+  id: string
+  name: string
+  bucket: string
+  endpoint: string | null
+}
+
 /**
- * The fields for an existing S3 (or S3-compatible) bucket.
+ * Where an S3 library's files are: a connection, and a prefix within its
+ * bucket.
  *
- * Only bucket is required. Region and endpoint default sensibly for real AWS;
- * a self-hosted gateway like MinIO needs the endpoint filled in, at which
- * point path-style addressing is switched on automatically since virtual-host
- * addressing needs a wildcard DNS entry per bucket that self-hosted gateways
- * rarely have.
+ * The bucket and its credentials are not asked for here. They are set up once
+ * under Storage and shared, so a bucket split into several libraries needs its
+ * key typed once, and withdrawing it is one change rather than one per library.
  */
 export function S3Fields({
+  connections,
   value,
   onChange,
 }: {
+  connections: ConnectionOption[]
   value: S3Config
   onChange: (next: S3Config) => void
 }) {
+  if (connections.length === 0) {
+    return (
+      <div className="flex items-start gap-3 rounded-[var(--radius-control)] bg-[var(--color-surface-2)] p-3 text-sm">
+        <Cloud className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)]" />
+        <p className="text-[var(--color-ink-muted)]">
+          There are no S3 connections yet. Add the bucket and its key under{' '}
+          <Link
+            href="/admin/storage"
+            className="font-medium text-[var(--color-ink)] underline decoration-[var(--color-border-strong)] underline-offset-2 hover:decoration-[var(--color-accent)]"
+          >
+            Storage
+          </Link>{' '}
+          first, then come back here.
+        </p>
+      </div>
+    )
+  }
+
+  const selected = connections.find((connection) => connection.id === value.connectionId)
+
   return (
     <div className="space-y-4">
-      <Field label="Bucket" htmlFor="s3-bucket">
-        <Input
-          name="s3-bucket"
+      <Field
+        label="S3 connection"
+        htmlFor="s3-connection"
+        hint={
+          selected
+            ? `Bucket ${selected.bucket}${selected.endpoint ? ` at ${selected.endpoint}` : ''}.`
+            : undefined
+        }
+      >
+        <Select
           autoFocus
-          value={value.bucket}
-          placeholder="my-print-library"
-          onChange={(e) => onChange({ ...value, bucket: e.target.value })}
-        />
+          value={value.connectionId}
+          onChange={(e) => onChange({ ...value, connectionId: e.target.value })}
+        >
+          <option value="" disabled>
+            Choose a connection…
+          </option>
+          {connections.map((connection) => (
+            <option key={connection.id} value={connection.id}>
+              {connection.name} ({connection.bucket})
+            </option>
+          ))}
+        </Select>
       </Field>
 
       <Field
         label="Prefix"
         htmlFor="s3-prefix"
-        hint="Optional. Only this folder within the bucket is indexed."
+        hint="Optional. Only this folder within the bucket is indexed, so one bucket can hold several libraries."
       >
         <Input
           name="s3-prefix"
@@ -45,56 +92,13 @@ export function S3Fields({
         />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Region" htmlFor="s3-region" hint="Leave blank for us-east-1.">
-          <Input
-            name="s3-region"
-            value={value.region ?? ''}
-            placeholder="us-east-1"
-            onChange={(e) => onChange({ ...value, region: e.target.value })}
-          />
-        </Field>
-
-        <Field
-          label="Endpoint"
-          htmlFor="s3-endpoint"
-          hint="Only for a self-hosted gateway (MinIO, etc). Leave blank for AWS."
-        >
-          <Input
-            name="s3-endpoint"
-            value={value.endpoint ?? ''}
-            placeholder="https://minio.example.com"
-            onChange={(e) => onChange({ ...value, endpoint: e.target.value })}
-          />
-        </Field>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label="Access key ID"
-          htmlFor="s3-access-key"
-          hint="Leave blank to use the server's own credentials."
-        >
-          <Input
-            name="s3-access-key"
-            value={value.accessKeyId ?? ''}
-            onChange={(e) => onChange({ ...value, accessKeyId: e.target.value })}
-          />
-        </Field>
-
-        <Field label="Secret access key" htmlFor="s3-secret-key">
-          <Input
-            name="s3-secret-key"
-            type="password"
-            value={value.secretAccessKey ?? ''}
-            onChange={(e) => onChange({ ...value, secretAccessKey: e.target.value })}
-          />
-        </Field>
-      </div>
-
       <p className="text-xs text-[var(--color-ink-faint)]">
-        The secret key is encrypted before it is stored. Downloads are served with a presigned URL,
-        so large files go straight from the bucket rather than through this server.
+        Manage buckets and keys under{' '}
+        <Link href="/admin/storage" className="underline underline-offset-2">
+          Storage
+        </Link>
+        . Downloads are served with a presigned URL, so large files go straight from the bucket
+        rather than through this server.
       </p>
     </div>
   )

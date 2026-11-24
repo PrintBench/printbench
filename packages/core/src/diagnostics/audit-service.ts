@@ -47,6 +47,10 @@ export const AUDIT_ACTIONS = {
   'library.scan_aborted': 'Scan aborted',
   'library.scan_failed': 'Scan failed',
 
+  'storage.created': 'Added an S3 connection',
+  'storage.updated': 'Changed an S3 connection',
+  'storage.deleted': 'Removed an S3 connection',
+
   'creator.created': 'Added a creator',
 
   'tag.updated': 'Changed a tag',
@@ -103,6 +107,7 @@ export const AUDIT_CATEGORIES = {
   user: 'Users',
   model: 'Models',
   library: 'Libraries',
+  storage: 'Storage',
   creator: 'Creators',
   tag: 'Tags',
   collection: 'Collections',

@@ -12,7 +12,7 @@ import {
   dirname,
   extensionOf,
   isSafeRelativePath,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   normalizePath,
   isIgnoredName,
   isIndexable,
@@ -222,7 +222,7 @@ async function ingest(
     return
   }
 
-  const storage = createStorageAdapter(libraryLocationFromRow(library))
+  const storage = createStorageAdapter(await resolveLibraryLocation(getDb(), library))
   const staged = path.join(stagingDir, uploadId)
 
   /*

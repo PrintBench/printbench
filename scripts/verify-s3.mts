@@ -24,7 +24,7 @@ import {
   S3Adapter,
   createStorageAdapter,
   encryptSecret,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   loadRootEnv,
   scanLibrary,
   type LibraryLocation,
@@ -80,6 +80,7 @@ let workDir = ''
 
 async function cleanup() {
   await db.execute(sql`DELETE FROM libraries WHERE id = ${LIBRARY_ID}`)
+  await db.execute(sql`DELETE FROM s3_connections WHERE id = ${LIBRARY_ID}`)
   if (workDir) await rm(workDir, { recursive: true, force: true })
 }
 
@@ -202,18 +203,21 @@ try {
   check('refuses to extract over an existing folder', refusedSecond)
 
   section('Scanning a bucket')
+  // The connection reuses the library's id, so cleanup is one id for both.
   await db.execute(sql`
-    INSERT INTO libraries (id, name, kind, backend, allow_writes, s3_bucket, s3_prefix,
-                           s3_endpoint, s3_region, s3_access_key_id, s3_secret_access_key,
-                           s3_force_path_style)
-    VALUES (${LIBRARY_ID}, 'S3 Verify', 'managed', 's3', true, ${BUCKET}, ${PREFIX},
-            ${ENDPOINT}, 'us-east-1', ${ACCESS_KEY}, ${encryptSecret(SECRET_KEY)}, true)`)
+    INSERT INTO s3_connections (id, name, bucket, endpoint, region, access_key_id,
+                                secret_access_key, force_path_style)
+    VALUES (${LIBRARY_ID}, ${`S3 Verify ${PREFIX}`}, ${BUCKET}, ${ENDPOINT}, 'us-east-1',
+            ${ACCESS_KEY}, ${encryptSecret(SECRET_KEY)}, true)`)
+  await db.execute(sql`
+    INSERT INTO libraries (id, name, kind, backend, allow_writes, s3_connection_id, s3_prefix)
+    VALUES (${LIBRARY_ID}, 'S3 Verify', 'managed', 's3', true, ${LIBRARY_ID}, ${PREFIX})`)
 
   const rows = await db
     .select()
     .from(schema.libraries)
     .where(sql`id = ${LIBRARY_ID}`)
-  const location = libraryLocationFromRow(rows[0]!)
+  const location = await resolveLibraryLocation(db, rows[0]!)
   check('credentials decrypt out of the database', location.s3SecretAccessKey === SECRET_KEY)
 
   const scanStorage = createStorageAdapter(location)

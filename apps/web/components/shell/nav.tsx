@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   Boxes,
   ClipboardList,
+  Cloud,
   DatabaseBackup,
   FolderTree,
   HardDrive,
@@ -54,6 +55,7 @@ const ICONS = {
   heart: Heart,
   history: History,
   drive: HardDrive,
+  cloud: Cloud,
   health: Stethoscope,
   printer: Printer,
   settings: Settings,
@@ -92,6 +94,7 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
     title: 'Manage',
     items: [
       { href: '/admin/libraries', label: 'Libraries', icon: 'drive', requires: 'library:manage' },
+      { href: '/admin/storage', label: 'Storage', icon: 'cloud', requires: 'library:manage' },
       { href: '/admin/printers', label: 'Printers', icon: 'printer', requires: 'printhost:manage' },
       {
         href: '/admin/health',

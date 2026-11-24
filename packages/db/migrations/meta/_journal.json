@@ -148,6 +148,27 @@
       "when": 1795416882579,
       "tag": "0020_perfect_sauron",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795518641350,
+      "tag": "0021_s3_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795518641816,
+      "tag": "0022_move_s3_settings_to_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795518656580,
+      "tag": "0023_drop_library_s3_columns",
+      "breakpoints": true
     }
   ]
 }

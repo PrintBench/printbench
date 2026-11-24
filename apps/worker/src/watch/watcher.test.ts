@@ -38,8 +38,8 @@ describe('watchTargets', { tags: ['integration'] }, () => {
         (${LOCAL_OFF}, 'Not watched', 'in_place', 'local', '/libraries/quiet', false)
     `)
     await db.execute(sql`
-      INSERT INTO libraries (id, name, kind, backend, s3_bucket, watch_enabled) VALUES
-        (${S3_ON}, 'S3 watched (should be ignored)', 'in_place', 's3', 'bucket', true)
+      INSERT INTO libraries (id, name, kind, backend, s3_prefix, watch_enabled) VALUES
+        (${S3_ON}, 'S3 watched (should be ignored)', 'in_place', 's3', 'models', true)
     `)
   })
 

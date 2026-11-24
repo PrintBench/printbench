@@ -4,7 +4,7 @@ import { getDb, schema } from '@pb/db'
 import {
   createStorageAdapter,
   getPreviewStore,
-  libraryLocationFromRow,
+  resolveLibraryLocation,
   previewKey,
   applyEmbeddedModelMetadata,
   isEmbeddedMetadataSource,
@@ -74,7 +74,7 @@ async function loadFile(fileId: string): Promise<FileContext | null> {
   return {
     file: row.file,
     model: row.model,
-    storage: createStorageAdapter(libraryLocationFromRow(row.library)),
+    storage: createStorageAdapter(await resolveLibraryLocation(getDb(), row.library)),
     relativePath,
   }
 }
