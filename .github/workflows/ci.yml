@@ -4,16 +4,70 @@ on:
   push: { branches: [main] }
   pull_request:
   workflow_call:
+    inputs:
+      full_ci:
+        description: Run the full checks for a reusable workflow call
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Each main push checks its own diff, so a docs push must leave earlier builds running.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    if: ${{ !inputs.full_ci }}
+    runs-on: ubuntu-latest
+    outputs:
+      skip_full_ci: ${{ steps.diff.outputs.skip_full_ci }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for app, build or Docker changes
+        id: diff
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            # Compare the tested merge commit with its base parent.
+            BASE_SHA=HEAD^1
+          fi
+
+          # Unknown paths and unavailable comparisons both get the full checks.
+          if [[ -n "$BASE_SHA" ]] && git diff --quiet --no-renames "$BASE_SHA" HEAD -- . \
+            ':(exclude)docs' \
+            ':(exclude)screenshots' \
+            ':(exclude).agents' \
+            ':(exclude).claude' \
+            ':(exclude).codex' \
+            ':(exclude).github/ISSUE_TEMPLATE' \
+            ':(exclude).github/PULL_REQUEST_TEMPLATE.md' \
+            ':(exclude).github/dependabot.yml' \
+            ':(exclude).git-blame-ignore-revs' \
+            ':(exclude).gitignore' \
+            ':(exclude).nvmrc' \
+            ':(exclude)CLAUDE.md' \
+            ':(exclude)CODE_OF_CONDUCT.md' \
+            ':(exclude)CONTRIBUTING.md' \
+            ':(exclude)LICENSE' \
+            ':(exclude)README.md' \
+            ':(exclude)SECURITY.md' \
+            ':(exclude)SUPPORT.md'; then
+            echo 'skip_full_ci=true' >> "$GITHUB_OUTPUT"
+            echo 'Only repository documentation or local tooling changed.'
+          fi
+
   verify:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.skip_full_ci != 'true' }}
     runs-on: ubuntu-latest
 
     services:
@@ -81,6 +135,8 @@ jobs:
           retention-days: 7
 
   docker:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.skip_full_ci != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

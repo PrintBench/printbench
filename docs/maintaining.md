@@ -8,6 +8,12 @@ These requirements apply to administrators too; force pushes and branch deletion
 are blocked. Keep the check names stable, or update branch protection when
 renaming jobs. Release publication is not a required PR check.
 
+CI checks the changed paths on pull requests and pushes to `main`. When only
+repository documentation, screenshots, local tooling, or GitHub templates and
+Dependabot configuration change, GitHub reports `verify` and `docker` as
+skipped. App code, Docker and Compose files, build dependencies, and workflow
+changes run both jobs. Tagged releases always run full CI.
+
 There is currently one collaborator. No approving review is required, so the
 maintainer can merge their own PR after CI passes. Add a reviewer requirement
 and CODEOWNERS when another willing reviewer with write access is available.
