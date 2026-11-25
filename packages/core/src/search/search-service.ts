@@ -120,7 +120,7 @@ const WORD_SIMILARITY_THRESHOLD = 0.5
  * transaction and these queries do not run in one. It applies to the pooled
  * connection, which is exactly the scope wanted.
  */
-async function applyTrigramThreshold(db: Database): Promise<void> {
+export async function applyTrigramThreshold(db: Pick<Database, 'execute'>): Promise<void> {
   const value = WORD_SIMILARITY_THRESHOLD
   if (!Number.isFinite(value) || value < 0 || value > 1) {
     throw new Error(`Invalid trigram threshold: ${value}`)
@@ -430,12 +430,12 @@ async function facet<T extends { value: string; label: string; count: string }>(
  * `-term` excludes, `"a b"` is a phrase, and bare `or` is a disjunction. Each
  * expresses precision the fuzzy fallbacks would undo.
  */
-function hasSearchOperators(query: string): boolean {
+export function hasSearchOperators(query: string): boolean {
   return /(^|\s)-\S/.test(query) || query.includes('"') || /(^|\s)or(\s|$)/i.test(query)
 }
 
 /** ILIKE treats these as wildcards; a literal search must not. */
-function escapeLike(value: string): string {
+export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`)
 }
 

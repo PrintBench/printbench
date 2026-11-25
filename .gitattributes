@@ -12,6 +12,9 @@ Dockerfile*     text eol=lf
 # Generated; keep diffs out of review.
 package-lock.json  -diff linguist-generated
 packages/db/migrations/meta/**  -diff linguist-generated
+# The bundled filament catalogue (npm run filaments:update). Diffable on purpose
+# so a refresh can be inspected locally, but collapsed in PR review.
+packages/filament-catalog/data/**  linguist-generated
 
 # Binary
 *.png binary

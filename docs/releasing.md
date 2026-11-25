@@ -11,7 +11,12 @@ does not publish anything. Prepare and finish one release at a time.
 2. Write `docs/releases/v<version>.md`. Include highlights and a nonempty
    `## Upgrade notes` section covering migrations, backup/restore implications,
    environment changes and compatibility. Say explicitly if no action is needed.
-3. Update the companion documentation for changed behaviour, including migrations,
+3. Refresh the bundled filament catalogue with `npm run filaments:update` and
+   land the result through a PR (see `docs/filament-catalog.md`). Paste the
+   printed added/removed table into the PR, and mention the dataset version in
+   the release note. `release:check` warns when the snapshot is over 30 days
+   old; releasing with older data is allowed, for example when upstream is down.
+4. Update the companion documentation for changed behaviour, including migrations,
    backup/restore guidance and environment-variable reference changes. The app
    repository owns release notes, contributor setup/checks, invariants, security
    policy and this checklist; do not edit their generated docs-site copies.
@@ -21,12 +26,13 @@ does not publish anything. Prepare and finish one release at a time.
    with any handwritten page changes. Land app changes first, then the docs
    update: documentation CI compares against the app repository's `main`.
    The app release note is also the source for the GitHub release body.
-4. With a migrated development/test database, run `npm run check`. Run relevant
+5. With a migrated development/test database, run `npm run check`. Run relevant
    verification scripts and `npm run build` for changes affecting builds.
-5. Run `npm run release:check -- v<version>`. This validates the version and notes
-   and prints the intended image tags without publishing. On a fork, set
-   `GITHUB_REPOSITORY=owner/repository` to inspect that image name.
-6. Commit the version, lockfile and notes together, land them on `main`, and wait
+6. Run `npm run release:check -- v<version>`. This validates the version and notes,
+   checks the bundled filament catalogue, and prints the intended image tags
+   without publishing. On a fork, set `GITHUB_REPOSITORY=owner/repository` to
+   inspect that image name.
+7. Commit the version, lockfile and notes together, land them on `main`, and wait
    for CI to pass. Review the release note as operator-facing documentation.
 
 For example, once the prepared version is `0.7.0`:

@@ -3,26 +3,30 @@ import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Filament, Spool, spoolHistory, spoolPrints } from '@pb/core'
-import { remainingFromMeasurement } from '@pb/core/filaments'
+import { remainingFromMeasurement, type CatalogPick } from '@pb/core/filaments'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { StockIndicator } from './library'
 import { EditFilamentForm, SpoolForm } from './spool-form'
-import { correctSpool, setFilamentArchived, setSpoolArchived } from './actions'
+import { correctSpool, refreshFromCatalog, setFilamentArchived, setSpoolArchived } from './actions'
 type History = Awaited<ReturnType<typeof spoolHistory>>
 export function SpoolDetails({
   spool,
   filaments,
   history,
   prints,
+  catalogEntry = null,
   canManage,
 }: {
   spool: Spool
   filaments: Filament[]
   history: History
   prints: Awaited<ReturnType<typeof spoolPrints>>
+  /** The catalogue colour this filament was added from, when it was. */
+  catalogEntry?: CatalogPick | null
   canManage: boolean
 }) {
   const router = useRouter()
@@ -80,6 +84,22 @@ export function SpoolDetails({
             <dd>{spool.lowStockG} g</dd>
           </div>
         </dl>
+        {spool.filament.catalogVariantUuid && (
+          <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-[var(--color-ink-muted)]">
+            From the catalogue:
+            {catalogEntry ? (
+              <Link
+                href={`/filaments/catalog/${catalogEntry.filamentUuid}`}
+                className="text-[var(--color-accent)] hover:underline"
+              >
+                {catalogEntry.brandName} · {catalogEntry.filamentName} · {catalogEntry.variantName}
+              </Link>
+            ) : (
+              <span>entry not loaded</span>
+            )}
+            {catalogEntry?.removed && <Badge tone="danger">No longer in catalogue</Badge>}
+          </p>
+        )}
         {[spool.filament.notes, spool.notes].filter(Boolean).map((note, i) => (
           <p key={i} className="mt-3 whitespace-pre-wrap text-sm">
             {note}
@@ -101,6 +121,16 @@ export function SpoolDetails({
           <Button variant="secondary" onClick={() => setMode('filament')}>
             Edit filament details
           </Button>
+          {catalogEntry && (
+            <Button
+              variant="secondary"
+              disabled={pending || spool.filament.archived}
+              title="Copy the brand, material, colour and temperatures from the catalogue again. Your name, notes and diameter are kept."
+              onClick={() => run(() => refreshFromCatalog(spool.filamentId))}
+            >
+              Refresh from catalogue
+            </Button>
+          )}
           <Button
             variant="secondary"
             disabled={pending || spool.filament.archived}

@@ -1,7 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Filament, Spool } from '@pb/core'
+import type { CatalogPick } from '@pb/core/filaments'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -54,12 +56,25 @@ export function FilamentLibrary({
   spools,
   filaments,
   canManage,
+  materials: catalogMaterials = [],
+  initialPick = null,
+  initialSizeUuid = null,
 }: {
   spools: Spool[]
   filaments: Filament[]
   canManage: boolean
+  materials?: string[]
+  /** A catalogue colour to start a new spool from ("Add spool" in the catalogue). */
+  initialPick?: CatalogPick | null
+  initialSizeUuid?: string | null
 }) {
-  const [adding, setAdding] = useState(false)
+  const router = useRouter()
+  const [adding, setAdding] = useState(initialPick !== null)
+  function closeForm() {
+    setAdding(false)
+    // Drop `?add=` from the catalogue so a reload does not reopen the form.
+    if (initialPick) router.replace('/filaments')
+  }
   const [query, setQuery] = useState('')
   const [material, setMaterial] = useState('')
   const [location, setLocation] = useState('')
@@ -92,10 +107,20 @@ export function FilamentLibrary({
           {spools.filter((s) => !s.archived).length} active spools
         </p>
         {canManage && (
-          <Button onClick={() => setAdding(!adding)}>{adding ? 'Close form' : 'Add spool'}</Button>
+          <Button onClick={() => (adding ? closeForm() : setAdding(true))}>
+            {adding ? 'Close form' : 'Add spool'}
+          </Button>
         )}
       </div>
-      {adding && <SpoolForm filaments={filaments} onCancel={() => setAdding(false)} />}
+      {adding && (
+        <SpoolForm
+          filaments={filaments}
+          materials={catalogMaterials}
+          initialPick={initialPick}
+          initialSizeUuid={initialSizeUuid}
+          onCancel={closeForm}
+        />
+      )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Input
           aria-label="Search filaments"

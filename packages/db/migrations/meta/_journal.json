@@ -176,6 +176,13 @@
       "when": 1795523351932,
       "tag": "0024_library_removal",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795546182730,
+      "tag": "0025_clear_james_howlett",
+      "breakpoints": true
     }
   ]
 }

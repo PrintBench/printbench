@@ -22,6 +22,7 @@ import { handleFileAnalyze, handleFileDigest, handleFileThumbnail } from './jobs
 import { handleHealthDetect } from './jobs/health'
 import { handleMaintArchive, handleMaintReconcile } from './jobs/maintenance'
 import { handleScheduleSweep } from './jobs/schedule'
+import { handleFilamentCatalogSync } from './jobs/filament-catalog'
 import { handleZipRequest } from './http/zip'
 import { handleUploadRequest } from './http/upload'
 import { createBackupHandler } from './backup/http'
@@ -146,10 +147,18 @@ async function startWork(): Promise<void> {
   await work(JOB.maintReconcile, handleMaintReconcile)
   await work(JOB.maintArchive, handleMaintArchive)
   await work(JOB.scheduleSweep, handleScheduleSweep)
+  await work(JOB.filamentCatalogSync, handleFilamentCatalogSync)
   console.log(
     '[worker] handlers: library.scan, library.remove, model.move, file.analyze, file.thumbnail, file.digest, ' +
-      'health.detect, library.schedule, maint.reconcile, maint.archive',
+      'health.detect, library.schedule, maint.reconcile, maint.archive, filament-catalog.sync',
   )
+
+  /*
+   * Load the filament catalogue bundled with this release. Here rather than in
+   * main() because startWork() also runs after a restore, which empties the
+   * catalogue tables (they are not backed up). Usually a one-row no-op.
+   */
+  await queue.send(JOB.filamentCatalogSync, {}, { singletonKey: 'filament-catalog' })
 
   /*
    * Re-enqueues derived work that was lost — a worker killed mid-render leaves

@@ -18,6 +18,7 @@ COPY packages/core/package.json packages/core/
 COPY packages/mesh/package.json packages/mesh/
 COPY packages/jobs/package.json packages/jobs/
 COPY packages/auth/package.json packages/auth/
+COPY packages/filament-catalog/package.json packages/filament-catalog/
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 # tsx and development tools bring their own esbuild versions. Rebuild each

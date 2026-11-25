@@ -66,18 +66,63 @@ export function prepareRelease({ tag, repository, root = process.cwd() }) {
   }
 }
 
+/** Beyond this, a release ships noticeably old filament data. A warning, not a failure. */
+export const CATALOG_STALE_DAYS = 30
+
+/**
+ * Checks the bundled filament catalogue (packages/filament-catalog/data).
+ *
+ * The catalogue ships inside the release and is never fetched at runtime, so
+ * this is the moment it can be refreshed (`npm run filaments:update`). A
+ * missing snapshot fails: the worker would have nothing to import. An old one
+ * only warns, so a release can still be cut offline or when upstream is down.
+ * Internal consistency is checked by the unit tests, which run in CI.
+ */
+export function checkFilamentCatalog({ root = process.cwd(), now = new Date() } = {}) {
+  let snapshot
+  try {
+    snapshot = JSON.parse(
+      readFileSync(resolve(root, 'packages/filament-catalog/data/snapshot.json'), 'utf8'),
+    )
+  } catch {
+    throw new Error(
+      'The filament catalogue snapshot is missing. Run `npm run filaments:update` and commit the result.',
+    )
+  }
+  const generated = new Date(snapshot.generatedAt)
+  if (!snapshot.datasetVersion || Number.isNaN(generated.getTime())) {
+    throw new Error('packages/filament-catalog/data/snapshot.json is not a valid snapshot.')
+  }
+  const ageDays = Math.floor((now.getTime() - generated.getTime()) / 86_400_000)
+  const warnings =
+    ageDays > CATALOG_STALE_DAYS
+      ? [
+          `The bundled filament catalogue is ${ageDays} days old (dataset ${snapshot.datasetVersion}). ` +
+            'Consider `npm run filaments:update` before releasing.',
+        ]
+      : []
+  return { datasetVersion: snapshot.datasetVersion, ageDays, warnings }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const meta = prepareRelease({
       tag: process.argv[2] ?? process.env.GITHUB_REF_NAME,
       repository: process.env.GITHUB_REPOSITORY ?? 'PrintBench/printbench',
     })
+    const catalog = checkFilamentCatalog()
+    for (const warning of catalog.warnings) {
+      process.stderr.write(`Warning: ${warning}\n`)
+      // Surfaces on the workflow run summary without failing it.
+      if (process.env.GITHUB_ACTIONS) process.stdout.write(`::warning::${warning}\n`)
+    }
     const output = [
       `version=${meta.version}`,
       `image=${meta.image}`,
       `nginx_image=${meta.nginxImage}`,
       `notes=${meta.notes}`,
       `prerelease=${meta.prerelease}`,
+      `filament_catalog=${catalog.datasetVersion}`,
       'tags<<RELEASE_TAGS',
       ...meta.tags,
       'RELEASE_TAGS',

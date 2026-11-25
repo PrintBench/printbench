@@ -1,0 +1,19 @@
+{
+  "source": "open-filament-database",
+  "sourceRepo": "https://github.com/OpenFilamentCollective/open-filament-database",
+  "licence": "MIT",
+  "tag": "dataset-v2026.11.23",
+  "datasetVersion": "2026.11.23",
+  "generatedAt": "2026-11-23T02:42:02Z",
+  "sourceSha256": "514c08ab287008fd1b02c4ba521646542bd2074d789e85999428f942ac03e1ba",
+  "contentSha256": "0cdc191999b8bc24712478ad98cb86c460b5cc6eee5ac76ea4efc308b41525fa",
+  "counts": {
+    "brands": 184,
+    "stores": 86,
+    "materials": 767,
+    "filaments": 2226,
+    "variants": 15824,
+    "sizes": 25020,
+    "purchase_links": 8431
+  }
+}

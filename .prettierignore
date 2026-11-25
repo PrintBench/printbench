@@ -14,3 +14,6 @@ apps/web/next-env.d.ts
 # Browser smoke artifacts
 test-results/
 playwright-report/
+
+# Bundled filament catalogue, written by `npm run filaments:update`
+packages/filament-catalog/data/

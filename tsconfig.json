@@ -6,6 +6,7 @@
     { "path": "./packages/mesh" },
     { "path": "./packages/jobs" },
     { "path": "./packages/auth" },
+    { "path": "./packages/filament-catalog" },
     { "path": "./apps/worker" }
   ],
   "exclude": ["reference"]
