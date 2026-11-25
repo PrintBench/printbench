@@ -2,6 +2,14 @@
 
 <!-- And why. The "why" is the part a reviewer cannot reconstruct from the diff. -->
 
+## Documentation impact
+
+<!--
+Link the documentation updated by this PR or the companion docs PR, and name the
+affected pages. Include any upgrade or migration guidance readers will need.
+If no documentation changes are needed, explain why.
+-->
+
 ## Checks
 
 - [ ] `npm run check` — formatting, lint, typechecking, release preparation tests
