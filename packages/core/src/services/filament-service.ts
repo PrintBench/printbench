@@ -29,6 +29,7 @@ export interface Spool {
   location: string | null
   notes: string | null
   lowStockG: number
+  catalogSizeUuid: string | null
   archived: boolean
   spoolArchived: boolean
 }
@@ -38,6 +39,18 @@ export interface FilamentUsage extends FilamentUsageInput {
 }
 const text = (value?: string | null) => value?.trim().slice(0, 5000) || null
 const number = (value: string | null) => (value === null ? null : Number(value))
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/**
+ * A catalogue link from a form. `undefined` means "not mentioned", so an edit
+ * from a form without the field keeps the existing link instead of clearing
+ * it; the key is then left out of the update entirely.
+ */
+function catalogLink<K extends string>(key: K, value: string | null | undefined) {
+  if (value === undefined) return {} as Partial<Record<K, string | null>>
+  if (value !== null && value !== '' && !UUID.test(value))
+    throw new FilamentValidationError('That catalogue entry is not valid.')
+  return { [key]: value || null } as Record<K, string | null>
+}
 function validateFilament(input: FilamentInput) {
   if (!text(input.name) || !text(input.material))
     throw new FilamentValidationError('Name and material are required.')
@@ -62,6 +75,7 @@ function validateFilament(input: FilamentInput) {
     nozzleTempC: input.nozzleTempC == null ? null : String(input.nozzleTempC),
     bedTempC: input.bedTempC == null ? null : String(input.bedTempC),
     notes: text(input.notes),
+    ...catalogLink('catalogVariantUuid', input.catalogVariantUuid),
   }
 }
 export async function listFilaments(db: FilamentDb): Promise<Filament[]> {
@@ -77,6 +91,7 @@ export async function listFilaments(db: FilamentDb): Promise<Filament[]> {
     nozzleTempC: number(row.nozzleTempC),
     bedTempC: number(row.bedTempC),
     notes: row.notes,
+    catalogVariantUuid: row.catalogVariantUuid,
     archived: row.archivedAt != null,
   }))
 }
@@ -120,6 +135,7 @@ export async function listSpools(db: FilamentDb): Promise<Spool[]> {
     location: row.location,
     notes: row.notes,
     lowStockG: Number(row.lowStockG),
+    catalogSizeUuid: row.catalogSizeUuid,
     spoolArchived: row.archivedAt != null,
     archived: row.archivedAt != null || byId.get(row.filamentId)!.archived,
   }))
@@ -135,6 +151,7 @@ function spoolValues(input: SpoolInput) {
     location: text(input.location),
     notes: text(input.notes),
     lowStockG: String(weight(input.lowStockG ?? 100, 'Low stock threshold')),
+    ...catalogLink('catalogSizeUuid', input.catalogSizeUuid),
   }
 }
 export async function createSpool(

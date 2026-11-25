@@ -65,5 +65,6 @@ export * from './import/makerworld-auth'
 export * from './import/makerworld-auth-service'
 
 export * from './services/filament-service'
+export * from './services/filament-catalog-service'
 
 export * from './services/filament-backup'

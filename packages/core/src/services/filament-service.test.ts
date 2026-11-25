@@ -324,4 +324,58 @@ describe('filament inventory with Postgres', { tags: ['integration'] }, () => {
     await deletePrint(db, run.id)
     expect(await balance(a.id)).toBe(330)
   })
+  it('keeps catalogue links through edits and backups, and restores older backups', async () => {
+    const VARIANT = 'ca7a0000-0000-4000-8000-0000000000aa'
+    const SIZE = 'ca7a0000-0000-4000-8000-0000000000bb'
+    const a = await add({
+      filament: { name: 'Linked PETG', material: 'PETG', catalogVariantUuid: VARIANT },
+      catalogSizeUuid: SIZE,
+    })
+    expect(a.filament.catalogVariantUuid).toBe(VARIANT)
+    expect(a.catalogSizeUuid).toBe(SIZE)
+
+    // A form that does not carry the link must not clear it.
+    await editFilament(db, a.filamentId, { name: 'Renamed PETG', material: 'PETG' })
+    await editSpool(db, a.id, { label: 'Relabelled' })
+    let spool = (await listSpools(db)).find((s) => s.id === a.id)!
+    expect(spool.filament.catalogVariantUuid).toBe(VARIANT)
+    expect(spool.catalogSizeUuid).toBe(SIZE)
+    // Clearing is explicit.
+    await editFilament(db, a.filamentId, {
+      name: 'Renamed PETG',
+      material: 'PETG',
+      catalogVariantUuid: null,
+    })
+    spool = (await listSpools(db)).find((s) => s.id === a.id)!
+    expect(spool.filament.catalogVariantUuid).toBeNull()
+    await expect(
+      editFilament(db, a.filamentId, { name: 'X', material: 'PETG', catalogVariantUuid: 'nope' }),
+    ).rejects.toThrow('catalogue entry')
+
+    const all = await db.transaction((tx) => exportFilamentInventory(tx), {
+      isolationLevel: 'repeatable read',
+    })
+    const backup = {
+      filaments: all.filaments.filter((f) => f.id === a.filamentId),
+      spools: all.spools.filter((s) => s.id === a.id),
+      changes: all.changes.filter((c) => c.spoolId === a.id),
+      usage: [],
+    }
+    expect(backup.spools[0]!.catalogSizeUuid).toBe(SIZE)
+    // No catalogue row exists for these uuids, and none is needed: links are not foreign keys.
+    for (const withLinks of [true, false]) {
+      await db.execute(sql`DELETE FROM filament_stock_changes WHERE spool_id = ${a.id}`)
+      await db.execute(sql`DELETE FROM filament_spools WHERE id = ${a.id}`)
+      await db.execute(sql`DELETE FROM filaments WHERE id = ${a.filamentId}`)
+      const input = withLinks
+        ? backup
+        : {
+            ...backup,
+            spools: backup.spools.map(({ catalogSizeUuid: _, ...rest }) => rest),
+          }
+      await restoreFilamentInventory(db, input)
+      const restored = (await listSpools(db)).find((s) => s.id === a.id)!
+      expect(restored.catalogSizeUuid).toBe(withLinks ? SIZE : null)
+    }
+  })
 })

@@ -2,16 +2,40 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Filament, Spool } from '@pb/core'
-import type { FilamentInput, SpoolInput } from '@pb/core/filaments'
+import {
+  prefillFromCatalog,
+  type CatalogPick,
+  type FilamentInput,
+  type SpoolInput,
+} from '@pb/core/filaments'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Field } from '@/components/ui/field'
 import { addSpool, saveFilament, saveSpool } from './actions'
+import { CatalogPicker } from './catalog-picker'
 
-export function FilamentFields({ initial }: { initial?: Filament }) {
+const DEFAULT_MATERIALS = ['PLA', 'PLA+', 'PETG', 'ABS', 'ASA', 'TPU', 'PA', 'PC']
+
+export function FilamentFields({
+  initial,
+  materials,
+  catalogVariantUuid,
+}: {
+  initial?: FilamentInput
+  /** Material suggestions, from the catalogue when it is loaded. */
+  materials?: string[]
+  /**
+   * Rendered as a hidden field only when given. Forms that leave it out (editing
+   * an existing filament) send no value, which keeps the stored link as it is.
+   */
+  catalogVariantUuid?: string
+}) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
+      {catalogVariantUuid !== undefined && (
+        <input type="hidden" name="catalogVariantUuid" value={catalogVariantUuid} />
+      )}
       <Field label="Product / display name" htmlFor="filament-name">
         <Input
           id="filament-name"
@@ -32,7 +56,7 @@ export function FilamentFields({ initial }: { initial?: Filament }) {
         />
       </Field>
       <datalist id="filament-materials">
-        {['PLA', 'PLA+', 'PETG', 'ABS', 'ASA', 'TPU', 'PA', 'PC'].map((m) => (
+        {(materials?.length ? materials : DEFAULT_MATERIALS).map((m) => (
           <option key={m} value={m} />
         ))}
       </datalist>
@@ -112,6 +136,9 @@ export function filamentInput(data: FormData): FilamentInput {
     nozzleTempC: nullable(data, 'nozzleTempC'),
     bedTempC: nullable(data, 'bedTempC'),
     notes: String(data.get('filamentNotes') ?? ''),
+    catalogVariantUuid: data.has('catalogVariantUuid')
+      ? String(data.get('catalogVariantUuid')) || null
+      : undefined,
   }
 }
 function nullable(data: FormData, key: string) {
@@ -122,18 +149,35 @@ export function SpoolForm({
   filaments,
   initial,
   duplicate = false,
+  materials,
+  initialPick = null,
+  initialSizeUuid = null,
   onCancel,
 }: {
   filaments: Filament[]
   initial?: Spool
   duplicate?: boolean
+  materials?: string[]
+  initialPick?: CatalogPick | null
+  initialSizeUuid?: string | null
   onCancel: () => void
 }) {
   const router = useRouter()
   const [filamentId, setFilamentId] = useState(initial?.filamentId ?? '')
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [pick, setPick] = useState<CatalogPick | null>(initialPick)
+  const [sizeUuid, setSizeUuid] = useState<string | null>(
+    initialPick?.sizes.some((s) => s.uuid === initialSizeUuid) ? initialSizeUuid : null,
+  )
   const editing = initial && !duplicate
+  const prefill = pick ? prefillFromCatalog(pick, sizeUuid) : null
+  // Remounting the uncontrolled fields is what applies a new prefill to them.
+  const prefillKey = `${pick?.variantUuid ?? 'manual'}:${sizeUuid ?? ''}`
+  // Picking a colour you already own offers that filament rather than a duplicate.
+  const owned = pick
+    ? filaments.find((f) => !f.archived && f.catalogVariantUuid === pick.variantUuid)
+    : undefined
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
@@ -148,6 +192,7 @@ export function SpoolForm({
       location: String(data.get('location') ?? ''),
       notes: String(data.get('notes') ?? ''),
       lowStockG: Number(data.get('lowStockG')),
+      catalogSizeUuid: editing ? undefined : String(data.get('catalogSizeUuid') ?? '') || null,
     }
     setError(null)
     startTransition(async () => {
@@ -168,6 +213,34 @@ export function SpoolForm({
       <h2 className="font-semibold">
         {editing ? 'Edit spool' : duplicate ? 'Duplicate spool' : 'Add spool'}
       </h2>
+      {!editing && !filamentId && (
+        <CatalogPicker
+          pick={pick}
+          sizeUuid={sizeUuid}
+          onPick={(p) => {
+            setPick(p)
+            setSizeUuid(p.sizes.length === 1 ? p.sizes[0]!.uuid : null)
+          }}
+          onSize={setSizeUuid}
+          onClear={() => {
+            setPick(null)
+            setSizeUuid(null)
+          }}
+        />
+      )}
+      {!editing && owned && filamentId !== owned.id && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-[var(--color-ink-muted)]">
+          You already have “{owned.name}”.
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => setFilamentId(owned.id)}
+          >
+            Add another spool of it
+          </Button>
+        </p>
+      )}
       {!editing && (
         <Field label="Filament" htmlFor="spool-filament">
           <Select
@@ -186,8 +259,18 @@ export function SpoolForm({
           </Select>
         </Field>
       )}
-      {!filamentId && <FilamentFields />}
-      <div className="grid gap-3 sm:grid-cols-2">
+      {!filamentId && (
+        <FilamentFields
+          key={`filament:${prefillKey}`}
+          initial={prefill?.filament}
+          materials={materials}
+          catalogVariantUuid={pick?.variantUuid ?? ''}
+        />
+      )}
+      {!editing && (
+        <input type="hidden" name="catalogSizeUuid" value={prefill?.spool.catalogSizeUuid ?? ''} />
+      )}
+      <div key={`spool:${prefillKey}`} className="grid gap-3 sm:grid-cols-2">
         <Field label="Spool label" htmlFor="spool-label">
           <Input
             id="spool-label"
@@ -204,7 +287,7 @@ export function SpoolForm({
             min="0.01"
             step="0.01"
             required
-            defaultValue={initial?.nominalWeightG ?? 1000}
+            defaultValue={initial?.nominalWeightG ?? prefill?.spool.nominalWeightG ?? 1000}
           />
         </Field>
         {!editing && (
@@ -224,7 +307,7 @@ export function SpoolForm({
               min="0"
               step="0.01"
               required
-              defaultValue={duplicate ? undefined : 1000}
+              defaultValue={duplicate ? undefined : (prefill?.spool.nominalWeightG ?? 1000)}
             />
           </Field>
         )}
@@ -235,7 +318,7 @@ export function SpoolForm({
             type="number"
             min="0"
             step="0.01"
-            defaultValue={initial?.emptyWeightG ?? ''}
+            defaultValue={initial?.emptyWeightG ?? prefill?.spool.emptyWeightG ?? ''}
           />
         </Field>
         <Field label="Purchase cost" htmlFor="spool-cost">

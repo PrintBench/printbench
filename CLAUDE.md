@@ -16,6 +16,7 @@ packages/core   Framework-free domain logic: storage, library, scan, search, pol
 packages/mesh   STL/3MF/OBJ/PLY parsers and deterministic thumbnail rasteriser
 packages/jobs   pg-boss queue wrapper
 packages/auth   better-auth wrapper
+packages/filament-catalog  Bundled Open Filament Database snapshot + normaliser (worker-only)
 scripts/        verify-phase*.mts end-to-end checks, smoke helpers, backup, release metadata
 docker/         Dockerfile, nginx, entrypoints (compose files live at the repo root)
 reference/      AGPL material, gitignored: NEVER lint, import, build or ship it
@@ -85,4 +86,4 @@ npm run db:generate                # regenerate migration after editing the Driz
 ## More detail
 
 `docs/deployment.md`, `docs/s3-storage.md`, `docs/model-imports.md`, `docs/model-packages.md`,
-`docs/worker-memory.md`. User-facing docs live at https://docs.printbench.app (separate repo).
+`docs/worker-memory.md`, `docs/filament-catalog.md` (bundled offline filament data; refreshed per release). User-facing docs live at https://docs.printbench.app (separate repo).

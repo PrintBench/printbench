@@ -23,21 +23,33 @@ export interface FilamentSnapshot {
   spoolLabel: string | null
 }
 
-export const filaments = pgTable('filaments', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  brand: text('brand'),
-  material: text('material').notNull(),
-  colorName: text('color_name'),
-  colorHex: text('color_hex'),
-  diameterMm: numeric('diameter_mm', { precision: 5, scale: 2 }).notNull().default('1.75'),
-  nozzleTempC: numeric('nozzle_temp_c', { precision: 5, scale: 1 }),
-  bedTempC: numeric('bed_temp_c', { precision: 5, scale: 1 }),
-  notes: text('notes'),
-  archivedAt: timestamp('archived_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const filaments = pgTable(
+  'filaments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    brand: text('brand'),
+    material: text('material').notNull(),
+    colorName: text('color_name'),
+    colorHex: text('color_hex'),
+    diameterMm: numeric('diameter_mm', { precision: 5, scale: 2 }).notNull().default('1.75'),
+    nozzleTempC: numeric('nozzle_temp_c', { precision: 5, scale: 1 }),
+    bedTempC: numeric('bed_temp_c', { precision: 5, scale: 1 }),
+    notes: text('notes'),
+    /**
+     * The catalogue colour (filament_catalog_variants.uuid) this was created
+     * from. The values above are a copy the user may have edited; this is only
+     * provenance. Deliberately not a foreign key: a filament backup must
+     * restore onto an instance whose catalogue has not been imported yet, or
+     * no longer has the entry.
+     */
+    catalogVariantUuid: uuid('catalog_variant_uuid'),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('filaments_catalog_variant_idx').on(t.catalogVariantUuid)],
+)
 
 export const filamentSpools = pgTable(
   'filament_spools',
@@ -55,6 +67,8 @@ export const filamentSpools = pgTable(
     location: text('location'),
     notes: text('notes'),
     lowStockG: numeric('low_stock_g', { precision: 10, scale: 2 }).notNull().default('100'),
+    /** The catalogue spool size this roll matches; provenance only, no FK (see catalogVariantUuid). */
+    catalogSizeUuid: uuid('catalog_size_uuid'),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

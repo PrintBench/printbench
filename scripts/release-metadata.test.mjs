@@ -6,7 +6,7 @@ import process from 'node:process'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath, URL } from 'node:url'
 import { afterEach, test } from 'node:test'
-import { prepareRelease } from './release-metadata.mjs'
+import { checkFilamentCatalog, prepareRelease } from './release-metadata.mjs'
 
 const roots = []
 afterEach(() => {
@@ -22,6 +22,12 @@ function fixture(
   writeFileSync(join(root, 'package.json'), JSON.stringify({ version }))
   mkdirSync(join(root, 'docs/releases'), { recursive: true })
   writeFileSync(join(root, `docs/releases/v${version}.md`), content)
+  // A real checkout always has a bundled filament catalogue; the CLI requires one.
+  mkdirSync(join(root, 'packages/filament-catalog/data'), { recursive: true })
+  writeFileSync(
+    join(root, 'packages/filament-catalog/data/snapshot.json'),
+    JSON.stringify({ datasetVersion: '2026.11.23', generatedAt: new Date().toISOString() }),
+  )
   return { root, tag: `v${version}`, repository: 'PrintBench/PrintBench' }
 }
 
@@ -130,4 +136,45 @@ test('CLI writes validated multiline GitHub outputs and exits nonzero on failure
   assert.equal(invalid.status, 1)
   assert.match(invalid.stderr, /does not match package.json/)
   assert.equal(readFileSync(outputFile, 'utf8'), output)
+})
+
+function catalogFixture(snapshot) {
+  const root = mkdtempSync(join(tmpdir(), 'pb-catalog-'))
+  roots.push(root)
+  if (snapshot) {
+    mkdirSync(join(root, 'packages/filament-catalog/data'), { recursive: true })
+    writeFileSync(
+      join(root, 'packages/filament-catalog/data/snapshot.json'),
+      JSON.stringify(snapshot),
+    )
+  }
+  return root
+}
+
+test('a recent filament catalogue passes without warnings', () => {
+  const root = catalogFixture({ datasetVersion: '2026.11.23', generatedAt: '2026-11-23T02:42:02Z' })
+  const result = checkFilamentCatalog({ root, now: new Date('2026-12-01T00:00:00Z') })
+  assert.equal(result.datasetVersion, '2026.11.23')
+  assert.deepEqual(result.warnings, [])
+})
+
+test('an old filament catalogue warns but does not fail', () => {
+  const root = catalogFixture({ datasetVersion: '2026.01.01', generatedAt: '2026-01-01T00:00:00Z' })
+  const result = checkFilamentCatalog({ root, now: new Date('2026-03-01T00:00:00Z') })
+  assert.equal(result.ageDays, 59)
+  assert.match(result.warnings[0], /59 days old/)
+})
+
+test('a missing or broken filament catalogue snapshot fails', () => {
+  assert.throws(() => checkFilamentCatalog({ root: catalogFixture(null) }), /filaments:update/)
+  assert.throws(
+    () =>
+      checkFilamentCatalog({ root: catalogFixture({ datasetVersion: 'x', generatedAt: 'nope' }) }),
+    /not a valid snapshot/,
+  )
+})
+
+test('the committed filament catalogue snapshot is valid', () => {
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  assert.ok(checkFilamentCatalog({ root }).datasetVersion)
 })
