@@ -1,6 +1,6 @@
 /**
  * `npm run test:map`: which real-world scenarios have a test behind them, and
- * does every test file follow the rules?
+ * does every test file follow docs/testing.md?
  *
  * Coverage gaps are listed but do not fail the run. A test that never runs,
  * proves nothing or claims something that does not exist always does.

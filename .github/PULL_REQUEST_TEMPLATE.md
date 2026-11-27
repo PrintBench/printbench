@@ -10,6 +10,14 @@ affected pages. Include any upgrade or migration guidance readers will need.
 If no documentation changes are needed, explain why.
 -->
 
+## Tests
+
+<!--
+For each new test: the scenario, bug or module contract it stands behind, and how
+you saw it fail. "No new test" is a fine answer; say why. Reviewer's question:
+would this fail if the thing a user does broke? See docs/testing.md.
+-->
+
 ## Checks
 
 - [ ] `npm run check` — formatting, lint, typechecking, release preparation tests

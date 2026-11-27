@@ -33,6 +33,9 @@ backups/
 # and a second tsconfig root that confuses eslint if it is walked.
 .claude/worktrees/
 
+# The base branch's copy of the test guard, unpacked by CI.
+.test-guard/
+
 # Next.js rewrites these on every dev/build run, unprompted. Tracking them
 # only means a dirty tree the first time anyone runs `npm run dev`.
 apps/web/next-env.d.ts
