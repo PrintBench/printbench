@@ -14,6 +14,7 @@ import { sql } from 'drizzle-orm'
 import { loadRootEnv } from '@pb/core'
 import { createDb } from '@pb/db'
 import { JOB, JobQueue } from '@pb/jobs'
+import { createThrowawayAccount } from './lib/throwaway-account'
 
 loadRootEnv()
 
@@ -58,11 +59,7 @@ try {
   await queue.start()
 
   section('Set up')
-  await fetch(`${BASE}/api/auth/sign-up/email`, {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ name: 'Phase Four Verify', email: EMAIL, password: PASSWORD }),
-  })
+  await createThrowawayAccount(db, { name: 'Phase Four Verify', email: EMAIL, password: PASSWORD })
   await db.execute(sql`UPDATE "user" SET role = 'admin' WHERE email = ${EMAIL}`)
   const signIn = await fetch(`${BASE}/api/auth/sign-in/email`, {
     method: 'POST',
