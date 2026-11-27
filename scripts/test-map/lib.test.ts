@@ -262,4 +262,11 @@ describe('the repository', () => {
 
     expect(buildReport(real, await findTestFiles(root)).errors).toEqual([])
   })
+
+  it.each(['CLAUDE.md', 'AGENTS.md'])(
+    'sends agents to the testing policy from %s',
+    async (name) => {
+      expect(await readFile(path.join(root, name), 'utf8')).toContain('docs/testing.md')
+    },
+  )
 })

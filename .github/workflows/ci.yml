@@ -41,8 +41,11 @@ jobs:
             BASE_SHA=HEAD^1
           fi
 
-          # Unknown paths and unavailable comparisons both get the full checks.
-          if [[ -n "$BASE_SHA" ]] && git diff --quiet --no-renames "$BASE_SHA" HEAD -- . \
+          # Unknown paths and unavailable comparisons both get the full checks, and so
+          # do the test rules that sit under otherwise skipped paths.
+          if [[ -n "$BASE_SHA" ]] &&
+            git diff --quiet --no-renames "$BASE_SHA" HEAD -- docs/testing.md .claude/settings.json &&
+            git diff --quiet --no-renames "$BASE_SHA" HEAD -- . \
             ':(exclude)docs' \
             ':(exclude)screenshots' \
             ':(exclude).agents' \
@@ -87,6 +90,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The test guard compares against the first parent of the merge commit.
+          fetch-depth: 2
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -109,6 +115,9 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Test rules
+        run: npm run test:map
 
       - name: Unit tests
         run: npm run test:unit
@@ -133,6 +142,30 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+      # Last, and even after a failure, so its list is there to read on any run.
+      - name: Test guard
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          args=(--base HEAD^1)
+          if git cat-file -e HEAD^1:scripts/test-map/guard.mts 2>/dev/null; then
+            # Judge the change by the rules already on the base branch, so a pull
+            # request cannot loosen the check that is reviewing it.
+            mkdir .test-guard
+            git archive HEAD^1 scripts/test-map | tar -x -C .test-guard
+            guard=.test-guard/scripts/test-map/guard.mts
+            labels=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '.[].name')
+            if grep -qx test-policy <<<"$labels"; then args+=(--approved); fi
+          else
+            # The change that introduces the guard has nothing to be judged by.
+            guard=scripts/test-map/guard.mts
+            args+=(--approved)
+          fi
+          npx tsx "$guard" "${args[@]}"
 
   docker:
     needs: changes

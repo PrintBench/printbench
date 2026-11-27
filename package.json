@@ -66,6 +66,7 @@
     "test:unit": "vitest run --mode unit",
     "test:integration": "vitest run --mode integration",
     "test:map": "tsx scripts/test-map/report.mts",
+    "test:guard": "tsx scripts/test-map/guard.mts",
     "release:check": "node scripts/release-metadata.mjs",
     "test:release": "node --test scripts/release-metadata.test.mjs",
     "verify:smoke": "playwright test"
