@@ -30,6 +30,7 @@ import {
   updatePrint,
 } from '@pb/core'
 import { createDb } from '@pb/db'
+import { createThrowawayAccount } from './lib/throwaway-account'
 
 loadRootEnv()
 
@@ -90,17 +91,11 @@ try {
   }
   check('two models indexed', true)
 
-  const signUp = await fetch(`${BASE}/api/auth/sign-up/email`, {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ name: 'Phase Nine Verify', email: EMAIL, password: PASSWORD }),
+  const userId = await createThrowawayAccount(db, {
+    name: 'Phase Nine Verify',
+    email: EMAIL,
+    password: PASSWORD,
   })
-  check('throwaway account created', signUp.ok, `HTTP ${signUp.status}`)
-
-  const created = await db.execute<{ id: string }>(
-    sql`SELECT id FROM "user" WHERE email = ${EMAIL}`,
-  )
-  const userId = created.rows[0]!.id
 
   const signIn = await fetch(`${BASE}/api/auth/sign-in/email`, {
     method: 'POST',

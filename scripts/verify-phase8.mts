@@ -31,6 +31,7 @@ import {
   type LibraryLocation,
 } from '@pb/core'
 import { createDb } from '@pb/db'
+import { createThrowawayAccount } from './lib/throwaway-account'
 
 loadRootEnv()
 
@@ -97,11 +98,7 @@ try {
   )
   check('library scanned', scan.status === 'succeeded', scan.abortReason ?? '')
 
-  await fetch(`${BASE}/api/auth/sign-up/email`, {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ name: 'Phase Eight Verify', email: EMAIL, password: PASSWORD }),
-  })
+  await createThrowawayAccount(db, { name: 'Phase Eight Verify', email: EMAIL, password: PASSWORD })
   await db.execute(sql`UPDATE "user" SET role = 'admin' WHERE email = ${EMAIL}`)
   const signIn = await fetch(`${BASE}/api/auth/sign-in/email`, {
     method: 'POST',

@@ -263,6 +263,10 @@ function buildNativeAuth(database: Database) {
         if (demoBlocksAuthPath(ctx.path)) {
           throw new APIError('FORBIDDEN', { message: DEMO_UNAVAILABLE })
         }
+        if (ctx.path === '/sign-up/email') {
+          refusePublicSignUp(ctx.request)
+          return
+        }
         if (ctx.path !== '/sign-out') return
         // After the endpoint runs the session is gone, and with it the name.
         const current = await getSessionFromCtx(ctx).catch(() => null)
@@ -306,6 +310,28 @@ function buildNativeAuth(database: Database) {
       nextCookies(),
     ],
   })
+}
+
+/**
+ * PrintBench is invite-only, but better-auth's email sign-up endpoint is open
+ * to anyone who can reach /api/auth. Without this, a POST to
+ * /api/auth/sign-up/email creates a viewer account on any public instance.
+ *
+ * Accounts are only ever made by first-run setup, an invitation or an admin.
+ * The first two call `auth.api.signUpEmail` from a server action because it
+ * also signs the new person in (nextCookies() sets the cookie). Only a request
+ * that came in through the HTTP router carries `request`, so refusing exactly
+ * those closes the public route and leaves the server-side calls working.
+ *
+ * Not `emailAndPassword.disableSignUp`: better-auth checks that inside the
+ * endpoint itself, so it would refuse those server-side calls too.
+ */
+function refusePublicSignUp(request: Request | undefined): void {
+  if (request) {
+    throw new APIError('FORBIDDEN', {
+      message: 'Accounts are created by invitation. Ask an admin for an invite link.',
+    })
+  }
 }
 
 /** Same header order better-auth is configured with above. */

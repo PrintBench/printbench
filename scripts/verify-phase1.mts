@@ -1,15 +1,17 @@
 /**
  * End-to-end check of the Phase 1 authenticated surface.
  *
- * Creates a clearly-labelled throwaway account, exercises the real HTTP
- * endpoints, and asserts the role guards hold in both directions. Cleans up
- * after itself so the instance is left in first-run state for the real admin.
+ * Checks public sign-up is refused, creates a clearly-labelled throwaway
+ * account server-side, exercises the real HTTP endpoints, and asserts the role
+ * guards hold in both directions. Cleans up after itself so the instance is
+ * left in first-run state for the real admin.
  *
  *   npx tsx scripts/verify-phase1.mts
  */
 import { sql } from 'drizzle-orm'
 import { loadRootEnv } from '@pb/core'
 import { createDb } from '@pb/db'
+import { createThrowawayAccount } from './lib/throwaway-account'
 
 loadRootEnv()
 
@@ -71,13 +73,18 @@ try {
   )
   check('/setup is reachable', (await get('/setup')).status === 200)
 
-  section('Create an account via the real signup endpoint')
+  section('Public sign-up is closed')
   const signUp = await fetch(`${BASE}/api/auth/sign-up/email`, {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify({ name: 'Phase One Verify', email: EMAIL, password: PASSWORD }),
   })
-  check('sign-up succeeds', signUp.ok, `HTTP ${signUp.status}`)
+  check('HTTP sign-up is refused', signUp.status === 403, `HTTP ${signUp.status}`)
+  const leaked = await db.execute(sql`SELECT 1 FROM "user" WHERE email = ${EMAIL}`)
+  check('no account was created', leaked.rows.length === 0)
+
+  section('Create an account the way setup and invitations do')
+  await createThrowawayAccount(db, { name: 'Phase One Verify', email: EMAIL, password: PASSWORD })
 
   const created = await db.execute<{ id: string; role: string }>(
     sql`SELECT id, role FROM "user" WHERE email = ${EMAIL}`,
