@@ -13,6 +13,7 @@ import { loadRootEnv, parseSidecar } from '@pb/core'
 import { createDb } from '@pb/db'
 import { JobQueue } from '@pb/jobs'
 import { cube, sphere, toBinaryStl } from '../packages/mesh/src/__fixtures__/shapes'
+import { createThrowawayAccount } from './lib/throwaway-account'
 
 loadRootEnv()
 
@@ -84,11 +85,7 @@ try {
   inPlaceRoot = path.join(base, 'in-place')
 
   section('Set up')
-  await fetch(`${BASE}/api/auth/sign-up/email`, {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ name: 'Phase Six Verify', email: EMAIL, password: PASSWORD }),
-  })
+  await createThrowawayAccount(db, { name: 'Phase Six Verify', email: EMAIL, password: PASSWORD })
   await db.execute(sql`UPDATE "user" SET role = 'admin' WHERE email = ${EMAIL}`)
   const signIn = await fetch(`${BASE}/api/auth/sign-in/email`, {
     method: 'POST',

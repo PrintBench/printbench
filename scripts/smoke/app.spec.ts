@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import { createDb } from '@pb/db'
+import { createThrowawayAccount } from '../lib/throwaway-account'
 
 // An ordinary tetrahedron, small enough to keep the smoke suite fast while
 // still exercising parsing, geometry analysis and generated thumbnails.
@@ -62,10 +63,7 @@ test('existing authentication checks against the production web server', async (
   }
 })
 
-test('browser scan, upload, thumbnail delivery and revoked permissions', async ({
-  page,
-  request,
-}) => {
+test('browser scan, upload, thumbnail delivery and revoked permissions', async ({ page }) => {
   const { db, pool } = createDb()
   const run = randomUUID()
   const email = `smoke-${run}@example.test`
@@ -92,11 +90,7 @@ test('browser scan, upload, thumbnail delivery and revoked permissions', async (
     await mkdir(path.join(scanPath, 'Smoke Model'), { recursive: true })
     await mkdir(uploadPath, { recursive: true })
     await writeFile(path.join(scanPath, 'Smoke Model', 'smoke.stl'), mesh)
-    const signup = await request.post('/api/auth/sign-up/email', {
-      headers: { origin: 'http://localhost:3000' },
-      data: { name: 'Smoke Admin', email, password },
-    })
-    expect(signup.ok(), 'Throwaway signup').toBe(true)
+    await createThrowawayAccount(db, { name: 'Smoke Admin', email, password })
     await db.execute(sql`UPDATE "user" SET role = 'admin' WHERE email = ${email}`)
     await db.execute(sql`
       INSERT INTO libraries (id, name, kind, backend, path, allow_writes, write_sidecar)

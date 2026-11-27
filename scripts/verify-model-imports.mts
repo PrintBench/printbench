@@ -18,6 +18,7 @@ import sharp from 'sharp'
 import * as tus from 'tus-js-client'
 import { loadRootEnv, parseSidecar } from '@pb/core'
 import { createDb } from '@pb/db'
+import { createThrowawayAccount } from './lib/throwaway-account'
 
 loadRootEnv()
 const BASE = (process.env.VERIFY_BASE_URL ?? 'http://localhost:3220').replace(/\/$/, '')
@@ -138,12 +139,11 @@ try {
   await mkdir(storageRoot, { recursive: true })
   root = await mkdtemp(path.join(storageRoot, 'pb-model-import-'))
 
-  const signup = await fetch(`${BASE}/api/auth/sign-up/email`, {
-    method: 'POST',
-    headers: HEADERS,
-    body: JSON.stringify({ name: 'Model Import Verification', email: EMAIL, password: PASSWORD }),
+  await createThrowawayAccount(db, {
+    name: 'Model Import Verification',
+    email: EMAIL,
+    password: PASSWORD,
   })
-  if (!signup.ok) throw new Error(`Fixture signup failed: HTTP ${signup.status}`)
   await db.execute(sql`UPDATE "user" SET role = 'admin' WHERE email = ${EMAIL}`)
   const signin = await fetch(`${BASE}/api/auth/sign-in/email`, {
     method: 'POST',
