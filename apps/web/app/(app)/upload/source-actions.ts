@@ -1,7 +1,14 @@
 'use server'
 
 import { requireUser } from '@pb/auth'
-import { assertCan, PolicyError, MakerWorldImportError, getMakerWorldImportStatus } from '@pb/core'
+import {
+  assertCan,
+  assertDemoAllows,
+  DemoModeError,
+  PolicyError,
+  MakerWorldImportError,
+  getMakerWorldImportStatus,
+} from '@pb/core'
 import { getDb } from '@pb/db'
 import { ModelImportQueueError, submitModelSourceImport } from '@/lib/model-source-import'
 
@@ -13,6 +20,8 @@ export interface MakerWorldImportStatus {
 }
 
 async function authorize() {
+  // Importing from a link makes the server fetch from the internet on a stranger's say-so.
+  assertDemoAllows('model-source-import')
   const user = await requireUser()
   assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'file:upload')
   return user
@@ -20,6 +29,7 @@ async function authorize() {
 
 // Never return arbitrary service errors: upstream failures can contain credentials.
 function failure(error: unknown, message: string): Failure {
+  if (error instanceof DemoModeError) return { ok: false, error: error.message }
   if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
   if (error instanceof MakerWorldImportError || error instanceof ModelImportQueueError) {
     return { ok: false, error: error.message }

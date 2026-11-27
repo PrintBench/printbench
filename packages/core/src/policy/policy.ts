@@ -6,6 +6,8 @@
  * authorization on its own — every mutating action calls this server-side too.
  */
 
+import { isDemoMode } from '../config/demo'
+
 export const ROLES = { admin: 'admin', member: 'member', viewer: 'viewer' } as const
 export type Role = (typeof ROLES)[keyof typeof ROLES]
 
@@ -110,7 +112,28 @@ export interface PolicyUser {
   id: string
   role?: Role | string | null
   banned?: boolean | null
+  /**
+   * Set by the server when rendering for a demo instance. The browser cannot
+   * read PRINTBENCH_DEMO, so the sidebar's copy of can() learns it here.
+   */
+  demo?: boolean
 }
+
+/**
+ * Areas a public demo visitor must not reach, whatever their role.
+ *
+ * Users and invitations would let one visitor lock out the next; backups hold
+ * every credential; diagnostics show how the host is run; print hosts make the
+ * server connect to any address a stranger types. The rest of the admin UI
+ * stays open, because showing it is the point of a demo.
+ */
+const DEMO_DENIED: ReadonlySet<Action> = new Set([
+  'user:manage',
+  'instance:backup',
+  'diagnostics:view',
+  'printhost:manage',
+  'printhost:send',
+])
 
 /** Ownership-scoped resources: a viewer may edit their own list, not others'. */
 export interface OwnedResource {
@@ -139,6 +162,8 @@ export function can(
 
   const role = normalizeRole(user.role)
   if (!role) return false
+
+  if (DEMO_DENIED.has(action) && (user.demo || isDemoMode())) return false
 
   // Personal collections and authored notes belong to whoever made them,
   // regardless of role.

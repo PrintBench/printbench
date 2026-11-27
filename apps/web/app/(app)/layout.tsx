@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@pb/auth'
-import { can, getSettings, queueStats } from '@pb/core'
+import { can, getSettings, isDemoMode, queueStats } from '@pb/core'
 import { getDb } from '@pb/db'
 import { needsFirstRunSetup } from '@/lib/setup'
 import { Sidebar } from '@/components/shell/sidebar'
 import { PreviewStatusProvider } from '@/components/model/preview-status-provider'
 import { ActivityPanel } from '@/components/shell/activity-panel'
+import { DemoBanner } from '@/components/shell/demo-banner'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const db = getDb()
   const policyUser = { id: user.id, role: user.role ?? 'viewer', banned: user.banned ?? false }
+  const demo = isDemoMode()
 
   /*
    * The queue count is read here rather than inside the nav so the pill is
@@ -43,10 +45,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar
         siteName={siteName}
         counts={counts}
-        user={{ ...policyUser, name: user.name, email: user.email }}
+        // The browser cannot read PRINTBENCH_DEMO, so the sidebar's can() is told.
+        user={{ ...policyUser, demo, name: user.name, email: user.email }}
       />
       <main className="min-w-0 flex-1">
         <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
+          {demo && <DemoBanner />}
           <PreviewStatusProvider>{children}</PreviewStatusProvider>
         </div>
       </main>

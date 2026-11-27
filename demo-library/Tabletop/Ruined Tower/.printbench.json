@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.990Z",
+  "name": "Ruined Tower",
+  "notes": "Scatter terrain, 90 mm tall.",
+  "license": "CC BY-NC 4.0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": false,
+  "licenseNotes": null,
+  "creator": "Forge & Fable",
+  "tags": [
+    "scenery",
+    "tabletop",
+    "terrain"
+  ],
+  "links": [],
+  "previewFile": "ruined_tower.stl"
+}

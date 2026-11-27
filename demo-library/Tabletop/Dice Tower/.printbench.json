@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.976Z",
+  "name": "Dice Tower",
+  "notes": "A faceted die blank for testing finishes.",
+  "license": "CC BY-NC 4.0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": false,
+  "licenseNotes": null,
+  "creator": "Forge & Fable",
+  "tags": [
+    "dice",
+    "tabletop"
+  ],
+  "links": [],
+  "previewFile": "d20_ish.stl"
+}

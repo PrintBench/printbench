@@ -7,6 +7,7 @@ import {
   normalizePath,
   type StorageAdapter,
 } from '@pb/core'
+import { zipUncompressedLimit } from '../demo/quota'
 
 /**
  * Extracting an uploaded zip into a library.
@@ -61,6 +62,7 @@ export async function extractZipIntoLibrary(
   storage: StorageAdapter,
   destRelativePath: string,
 ): Promise<ZipIngestResult> {
+  const uncompressedLimit = zipUncompressedLimit(MAX_ZIP_UNCOMPRESSED_BYTES)
   const size = (await stat(zipPath)).size
   if (size > MAX_ZIP_INPUT_BYTES) {
     throw new ZipIngestError(
@@ -128,9 +130,9 @@ export async function extractZipIntoLibrary(
       }
 
       bytesExtracted += data.byteLength
-      if (bytesExtracted > MAX_ZIP_UNCOMPRESSED_BYTES) {
+      if (bytesExtracted > uncompressedLimit) {
         throw new ZipIngestError(
-          `That zip expands to more than ${formatBytes(MAX_ZIP_UNCOMPRESSED_BYTES)}, which is too large to extract.`,
+          `That zip expands to more than ${formatBytes(uncompressedLimit)}, which is too large to extract.`,
         )
       }
 

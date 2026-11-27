@@ -1,4 +1,6 @@
 export * from './config/env'
+export * from './config/demo'
+export * from './config/demo-server'
 export * from './policy/policy'
 export * from './security/signed-token'
 export * from './security/backup-ticket'

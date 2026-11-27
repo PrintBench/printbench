@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.872Z",
+  "name": "Gridfinity Bin 2x1",
+  "notes": "Standard 42 mm grid. Prints well at 0.2 mm with no supports.",
+  "license": "CC BY 4.0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": true,
+  "licenseNotes": null,
+  "creator": "Northwind Makes",
+  "tags": [
+    "functional",
+    "gridfinity",
+    "organiser"
+  ],
+  "links": [],
+  "previewFile": "gridfinity_bin_2x1.stl"
+}

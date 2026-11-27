@@ -21,6 +21,7 @@ import {
 } from '@pb/core'
 import { JOB, getQueue } from '@pb/jobs'
 import { extractZipIntoLibrary, ZipIngestError } from './zip-ingest'
+import { assertDemoQuota, DemoQuotaError, uploadMaxSize } from '../demo/quota'
 
 /**
  * Resumable uploads, via the tus protocol.
@@ -128,7 +129,7 @@ function getServer(stagingDir: string): Server {
     datastore: new FileStore({ directory: stagingDir }),
     // 8 GB. Larger than any single mesh anyone reasonably has, small enough
     // that a runaway client cannot fill the disk.
-    maxSize: 8 * 1024 * 1024 * 1024,
+    maxSize: uploadMaxSize(8 * 1024 * 1024 * 1024),
     respectForwardedHeaders: true,
 
     /*
@@ -173,6 +174,17 @@ function getServer(stagingDir: string): Server {
       if (!verifyUploadToken(libraryId, expires, token, secret)) {
         throw { status_code: 403, body: 'Invalid or expired upload link' }
       }
+    },
+
+    async onUploadCreate(_request, upload) {
+      try {
+        await assertDemoQuota(upload.size ?? 0, stagingDir)
+      } catch (error) {
+        if (error instanceof DemoQuotaError)
+          throw { status_code: error.status, body: error.message }
+        throw error
+      }
+      return {}
     },
 
     async onUploadFinish(request, upload) {

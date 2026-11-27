@@ -25,6 +25,7 @@ import {
   type LibraryRemovalRequest,
 } from '@pb/core'
 import { assertCan, assertCanTriggerScan, cronProblem, PolicyError } from '@pb/core'
+import { DEMO_UNAVAILABLE, isDemoMode, isDemoSeededLibrary } from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
 import { getStartedQueue, JOB } from '@pb/jobs'
@@ -39,6 +40,22 @@ async function assertAdmin() {
     'library:manage',
   )
   return user
+}
+
+/**
+ * Refusal for changing one of the libraries a demo reset creates, else null.
+ *
+ * Visitors can make and remove their own libraries; these two are the shop
+ * window, and losing one would break the demo for everyone until midnight.
+ */
+async function demoProtected(libraryId: string): Promise<{ ok: false; error: string } | null> {
+  if (!isDemoMode()) return null
+  const [row] = await getDb()
+    .select({ path: schema.libraries.path })
+    .from(schema.libraries)
+    .where(eq(schema.libraries.id, libraryId))
+    .limit(1)
+  return isDemoSeededLibrary(row?.path) ? { ok: false, error: DEMO_UNAVAILABLE } : null
 }
 
 type BrowseResponse = { ok: true; result: BrowseResult } | { ok: false; error: string }
@@ -230,6 +247,9 @@ export async function createLibrary(input: {
 
     const name = input.name.trim()
     if (!name) return { ok: false, error: 'Give the library a name.' }
+
+    // An S3 library makes the server talk to whatever endpoint a visitor typed.
+    if (input.s3 && isDemoMode()) return { ok: false, error: DEMO_UNAVAILABLE }
 
     if (input.s3) {
       const created = await createS3Library(getDb(), {
@@ -424,6 +444,8 @@ export async function updateLibrarySchedule(
 ): Promise<Result> {
   try {
     const actor = await assertAdmin()
+    const refused = await demoProtected(libraryId)
+    if (refused) return refused
 
     const cron = input.scanCron.trim()
     const problem = cronProblem(cron)
@@ -476,6 +498,8 @@ export async function updateLibraryWatch(
 ): Promise<Result> {
   try {
     const actor = await assertAdmin()
+    const refused = await demoProtected(libraryId)
+    if (refused) return refused
 
     const [updated] = await getDb()
       .update(schema.libraries)
@@ -513,6 +537,8 @@ export async function updateLibrary(
 ): Promise<Result> {
   try {
     const actor = await assertAdmin()
+    const refused = await demoProtected(libraryId)
+    if (refused) return refused
 
     const updated = await updateLibrarySettings(getDb(), libraryId, input)
     if (!updated.ok) return updated
@@ -588,6 +614,8 @@ export async function removeLibrary(
 ): Promise<Result<{ queued: boolean }>> {
   try {
     const actor = await assertAdmin()
+    const refused = await demoProtected(libraryId)
+    if (refused) return refused
     const db = getDb()
 
     const requested = await requestLibraryRemoval(db, libraryId, request)

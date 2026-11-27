@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.919Z",
+  "name": "Cable Clips",
+  "notes": "8 mm and 12 mm clips. Stick-on adhesive pad not included.",
+  "license": "CC0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": true,
+  "licenseNotes": null,
+  "creator": "Tinker Lab",
+  "tags": [
+    "desk",
+    "functional",
+    "quick-print"
+  ],
+  "links": [],
+  "previewFile": "cable_clip_12mm.obj"
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.963Z",
+  "name": "Hill Terrain Tile",
+  "notes": "Standard 100 mm tile. Prints flat, no supports needed.",
+  "license": "CC BY-NC 4.0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": false,
+  "licenseNotes": null,
+  "creator": "Forge & Fable",
+  "tags": [
+    "no-supports",
+    "tabletop",
+    "terrain"
+  ],
+  "links": [],
+  "previewFile": "hill_tile_ridge.stl"
+}

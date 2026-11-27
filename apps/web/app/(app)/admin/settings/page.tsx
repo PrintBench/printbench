@@ -1,4 +1,11 @@
-import { can, checkForUpdate, getSettings } from '@pb/core'
+import {
+  DEMO_LOCKED_SETTINGS,
+  can,
+  checkForUpdate,
+  getSettings,
+  isDemoMode,
+  type Settings,
+} from '@pb/core'
 import { getSessionUser } from '@pb/auth'
 import { getDb } from '@pb/db'
 import { PageHeader } from '@/components/shell/page-header'
@@ -29,7 +36,11 @@ export default async function SettingsPage() {
         title="System settings"
         description="Instance-wide options. Anything that belongs to one library is on that library instead."
       />
-      <SettingsForm initial={settings} update={update} />
+      <SettingsForm
+        initial={settings}
+        update={update}
+        locked={isDemoMode() ? (Object.keys(DEMO_LOCKED_SETTINGS) as (keyof Settings)[]) : []}
+      />
     </>
   )
 }

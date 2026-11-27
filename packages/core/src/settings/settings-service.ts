@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import type { Database } from '@pb/db'
+import { isDemoMode } from '../config/demo'
 
 /**
  * Site-wide settings.
@@ -163,8 +164,23 @@ export async function getSettings(db: Database): Promise<Settings> {
       // Keep the default and carry on.
     }
   }
-  return settings
+  return isDemoMode() ? { ...settings, ...DEMO_LOCKED_SETTINGS } : settings
 }
+
+/**
+ * Settings a demo visitor sees but cannot change.
+ *
+ * Public sharing would host visitors' uploads on the demo's domain, update
+ * checks are outbound calls nobody there needs, sidecars would write into the
+ * read-only shop window, and the site name is shown to every other visitor.
+ * Everything else stays editable: trying the settings is part of the demo.
+ */
+export const DEMO_LOCKED_SETTINGS = {
+  siteName: 'PrintBench Demo',
+  publicSharing: false,
+  updateChecks: false,
+  writeSidecars: false,
+} as const satisfies Partial<Settings>
 
 export async function getSetting<K extends keyof Settings>(
   db: Database,
@@ -175,7 +191,9 @@ export async function getSetting<K extends keyof Settings>(
 
 /** Writes a partial update, validating each value first. */
 export async function updateSettings(db: Database, patch: Partial<Settings>): Promise<Settings> {
-  const entries = Object.entries(patch).filter(([key]) => key in DEFAULT_SETTINGS)
+  const entries = Object.entries(patch).filter(
+    ([key]) => key in DEFAULT_SETTINGS && !(isDemoMode() && key in DEMO_LOCKED_SETTINGS),
+  )
 
   // Validate everything before writing anything, so a form with one bad field
   // does not half-apply.

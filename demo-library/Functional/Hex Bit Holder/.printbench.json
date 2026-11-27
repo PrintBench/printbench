@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.925Z",
+  "name": "Hex Bit Holder",
+  "notes": "Holds twelve 1/4\" hex bits.",
+  "license": "CC BY 4.0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": true,
+  "licenseNotes": null,
+  "creator": "Northwind Makes",
+  "tags": [
+    "functional",
+    "organiser",
+    "workshop"
+  ],
+  "links": [],
+  "previewFile": "hex_bit_holder.stl"
+}

@@ -14,7 +14,8 @@ vi.mock('@pb/auth', () => ({ requireUser: mocks.requireUser }))
 vi.mock('@pb/db', () => ({ getDb: () => 'db' }))
 // The audit trail has its own tests; here it would only write to a real database.
 vi.mock('@/lib/audit', () => ({ audit: vi.fn(async () => {}) }))
-vi.mock('@pb/core', () => ({
+vi.mock('@pb/core', async () => ({
+  ...(await vi.importActual<typeof import('@pb/core/demo')>('@pb/core/demo')),
   PolicyError: class PolicyError extends Error {},
   MakerWorldImportError: class MakerWorldImportError extends Error {},
   assertCan: mocks.assertCan,
@@ -38,6 +39,23 @@ beforeEach(() => {
 })
 
 describe('model source action boundaries', () => {
+  // A demo must never fetch from the internet on a stranger's say-so.
+  it('refuses on a demo before reading the session or touching the import service', async () => {
+    vi.stubEnv('PRINTBENCH_DEMO', '1')
+    try {
+      expect(
+        await startModelSourceImport({
+          libraryId: 'lib',
+          url: 'https://www.thingiverse.com/thing:1',
+        }),
+      ).toEqual({ ok: false, error: 'Not available in the demo.' })
+      expect(mocks.requireUser).not.toHaveBeenCalled()
+      expect(mocks.create).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it.each([
     'https://makerworld.com/en/models/1',
     'https://www.printables.com/model/123-example',

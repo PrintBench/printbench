@@ -17,3 +17,6 @@ playwright-report/
 
 # Bundled filament catalogue, written by `npm run filaments:update`
 packages/filament-catalog/data/
+
+# Sample library; its .printbench.json sidecars are written by the app, not by hand.
+demo-library/

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
 
-export function LoginForm() {
+export function LoginForm({ demo }: { demo?: { email: string; password: string } }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -36,11 +36,35 @@ export function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {demo && (
+        <div className="rounded-lg bg-[var(--color-accent-soft)] px-4 py-3 text-sm">
+          <p className="font-medium">Demo account (already filled in)</p>
+          <p className="mt-1 text-[var(--color-ink-muted)]">
+            {demo.email} · {demo.password}
+          </p>
+          <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
+            Everyone shares this account, and it all resets at midnight UTC.
+          </p>
+        </div>
+      )}
       <Field label="Email" htmlFor="email">
-        <Input name="email" type="email" autoComplete="email" required autoFocus />
+        <Input
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          autoFocus={!demo}
+          defaultValue={demo?.email}
+        />
       </Field>
       <Field label="Password" htmlFor="password">
-        <Input name="password" type="password" autoComplete="current-password" required />
+        <Input
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          defaultValue={demo?.password}
+        />
       </Field>
 
       {error && (

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.892Z",
+  "name": "Gridfinity Bin 4x2",
+  "notes": "Wide bin that fits the long side of a toolbox drawer.",
+  "license": "CC BY 4.0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": true,
+  "licenseNotes": null,
+  "creator": "Northwind Makes",
+  "tags": [
+    "functional",
+    "gridfinity",
+    "organiser"
+  ],
+  "links": [],
+  "previewFile": "gridfinity_bin_4x2.stl"
+}

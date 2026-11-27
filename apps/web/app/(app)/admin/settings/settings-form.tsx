@@ -22,10 +22,14 @@ import { UpdateStatusPanel } from './update-status'
 export function SettingsForm({
   initial,
   update,
+  locked = [],
 }: {
   initial: Settings
   update: UpdateStatus | null
+  /** Settings shown but not editable here (the public demo fixes a few). */
+  locked?: (keyof Settings)[]
 }) {
+  const isLocked = (key: keyof Settings) => locked.includes(key)
   const router = useRouter()
   const [values, setValues] = useState<Settings>(initial)
   const [pending, startTransition] = useTransition()
@@ -57,8 +61,20 @@ export function SettingsForm({
         <CardContent className="space-y-4 p-4">
           <h2 className="text-sm font-semibold">This instance</h2>
 
-          <Field label="Name" htmlFor="site-name" hint="Shown in the sidebar and the browser tab.">
-            <Input value={values.siteName} onChange={(e) => set('siteName', e.target.value)} />
+          <Field
+            label="Name"
+            htmlFor="site-name"
+            hint={
+              isLocked('siteName')
+                ? `${LOCKED_NOTE} Shown in the sidebar and the browser tab.`
+                : 'Shown in the sidebar and the browser tab.'
+            }
+          >
+            <Input
+              value={values.siteName}
+              disabled={isLocked('siteName')}
+              onChange={(e) => set('siteName', e.target.value)}
+            />
           </Field>
 
           <Field
@@ -103,6 +119,7 @@ export function SettingsForm({
             label="Write metadata back to disk"
             hint="Keeps a .printbench.json beside each model in writable libraries, so tags, creator and licence survive losing the database. Never touches your model files."
             checked={values.writeSidecars}
+            locked={isLocked('writeSidecars')}
             onChange={(value) => set('writeSidecars', value)}
           />
         </CardContent>
@@ -140,6 +157,7 @@ export function SettingsForm({
             label="Allow share links"
             hint="Lets a signed-out visitor open a model you have explicitly shared. Off means the instance is entirely private."
             checked={values.publicSharing}
+            locked={isLocked('publicSharing')}
             onChange={(value) => set('publicSharing', value)}
           />
         </CardContent>
@@ -155,6 +173,7 @@ export function SettingsForm({
             label="Check for new versions"
             hint="Reads the public PrintBench release feed on GitHub every few hours and says so in the corner of the screen when a newer version is out. Sends nothing about this instance or its library. Turn it off to keep the instance from making any outbound request."
             checked={values.updateChecks}
+            locked={isLocked('updateChecks')}
             onChange={(value) => set('updateChecks', value)}
           />
         </CardContent>
@@ -222,28 +241,42 @@ export function SettingsForm({
   )
 }
 
+/** Said beside a setting the public demo fixes, so a change that cannot stick never looks saved. */
+const LOCKED_NOTE = 'Fixed on the public demo.'
+
 function Toggle({
   label,
   hint,
   checked,
+  locked = false,
   onChange,
 }: {
   label: string
   hint: string
   checked: boolean
+  locked?: boolean
   onChange: (value: boolean) => void
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3">
+    <label
+      className={
+        locked
+          ? 'flex cursor-not-allowed items-start gap-3 opacity-70'
+          : 'flex cursor-pointer items-start gap-3'
+      }
+    >
       <input
         type="checkbox"
         checked={checked}
+        disabled={locked}
         onChange={(e) => onChange(e.target.checked)}
         className="mt-1"
       />
       <span className="min-w-0">
         <span className="block text-sm font-medium text-[var(--color-ink)]">{label}</span>
-        <span className="block text-xs text-[var(--color-ink-faint)]">{hint}</span>
+        <span className="block text-xs text-[var(--color-ink-faint)]">
+          {locked ? `${LOCKED_NOTE} ${hint}` : hint}
+        </span>
       </span>
     </label>
   )

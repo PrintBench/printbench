@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
+import { isDemoMode } from '@pb/core'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 
@@ -8,11 +9,17 @@ import { EmptyState } from '@/components/ui/empty-state'
  * A refusal should be a normal, legible screen — not a 500.
  */
 export function NotPermitted({ what = 'this page' }: { what?: string }) {
+  // On the demo the visitor is already an admin; the page is fenced off, not their role.
+  const demo = isDemoMode()
   return (
     <EmptyState
       icon={<Lock />}
-      title="You don't have access"
-      description={`Your account doesn't have permission to view ${what}. An admin can change your role.`}
+      title={demo ? 'Not available in the demo' : "You don't have access"}
+      description={
+        demo
+          ? `This public demo keeps ${what} switched off. It works as normal on your own PrintBench.`
+          : `Your account doesn't have permission to view ${what}. An admin can change your role.`
+      }
       action={
         <Button asChild variant="secondary">
           <Link href="/">Back to dashboard</Link>

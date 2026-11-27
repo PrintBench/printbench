@@ -1,4 +1,4 @@
-import { can, MakerWorldImportError, PolicyError } from '@pb/core'
+import { can, DEMO_UNAVAILABLE, isDemoMode, MakerWorldImportError, PolicyError } from '@pb/core'
 import { getDb, type Database } from '@pb/db'
 import { readClipperTokenUser } from '@/lib/clipper-tokens'
 
@@ -14,6 +14,8 @@ export async function withClipperUser(
   request: Request,
   execute: (db: Database, user: ClipperUser) => Promise<Response>,
 ): Promise<Response> {
+  // Tokens cannot be issued on the demo; refuse here too in case one predates the switch.
+  if (isDemoMode()) return clipperJson({ error: DEMO_UNAVAILABLE }, 403)
   try {
     const db = getDb()
     const user = await readClipperTokenUser(db, request.headers.get('Authorization'))
