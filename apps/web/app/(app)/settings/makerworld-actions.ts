@@ -3,6 +3,8 @@
 import { requireUser } from '@pb/auth'
 import {
   assertCan,
+  assertDemoAllows,
+  DemoModeError,
   PolicyError,
   MakerWorldImportError,
   getMakerWorldCookieStatus,
@@ -22,6 +24,8 @@ import { audit } from '@/lib/audit'
 type Failure = { ok: false; error: string; retryChallengeId?: string; restart?: boolean }
 
 async function authorize() {
+  // On the shared demo account a saved Bambu login would be usable by every later visitor.
+  assertDemoAllows('makerworld')
   const user = await requireUser()
   assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'file:upload')
   return user
@@ -29,6 +33,7 @@ async function authorize() {
 
 // Never return arbitrary service errors: credential failures may contain secrets.
 function failure(error: unknown, message: string): Failure {
+  if (error instanceof DemoModeError) return { ok: false, error: error.message }
   if (error instanceof MakerWorldChallengeError)
     return {
       ok: false,

@@ -3,7 +3,15 @@
 import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
-import { PolicyError, assertCan, getSettings, shareModel, unshareModel } from '@pb/core'
+import {
+  DEMO_UNAVAILABLE,
+  PolicyError,
+  assertCan,
+  getSettings,
+  isDemoMode,
+  shareModel,
+  unshareModel,
+} from '@pb/core'
 import { requireUser } from '@pb/auth'
 import { getDb, schema } from '@pb/db'
 import { audit } from '@/lib/audit'
@@ -29,6 +37,8 @@ async function modelFor(publicId: string): Promise<{ id: string; name: string } 
  * not have been.
  */
 export async function createShareLink(publicId: string): Promise<ShareResult> {
+  // A public link would let visitors host whatever they uploaded on the demo's domain.
+  if (isDemoMode()) return { ok: false, error: DEMO_UNAVAILABLE, sharingDisabled: true }
   try {
     const user = await requireUser()
     // Sharing a model publicly is an editing decision, not a viewing one.

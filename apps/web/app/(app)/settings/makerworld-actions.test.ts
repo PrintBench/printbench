@@ -16,7 +16,8 @@ vi.mock('@pb/auth', () => ({ requireUser: mocks.requireUser }))
 vi.mock('@pb/db', () => ({ getDb: () => 'db' }))
 // The audit trail has its own tests; here it would only write to a real database.
 vi.mock('@/lib/audit', () => ({ audit: vi.fn(async () => {}) }))
-vi.mock('@pb/core', () => ({
+vi.mock('@pb/core', async () => ({
+  ...(await vi.importActual<typeof import('@pb/core/demo')>('@pb/core/demo')),
   PolicyError: class PolicyError extends Error {},
   MakerWorldImportError: class MakerWorldImportError extends Error {},
   assertCan: mocks.assertCan,

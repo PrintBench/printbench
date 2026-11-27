@@ -1,6 +1,7 @@
 'use server'
 
 import { requireUser } from '@pb/auth'
+import { DEMO_UNAVAILABLE, isDemoMode } from '@pb/core'
 import { can } from '@pb/core/policy'
 import { getDb } from '@pb/db'
 import { z } from 'zod'
@@ -9,6 +10,8 @@ import { createClipperToken, revokeClipperToken } from '@/lib/clipper-tokens'
 const labelSchema = z.string().trim().min(1).max(80)
 
 export async function generateBrowserClipperToken(label: string) {
+  // A bearer token outlives the visitor who made it, and its imports fetch from the internet.
+  if (isDemoMode()) return { error: DEMO_UNAVAILABLE }
   try {
     const user = await requireUser()
     if (!can(user, 'file:upload')) return { error: 'Upload access is required.' }

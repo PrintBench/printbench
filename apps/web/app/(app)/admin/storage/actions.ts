@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@pb/auth'
 import {
   assertCan,
+  assertDemoAllows,
+  DemoModeError,
   createS3Connection,
   deleteS3Connection,
   PolicyError,
@@ -17,6 +19,8 @@ type Result = { ok: true } | { ok: false; error: string }
 
 /** The same permission as libraries: a connection is what a library is made of. */
 async function assertAdmin() {
+  // A connection makes the server reach any endpoint a visitor types.
+  assertDemoAllows('s3-connections')
   const user = await requireUser()
   assertCan(
     { id: user.id, role: user.role ?? null, banned: user.banned ?? false },
@@ -31,6 +35,7 @@ function done() {
 }
 
 function failure(error: unknown, fallback: string): Result {
+  if (error instanceof DemoModeError) return { ok: false, error: error.message }
   if (error instanceof PolicyError) return { ok: false, error: 'Not permitted.' }
   console.error('[storage]', fallback, error)
   return { ok: false, error: error instanceof Error ? error.message : fallback }

@@ -3,6 +3,8 @@
 import { requireUser } from '@pb/auth'
 import {
   assertCan,
+  assertDemoAllows,
+  DemoModeError,
   PolicyError,
   MakerWorldImportError,
   getThingiverseTokenStatus,
@@ -14,12 +16,15 @@ import { audit } from '@/lib/audit'
 type Failure = { ok: false; error: string }
 
 async function authorize() {
+  // On the shared demo account a saved API token would be usable by every later visitor.
+  assertDemoAllows('thingiverse')
   const user = await requireUser()
   assertCan({ id: user.id, role: user.role ?? null, banned: user.banned ?? false }, 'file:upload')
   return user
 }
 
 function failure(error: unknown, message: string): Failure {
+  if (error instanceof DemoModeError) return { ok: false, error: error.message }
   return {
     ok: false,
     error:

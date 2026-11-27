@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@pb/auth": "*",
     "@pb/core": "*",
     "@pb/db": "*",
     "@pb/jobs": "*",

@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { createDb } from '@pb/db'
+import { createDb, type Database } from '@pb/db'
 import {
   DEFAULT_SETTINGS,
+  DEMO_LOCKED_SETTINGS,
   SettingsValidationError,
   getSetting,
   getSettings,
@@ -149,5 +150,48 @@ describe('settings storage', { tags: ['integration'] }, () => {
     await updateSettings(db, { siteName: 'Temporary' })
     await resetSetting(db, 'siteName')
     expect(await getSetting(db, 'siteName')).toBe(DEFAULT_SETTINGS.siteName)
+  })
+})
+
+describe('demo-locked settings', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  /** Enough of a Database for getSettings/updateSettings: one table, kept in a Map. */
+  function fakeDb(initial: Record<string, unknown> = {}) {
+    const rows = new Map(Object.entries(initial))
+    const writes: string[] = []
+    const db = {
+      execute: async (query: { queryChunks?: unknown[] }) => {
+        const params = (query.queryChunks ?? []).filter(
+          (chunk) => typeof chunk === 'string' || typeof chunk === 'boolean',
+        ) as string[]
+        if (params.length >= 2) {
+          writes.push(params[0]!)
+          rows.set(params[0]!, JSON.parse(params[1]!))
+        }
+        return { rows: [...rows].map(([key, value]) => ({ key, value })) }
+      },
+    }
+    return { db: db as unknown as Database, writes }
+  }
+
+  it('forces the locked values on a demo, whatever is stored', async () => {
+    const { db } = fakeDb({ siteName: 'Defaced', publicSharing: true, missingGraceDays: 7 })
+    expect((await getSettings(db)).publicSharing).toBe(true)
+
+    vi.stubEnv('PRINTBENCH_DEMO', '1')
+    const settings = await getSettings(db)
+    expect(settings).toMatchObject(DEMO_LOCKED_SETTINGS)
+    // Everything else is still the visitor's to change.
+    expect(settings.missingGraceDays).toBe(7)
+  })
+
+  it('ignores updates to locked keys on a demo but applies the rest', async () => {
+    vi.stubEnv('PRINTBENCH_DEMO', '1')
+    const { db, writes } = fakeDb()
+    await updateSettings(db, { siteName: 'Defaced', publicSharing: true, missingGraceDays: 21 })
+    expect(writes).toEqual(['missingGraceDays'])
   })
 })

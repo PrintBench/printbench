@@ -4,13 +4,14 @@
  * and streaming ZIP downloads.
  *
  * Shares packages/db|core|mesh|jobs with the web app, and imports neither React
- * nor Next. Auth is a web-tier concern and is deliberately absent here.
+ * nor Next. Auth is a web-tier concern and is deliberately absent here; the demo
+ * reset borrows only its password hashing (@pb/auth/password-hash).
  */
 import { createServer } from 'node:http'
 import path from 'node:path'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { sql } from 'drizzle-orm'
-import { installLogCapture, loadRootEnv } from '@pb/core'
+import { DEMO_UNAVAILABLE, installLogCapture, isDemoMode, loadRootEnv } from '@pb/core'
 import { createDb } from '@pb/db'
 import { JOB, getQueue, type JobHandler, type JobName } from '@pb/jobs'
 import { withMemoryDiagnostics } from './memory-diagnostics'
@@ -27,6 +28,7 @@ import { handleZipRequest } from './http/zip'
 import { handleUploadRequest } from './http/upload'
 import { createBackupHandler } from './backup/http'
 import { activeWatchCount, startWatchReconciler } from './watch/watcher'
+import { createDemoScheduler } from './demo/schedule'
 
 // Must run before anything reads DATABASE_URL.
 loadRootEnv()
@@ -56,6 +58,9 @@ const STAGING_DIR = path.resolve(process.env.DATA_DIR ?? './data', 'uploads')
 mkdirSync(STAGING_DIR, { recursive: true })
 
 const { pool, db } = createDb()
+
+/** True while a demo reset is swapping the database and files out from under uploads. */
+let demoResetting = false
 
 /*
  * The shared singleton, NOT a fresh JobQueue.
@@ -108,6 +113,13 @@ const server = createServer((req, res) => {
   }
 
   if (pathname.startsWith('/api/backup/')) {
+    // The web tier never signs a backup ticket on a demo, but the first-run
+    // restore route is unauthenticated by design, so refuse here as well.
+    if (isDemoMode()) {
+      res.writeHead(403, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: DEMO_UNAVAILABLE }))
+      return
+    }
     void backup.handle(req, res)
     return
   }
@@ -115,7 +127,7 @@ const server = createServer((req, res) => {
   // Resumable uploads. tus owns everything under this prefix, including the
   // per-upload URLs it hands back.
   if (pathname.startsWith('/api/upload')) {
-    if (backup.isRestoring()) {
+    if (backup.isRestoring() || demoResetting) {
       // An upload landing now would be indexed into a database about to vanish.
       res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '60' })
       res.end('A restore is in progress')
@@ -224,7 +236,31 @@ async function main(): Promise<void> {
   await db.execute(sql`select 1`)
   console.log('[worker] database reachable')
 
-  await startWork()
+  /*
+   * A demo instance seeds itself: on first boot, after a missed midnight, and
+   * then every night. The reset resumes work itself (even when it fails), so
+   * startWork() runs here only when no reset was needed.
+   */
+  let started = false
+  if (isDemoMode()) {
+    const demo = createDemoScheduler({
+      db,
+      pool,
+      dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
+      pauseWork,
+      resumeWork,
+      onResetting: (resetting) => {
+        demoResetting = resetting
+      },
+    })
+    try {
+      started = await demo.catchUp()
+    } catch {
+      started = true
+    }
+    demo.arm()
+  }
+  if (!started) await startWork()
 
   await new Promise<void>((resolve) => server.listen(PORT, resolve))
   console.log(`[worker] listening on :${PORT}`)

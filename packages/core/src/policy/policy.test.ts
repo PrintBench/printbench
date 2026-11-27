@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ACTION_MINIMUM_ROLE,
   PolicyError,
@@ -150,5 +150,43 @@ describe('scan trigger authorization', () => {
   it('requires library management permission to force a scan', () => {
     expect(() => assertCanTriggerScan(member, { force: true })).toThrow(PolicyError)
     expect(() => assertCanTriggerScan(admin, { force: true })).not.toThrow()
+  })
+})
+
+describe('demo mode', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  const fenced: Action[] = [
+    'user:manage',
+    'instance:backup',
+    'diagnostics:view',
+    'printhost:manage',
+    'printhost:send',
+  ]
+
+  it('fences off accounts, backups, diagnostics and print hosts, even for an admin', () => {
+    for (const action of fenced) expect(can(admin, action)).toBe(true)
+    vi.stubEnv('PRINTBENCH_DEMO', '1')
+    for (const action of fenced) expect(can(admin, action)).toBe(false)
+  })
+
+  // The admin UI is the point of the demo, so the rest of it stays reachable.
+  it('leaves settings, libraries and curation alone', () => {
+    vi.stubEnv('PRINTBENCH_DEMO', '1')
+    for (const action of [
+      'settings:manage',
+      'library:manage',
+      'file:upload',
+      'model:edit',
+    ] as const)
+      expect(can(admin, action)).toBe(true)
+  })
+
+  // The browser cannot read the env var, so the sidebar relies on the flag on the user.
+  it('honours the flag on the user where the environment is unreadable', () => {
+    expect(can({ ...admin, demo: true }, 'user:manage')).toBe(false)
+    expect(can({ ...admin, demo: true }, 'settings:manage')).toBe(true)
   })
 })

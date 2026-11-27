@@ -9,6 +9,7 @@ import {
   applyEmbeddedModelMetadata,
   isEmbeddedMetadataSource,
   fetchMakerWorldProjectMetadata,
+  isDemoMode,
   type StorageAdapter,
   type EmbeddedModelMetadata,
 } from '@pb/core'
@@ -111,7 +112,8 @@ export async function handleFileAnalyze(
       }
       const internalId = metadata.sourceIdentifiers?.['MakerWorld internal design ID']
       let source: Awaited<ReturnType<typeof fetchMakerWorldProjectMetadata>> | undefined
-      if (internalId) {
+      // The demo makes no outbound calls on a visitor's behalf, even to a fixed host.
+      if (internalId && !isDemoMode()) {
         try {
           source = await fetchMakerWorldProjectMetadata(internalId)
           metadata = {

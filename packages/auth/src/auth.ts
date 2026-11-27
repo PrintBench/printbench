@@ -2,19 +2,20 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, eq } from 'drizzle-orm'
 import { betterAuth } from 'better-auth'
 import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api'
-import { hashPassword, verifyPassword } from 'better-auth/crypto'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins/admin'
 import { nextCookies } from 'better-auth/next-js'
-import { recordAudit } from '@pb/core'
+import { DEMO_UNAVAILABLE, isDemoMode, recordAudit } from '@pb/core'
 import { getDb, schema, type Database } from '@pb/db'
+import { hashAccountPassword, verifyAccountPassword } from './password-hash'
 import { ROLES, type Role } from './roles'
 
 /**
  * better-auth is wrapped so nothing else in the codebase imports it directly.
  * A breaking change upstream is then contained to this file.
  *
- * The worker process must never import this — auth is a web-tier concern.
+ * The worker process must never import this — auth is a web-tier concern. The
+ * one exception is `@pb/auth/password-hash`, which holds no auth instance.
  *
  * Built lazily: constructing it opens a database pool, and Next imports every
  * module during the build, where DATABASE_URL is legitimately absent. Deferring
@@ -26,8 +27,34 @@ export const PASSWORD_MIN_LENGTH = 10
 export const PASSWORD_MAX_LENGTH = 200
 
 /** Keep password encoding compatible with the configured authentication library. */
-export const hashAccountPassword = hashPassword
-export const verifyAccountPassword = verifyPassword
+export { hashAccountPassword, verifyAccountPassword }
+
+/**
+ * Endpoints a demo visitor must not reach on the shared account.
+ *
+ * Changing its password or name, or revoking sessions, locks the next visitor
+ * out or defaces the account for everyone until midnight. Sign-up would let
+ * anyone mint extra accounts; the admin plugin's routes (impersonate, ban,
+ * set-user-password) skip the app's own policy entirely.
+ */
+const DEMO_BLOCKED_PATHS = new Set([
+  '/sign-up/email',
+  '/change-password',
+  '/set-password',
+  '/change-email',
+  '/update-user',
+  '/delete-user',
+  '/revoke-session',
+  '/revoke-sessions',
+  '/revoke-other-sessions',
+  '/request-password-reset',
+  '/forget-password',
+  '/reset-password',
+])
+
+export function demoBlocksAuthPath(path: string): boolean {
+  return isDemoMode() && (DEMO_BLOCKED_PATHS.has(path) || path.startsWith('/admin/'))
+}
 
 export function getAuth(): ReturnType<typeof createAuth> {
   instance ??= createAuth(getDb())
@@ -233,6 +260,9 @@ function buildNativeAuth(database: Database) {
      */
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (demoBlocksAuthPath(ctx.path)) {
+          throw new APIError('FORBIDDEN', { message: DEMO_UNAVAILABLE })
+        }
         if (ctx.path !== '/sign-out') return
         // After the endpoint runs the session is gone, and with it the name.
         const current = await getSessionFromCtx(ctx).catch(() => null)

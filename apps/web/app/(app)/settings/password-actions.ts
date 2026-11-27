@@ -2,12 +2,15 @@
 
 import { headers } from 'next/headers'
 import { getAuth, requireUser } from '@pb/auth'
+import { DEMO_UNAVAILABLE, isDemoMode } from '@pb/core'
 import { audit } from '@/lib/audit'
 
 export async function changeOwnPassword(input: {
   currentPassword: string
   newPassword: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  // The demo account is shared: one visitor's new password locks out the rest.
+  if (isDemoMode()) return { ok: false, error: DEMO_UNAVAILABLE }
   try {
     const user = await requireUser()
     if (user.banned) return { ok: false, error: 'Not permitted.' }
