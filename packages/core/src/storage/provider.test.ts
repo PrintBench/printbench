@@ -1,3 +1,4 @@
+// @contract core/storage-provider
 import { describe, expect, it } from 'vitest'
 import { detectS3Provider, libraryLocationLabel } from './provider'
 

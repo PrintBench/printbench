@@ -1,3 +1,4 @@
+// @covers SETUP-001 USER-001
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eq, inArray, like } from 'drizzle-orm'
 import { createInvite } from '@pb/core'

@@ -1,3 +1,4 @@
+// @covers LIB-003
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

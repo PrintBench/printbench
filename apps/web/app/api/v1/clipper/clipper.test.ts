@@ -1,3 +1,4 @@
+// @covers IMPORT-003
 import { randomUUID } from 'node:crypto'
 import { eq, inArray } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

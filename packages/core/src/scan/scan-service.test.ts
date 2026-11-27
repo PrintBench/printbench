@@ -1,3 +1,4 @@
+// @covers SCAN-001 SCAN-003 SCAN-004
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

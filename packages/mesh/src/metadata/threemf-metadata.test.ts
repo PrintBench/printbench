@@ -1,3 +1,5 @@
+// @covers UPLOAD-003
+// @contract mesh/threemf-metadata
 import { beforeAll, describe, expect, it } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
 import sharp from 'sharp'

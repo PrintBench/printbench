@@ -1,3 +1,5 @@
+// @covers LIB-001
+// @contract core/library-roots
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

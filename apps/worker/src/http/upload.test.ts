@@ -1,3 +1,5 @@
+// @covers UPLOAD-001
+// @contract worker/upload-paths
 import { describe, expect, it } from 'vitest'
 import { publicUploadBase, sanitizeUploadPath, signUploadToken, verifyUploadToken } from './upload'
 

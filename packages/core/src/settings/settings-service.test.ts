@@ -1,3 +1,4 @@
+// @covers SETTINGS-001
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createDb, type Database } from '@pb/db'

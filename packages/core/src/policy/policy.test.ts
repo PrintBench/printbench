@@ -1,3 +1,5 @@
+// @covers USER-002
+// @contract core/policy
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ACTION_MINIMUM_ROLE,

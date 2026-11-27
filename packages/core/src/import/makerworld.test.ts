@@ -1,3 +1,5 @@
+// @covers IMPORT-001
+// @contract core/makerworld
 import { describe, expect, it, vi } from 'vitest'
 import {
   fetchMakerWorldModel,

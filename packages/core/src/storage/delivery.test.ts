@@ -1,3 +1,6 @@
+// @covers DOWNLOAD-001
+// @bug 41e61a4
+// @contract core/delivery
 import { afterEach, describe, expect, it } from 'vitest'
 import { accelMounts, accelRedirectPath, contentDisposition, parseRange } from './delivery'
 

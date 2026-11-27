@@ -1,3 +1,5 @@
+// @covers BROWSE-001
+// @contract web/preview-source
 import { describe, expect, it } from 'vitest'
 import { previewSource } from './preview-source'
 

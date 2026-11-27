@@ -1,3 +1,5 @@
+// @covers IMPORT-003
+// @contract clipper/client
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchLibraries,

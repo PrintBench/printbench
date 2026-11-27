@@ -1,3 +1,5 @@
+// @covers UPLOAD-002
+// @bug e025e9d
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

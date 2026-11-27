@@ -19,8 +19,10 @@ export default defineConfig(({ mode }) => {
     // The web app's `@/` import alias, so its server actions load under test.
     resolve: { alias: { '@': fileURLToPath(new URL('./apps/web', import.meta.url)) } },
     test: {
-      include: ['packages/**/*.test.ts', 'apps/**/*.test.ts'],
-      exclude: ['**/node_modules/**', 'reference/**'],
+      include: ['packages/**/*.test.ts', 'apps/**/*.test.ts', 'scripts/**/*.test.ts'],
+      // `next build` copies test files into .next/standalone, and those stale
+      // duplicates would otherwise run alongside the real ones.
+      exclude: ['**/node_modules/**', '**/.next/**', 'reference/**'],
       tags: [{ name: 'integration' }],
       tagsFilter: unitOnly
         ? ['!integration']

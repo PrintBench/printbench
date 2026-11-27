@@ -1,3 +1,4 @@
+// @covers SCAN-007
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createDb } from '@pb/db'

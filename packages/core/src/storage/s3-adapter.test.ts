@@ -1,3 +1,4 @@
+// @contract core/s3-adapter
 import { describe, expect, it, vi } from 'vitest'
 import { CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { S3Adapter, copySource, describeS3Error, sameEndpoint } from './s3-adapter'

@@ -1,3 +1,4 @@
+// @contract filament-catalog/normalise
 import { describe, expect, it } from 'vitest'
 import { CatalogDataError, normaliseDataset } from './normalise'
 

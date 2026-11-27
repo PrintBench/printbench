@@ -1,3 +1,4 @@
+// @covers DEMO-001
 import { randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'

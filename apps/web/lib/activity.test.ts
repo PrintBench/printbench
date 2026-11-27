@@ -1,3 +1,5 @@
+// @covers UPDATE-001
+// @contract web/activity
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createDb } from '@pb/db'

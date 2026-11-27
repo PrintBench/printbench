@@ -1,3 +1,5 @@
+// @covers LIB-001
+// @contract core/local-adapter
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, rm, symlink, writeFile, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

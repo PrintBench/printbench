@@ -1,3 +1,5 @@
+// @covers PRINTER-001 SLICER-001
+// @bug c58e5fd
 import { describe, expect, it, vi } from 'vitest'
 import {
   canSendToPrinter,

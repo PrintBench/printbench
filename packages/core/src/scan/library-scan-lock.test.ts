@@ -1,3 +1,5 @@
+// @covers SCAN-001
+// @contract core/scan-lock
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { sql } from 'drizzle-orm'

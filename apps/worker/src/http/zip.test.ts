@@ -1,3 +1,4 @@
+// @contract worker/download-tokens
 import { describe, expect, it } from 'vitest'
 import { signDownloadToken, verifyDownloadToken } from './zip'
 

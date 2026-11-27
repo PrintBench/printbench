@@ -1,3 +1,4 @@
+// @contract mesh/threemf
 import { describe, expect, it } from 'vitest'
 import { readThreeMf } from './threemf'
 import { MeshParseError } from '../types'

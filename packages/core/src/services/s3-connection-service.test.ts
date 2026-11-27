@@ -1,3 +1,4 @@
+// @covers S3-001 S3-002
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { createDb, schema } from '@pb/db'

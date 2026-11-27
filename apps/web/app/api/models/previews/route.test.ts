@@ -1,3 +1,4 @@
+// @contract web/preview-status-route
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { getSessionUser, modelPreviewStatuses, getDb } = vi.hoisted(() => ({

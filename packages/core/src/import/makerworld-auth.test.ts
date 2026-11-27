@@ -1,3 +1,5 @@
+// @covers IMPORT-002
+// @contract core/makerworld-auth
 import { describe, expect, it, vi } from 'vitest'
 import {
   beginBambuSignIn,

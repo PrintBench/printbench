@@ -1,3 +1,5 @@
+// @covers HISTORY-001
+// @contract core/slicer-metadata
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'

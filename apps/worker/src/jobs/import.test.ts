@@ -1,3 +1,4 @@
+// @covers IMPORT-001
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFile, writeFile } from 'node:fs/promises'
 import type { Readable } from 'node:stream'

@@ -1,3 +1,6 @@
+// @covers SLICER-001
+// @bug 9fdfdb2
+// @contract mesh/threemf-write
 import { describe, expect, it } from 'vitest'
 import { unzipSync, strFromU8 } from 'fflate'
 import { MAX_CONVERT_TRIANGLES, writeThreeMf } from './threemf'

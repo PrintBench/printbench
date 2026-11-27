@@ -1,3 +1,4 @@
+// @contract core/makerworld-network
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'

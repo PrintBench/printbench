@@ -1,3 +1,5 @@
+// @covers DEMO-001
+// @contract core/demo
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import path from 'node:path'
 import { DemoModeError, assertDemoAllows, demoConfig, isDemoMode } from './demo'

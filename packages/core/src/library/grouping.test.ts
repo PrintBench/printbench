@@ -1,3 +1,5 @@
+// @covers SCAN-002 SIDECAR-002
+// @contract core/grouping
 import { describe, expect, it } from 'vitest'
 import { groupModels, looksPresupported, pickPreviewFile, type WalkedDir } from './grouping'
 import { humanizeName, isIgnoredName, isSafeRelativePath, normalizePath, slugify } from './paths'

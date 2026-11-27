@@ -1,3 +1,4 @@
+// @covers ACCOUNT-001 DIAG-001
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createDb } from '@pb/db'

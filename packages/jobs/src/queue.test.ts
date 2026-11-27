@@ -1,3 +1,6 @@
+// @covers SCAN-001
+// @bug 609569b
+// @contract jobs/queue
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import pg from 'pg'
 import { JOB } from './names'

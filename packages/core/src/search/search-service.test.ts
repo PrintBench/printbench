@@ -1,3 +1,5 @@
+// @covers SEARCH-001 SEARCH-002 SEARCH-003 SEARCH-004
+// @bug 94387c2
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createDb } from '@pb/db'

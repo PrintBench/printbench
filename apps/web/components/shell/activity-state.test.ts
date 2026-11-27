@@ -1,3 +1,4 @@
+// @contract web/activity-state
 import { describe, expect, it } from 'vitest'
 import type { Activity } from '../../lib/activity'
 import { reconcileActivity, SUCCESS_HOLD_MS, EXIT_MS } from './activity-state'

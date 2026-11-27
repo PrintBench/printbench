@@ -1,3 +1,5 @@
+// @covers IMPORT-001
+// @contract core/printables
 import { describe, expect, it, vi } from 'vitest'
 import { fetchPrintablesModel, parsePrintablesUrl } from './printables'
 import type { SourceRequest } from './source-network'

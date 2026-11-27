@@ -1,3 +1,4 @@
+// @covers UPDATE-001
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   RELEASE_API_URL,
