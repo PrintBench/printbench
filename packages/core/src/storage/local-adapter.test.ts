@@ -131,6 +131,7 @@ describe('read-only enforcement', () => {
   it('allows writes when explicitly opted in', async () => {
     const adapter = new LocalAdapter({ ...inPlace(), allowWrites: true })
     await adapter.write('opted-in.txt', 'ok')
+    expect(await readFile(path.join(root, 'opted-in.txt'), 'utf8')).toBe('ok')
     await adapter.remove('opted-in.txt')
   })
 

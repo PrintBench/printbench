@@ -15,6 +15,8 @@
  */
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { analyze } from './analyze.js'
+import { runnerFor, type Runner } from './runners.js'
 
 export const PERSONAS = ['anyone', 'viewer', 'member', 'admin'] as const
 export const TIERS = ['pr', 'nightly'] as const
@@ -44,22 +46,27 @@ export type Level = (typeof LEVELS)[number]
 
 export interface TestFile {
   path: string
+  /** `null` when nothing executes the file, so it can stand behind nothing. */
+  runner: Runner | null
   level: Level
   annotations: Annotations
+  tests: number
+  mocks: number
+  problems: string[]
 }
 
 export interface Report {
   scenarios: { scenario: Scenario; level: Level | 'none'; files: string[] }[]
-  unannotated: string[]
   errors: string[]
 }
 
 const ANNOTATION = /^[ \t]*(?:\/\/|\/\*\*?|\*)[ \t]*@(covers|bug|contract)\b([^\n]*)$/gm
 const BUG_REFERENCE = /^(?:[0-9a-f]{7,40}|#\d+)$/
 
-export function parseAnnotations(source: string): Annotations {
+/** Takes the comments at the top of a file, not the whole source. */
+export function parseAnnotations(header: string): Annotations {
   const found: Annotations = { covers: [], bugs: [], contracts: [] }
-  for (const match of source.matchAll(ANNOTATION)) {
+  for (const match of header.matchAll(ANNOTATION)) {
     const values = match[2]!
       .replace(/\*\/.*$/, '')
       .split(/[\s,]+/)
@@ -76,22 +83,55 @@ export function parseAnnotations(source: string): Annotations {
  * "mocked" even if it also talks to Postgres, because the seam it replaced is
  * exactly where the unnoticed breakage tends to be.
  */
-export function testLevel(file: string, source: string): Level {
-  if (file.endsWith('.spec.ts')) return 'acceptance'
-  if (/^[ \t]*vi\.(?:do)?mock\(/im.test(source)) return 'mocked'
-  // Anchored to the describe line so a file that only quotes the tag is not
-  // counted as running against Postgres.
-  if (/^[ \t]*describe[^\n]*tags:\s*\[\s*['"]integration['"]/m.test(source)) return 'integration'
-  return 'unit'
+export function describeTestFile(file: string, source: string): TestFile {
+  const { header, tests, mocks, integration, problems } = analyze(file, source)
+  const runner = runnerFor(file)
+  const level: Level =
+    runner === 'playwright'
+      ? 'acceptance'
+      : mocks > 0
+        ? 'mocked'
+        : integration
+          ? 'integration'
+          : 'unit'
+  return {
+    path: file,
+    runner,
+    level,
+    annotations: parseAnnotations(header),
+    tests,
+    mocks,
+    problems,
+  }
 }
 
-export function validateCatalogue(value: unknown): { scenarios: Scenario[]; errors: string[] } {
-  const list = (value as { scenarios?: unknown } | null)?.scenarios
+export function validateCatalogue(value: unknown): {
+  scenarios: Scenario[]
+  contracts: string[]
+  errors: string[]
+} {
+  const { scenarios: list, contracts: listed } = (value ?? {}) as {
+    scenarios?: unknown
+    contracts?: unknown
+  }
   if (!Array.isArray(list)) {
-    return { scenarios: [], errors: ['catalogue: expected a "scenarios" array'] }
+    return { scenarios: [], contracts: [], errors: ['catalogue: expected a "scenarios" array'] }
   }
 
+  // A missing contract list is reported but does not hide the scenarios, so the
+  // guard can still compare against a catalogue written before contracts existed.
   const errors: string[] = []
+  if (!Array.isArray(listed)) errors.push('catalogue: expected a "contracts" array')
+  const contracts: string[] = []
+  for (const contract of Array.isArray(listed) ? listed : []) {
+    if (typeof contract !== 'string' || !contract.trim()) {
+      errors.push('catalogue: every contract must be a non-empty name')
+    } else if (contracts.includes(contract)) {
+      errors.push(`catalogue: duplicate contract "${contract}"`)
+    } else {
+      contracts.push(contract)
+    }
+  }
   const scenarios: Scenario[] = []
   const seen = new Set<string>()
 
@@ -124,78 +164,98 @@ export function validateCatalogue(value: unknown): { scenarios: Scenario[]; erro
     if (problems.length === 0) scenarios.push(item as Scenario)
   }
 
-  return { scenarios, errors }
+  return { scenarios, contracts, errors }
 }
 
 export function buildReport(catalogue: unknown, files: TestFile[]): Report {
-  const { scenarios, errors } = validateCatalogue(catalogue)
+  const { scenarios, contracts, errors } = validateCatalogue(catalogue)
   // An id that failed validation is already reported; naming it again as
   // "unknown" in every file that uses it would bury the actual cause.
   const declared = new Set(
     ((catalogue as { scenarios?: { id?: string }[] } | null)?.scenarios ?? []).map((s) => s?.id),
   )
+  const used = new Set<string>()
 
   for (const file of files) {
-    for (const id of file.annotations.covers) {
-      if (!declared.has(id)) errors.push(`${file.path}: @covers unknown scenario "${id}"`)
+    const fail = (message: string) => errors.push(`${file.path}: ${message}`)
+    const { covers, bugs, contracts: claimed } = file.annotations
+
+    if (!file.runner) fail('no test runner picks this file up, so it never runs')
+    if (covers.length + bugs.length + claimed.length === 0) {
+      fail('no @covers, @bug or @contract annotation at the top')
     }
-    for (const bug of file.annotations.bugs) {
-      if (!BUG_REFERENCE.test(bug)) {
-        errors.push(`${file.path}: @bug "${bug}" is not a commit hash or #issue`)
+    for (const id of covers) {
+      if (!declared.has(id)) fail(`@covers unknown scenario "${id}"`)
+    }
+    for (const bug of bugs) {
+      if (!BUG_REFERENCE.test(bug)) fail(`@bug "${bug}" is not a commit hash or #issue`)
+    }
+    for (const contract of claimed) {
+      used.add(contract)
+      if (!contracts.includes(contract)) {
+        fail(`@contract "${contract}" is not listed in the catalogue`)
       }
     }
+    if (file.tests === 0) fail('declares no tests')
+    for (const problem of file.problems) fail(problem)
+  }
+
+  // A name with no test behind it could be claimed later without anyone seeing
+  // the catalogue change.
+  for (const contract of contracts) {
+    if (!used.has(contract)) errors.push(`catalogue: contract "${contract}" has no test`)
   }
 
   const rows = scenarios.map((scenario) => {
     const matches = files.filter(
       (file) =>
-        file.annotations.covers.includes(scenario.id) ||
-        (scenario.bug !== undefined && file.annotations.bugs.includes(scenario.bug)),
+        file.runner !== null &&
+        (file.annotations.covers.includes(scenario.id) ||
+          (scenario.bug !== undefined && file.annotations.bugs.includes(scenario.bug))),
     )
     const level: Level | 'none' =
       LEVELS.find((candidate) => matches.some((file) => file.level === candidate)) ?? 'none'
     return { scenario, level, files: matches.map((file) => file.path).sort() }
   })
 
-  const unannotated = files
-    .filter(({ annotations: a }) => a.covers.length + a.bugs.length + a.contracts.length === 0)
-    .map((file) => file.path)
-    .sort()
-
-  return { scenarios: rows, unannotated, errors }
+  return { scenarios: rows, errors }
 }
 
-const TEST_FILE = /\.(?:test\.(?:ts|tsx|mjs)|spec\.ts)$/
-const ROOTS = ['apps', 'packages', 'scripts', 'tests']
+// Broader than what runs, so that a test put somewhere nothing looks is found.
+export const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 // Build output holds copies of real tests, which would be counted twice.
-const SKIP = new Set(['node_modules', '.next', 'dist'])
+const SKIP_ANYWHERE = new Set(['node_modules', '.next', 'dist', '.git'])
+// Local data, scratch checkouts and AGPL reference material at the top level.
+const SKIP_AT_ROOT = new Set([
+  '.claude',
+  '.test-guard',
+  'backups',
+  'coverage',
+  'data',
+  'demo-library',
+  'libraries',
+  'playwright-report',
+  'reference',
+  'test-results',
+])
 
 export async function findTestFiles(root: string): Promise<TestFile[]> {
   const found: TestFile[] = []
 
   async function walk(relative: string) {
-    const entries = await readdir(path.join(root, relative), { withFileTypes: true }).catch(
-      (error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return []
-        throw error
-      },
-    )
+    const entries = await readdir(path.join(root, relative), { withFileTypes: true })
     for (const entry of entries) {
-      const child = `${relative}/${entry.name}`
+      const child = relative ? `${relative}/${entry.name}` : entry.name
       if (entry.isDirectory()) {
-        if (!SKIP.has(entry.name)) await walk(child)
+        if (SKIP_ANYWHERE.has(entry.name) || (!relative && SKIP_AT_ROOT.has(entry.name))) continue
+        await walk(child)
       } else if (TEST_FILE.test(entry.name)) {
-        const source = await readFile(path.join(root, child), 'utf8')
-        found.push({
-          path: child,
-          level: testLevel(child, source),
-          annotations: parseAnnotations(source),
-        })
+        found.push(describeTestFile(child, await readFile(path.join(root, child), 'utf8')))
       }
     }
   }
 
-  for (const directory of ROOTS) await walk(directory)
+  await walk('')
   return found.sort((a, b) => a.path.localeCompare(b.path))
 }
 
@@ -226,7 +286,6 @@ export function formatReport(report: Report): string {
 
   section('No test at all', described('none'))
   section('Only mocked tests', described('mocked'))
-  section('Test files with no annotation', report.unannotated)
   section('Errors', report.errors)
 
   return lines.join('\n')

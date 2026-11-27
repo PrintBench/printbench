@@ -1,9 +1,9 @@
 /**
- * `npm run test:map`: which real-world scenarios have a test behind them?
+ * `npm run test:map`: which real-world scenarios have a test behind them, and
+ * does every test file follow the rules?
  *
- * Coverage gaps and unannotated files are reported but do not fail the run
- * unless `--strict` is passed. A catalogue or annotation that is simply wrong
- * always fails, because a typo would otherwise read as a missing test.
+ * Coverage gaps are listed but do not fail the run. A test that never runs,
+ * proves nothing or claims something that does not exist always does.
  */
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -17,5 +17,4 @@ const report = buildReport(catalogue, await findTestFiles(root))
 
 console.log(formatReport(report))
 
-const strict = process.argv.includes('--strict')
-if (report.errors.length > 0 || (strict && report.unannotated.length > 0)) process.exitCode = 1
+if (report.errors.length > 0) process.exitCode = 1

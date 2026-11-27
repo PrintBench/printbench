@@ -73,9 +73,10 @@ it describes. In a pull request:
 `npm run test:map` grades each scenario by the strongest test behind it:
 `acceptance` (a browser drives the running app), `integration` (real Postgres),
 `unit`, `mocked` (a file that uses `vi.mock`), or none. The grade is per file,
-so it is an upper bound on what is really covered. The report fails on an unknown
-scenario id or a malformed reference; gaps and unannotated files are listed but
-only fail with `npm run test:map -- --strict`.
+so it is an upper bound on what is really covered. Gaps are listed without
+failing. The report does fail on a test file that no runner picks up, is not
+annotated, claims an unknown scenario or contract, disables a test, or has a test
+that asserts nothing.
 
 ### Unit and integration tests
 
