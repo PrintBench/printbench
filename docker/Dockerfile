@@ -6,8 +6,12 @@
 
 FROM golang:1.26.11-alpine AS go-toolchain
 
+FROM node:26-slim AS node-base
+# npm 11.21.3 bundles the patched Undici 6.29.1 used by node-gyp.
+RUN npm install --global --no-audit --no-fund npm@11.21.3 && npm cache clean --force
+
 # ---- deps ------------------------------------------------------------------
-FROM node:26-slim AS deps
+FROM node-base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
@@ -49,7 +53,7 @@ find node_modules -type f -path '*/bin/esbuild' -exec sh -ec '
 SH
 
 # ---- build -----------------------------------------------------------------
-FROM node:26-slim AS build
+FROM node-base AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
@@ -57,7 +61,7 @@ COPY . .
 RUN npm run build -w @pb/web
 
 # ---- runtime ---------------------------------------------------------------
-FROM node:26-slim AS runtime
+FROM node-base AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update \
