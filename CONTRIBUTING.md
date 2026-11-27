@@ -47,6 +47,37 @@ suite includes the existing `verify:phase1` authentication checks. A separate
 CI job builds the Docker image. The local `check` command does not start a server or build images.
 For changes affecting builds, also run `npm run build`.
 
+### What each test is for
+
+`tests/scenarios/catalogue.json` lists what people actually do with PrintBench,
+each entry sourced from a page of the user documentation or from the commit that
+added the behaviour or fixed the bug. Every test file says what it stands behind, in comments at
+the top:
+
+```ts
+// @covers SCAN-001 SEARCH-002   scenarios from the catalogue
+// @bug 609569b                  the fix commit or #issue it guards against
+// @contract mesh/stl            a module's own rules, no single user journey
+```
+
+Only claim `@covers` when the test would fail if that scenario broke in the way
+it describes. In a pull request:
+
+- New user-facing behaviour adds or extends a scenario. `tier` is `pr` for the
+  journeys that must never break and `nightly` for the rest.
+- A bug fix adds a test annotated `@bug`. If users could see the bug, it also
+  adds a `BUG-<hash or issue>` scenario.
+- Prefer passing a dependency in (as core does with `fetchImpl`) over
+  `vi.mock`; a replaced module hides exactly the wiring that tends to break.
+
+`npm run test:map` grades each scenario by the strongest test behind it:
+`acceptance` (a browser drives the running app), `integration` (real Postgres),
+`unit`, `mocked` (a file that uses `vi.mock`), or none. The grade is per file,
+so it is an upper bound on what is really covered. Gaps are listed without
+failing. The report does fail on a test file that no runner picks up, is not
+annotated, claims an unknown scenario or contract, disables a test, or has a test
+that asserts nothing.
+
 ### Unit and integration tests
 
 ```bash

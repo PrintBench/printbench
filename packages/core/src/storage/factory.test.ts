@@ -1,3 +1,4 @@
+// @contract core/storage-factory
 import { describe, expect, it } from 'vitest'
 import { createStorageAdapter, libraryLocationFromRow } from './factory'
 import { LocalAdapter } from './local-adapter'

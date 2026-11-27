@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
+import { VITEST_INCLUDE } from './scripts/test-map/runners.js'
 
 export default defineConfig(({ mode }) => {
   const unitOnly = mode === 'unit'
@@ -19,8 +20,10 @@ export default defineConfig(({ mode }) => {
     // The web app's `@/` import alias, so its server actions load under test.
     resolve: { alias: { '@': fileURLToPath(new URL('./apps/web', import.meta.url)) } },
     test: {
-      include: ['packages/**/*.test.ts', 'apps/**/*.test.ts'],
-      exclude: ['**/node_modules/**', 'reference/**'],
+      include: VITEST_INCLUDE,
+      // `next build` copies test files into .next/standalone, and those stale
+      // duplicates would otherwise run alongside the real ones.
+      exclude: ['**/node_modules/**', '**/.next/**', 'reference/**'],
       tags: [{ name: 'integration' }],
       tagsFilter: unitOnly
         ? ['!integration']

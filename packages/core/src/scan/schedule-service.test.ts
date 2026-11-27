@@ -1,3 +1,5 @@
+// @covers SCAN-005
+// @contract core/schedule
 import { describe, expect, it } from 'vitest'
 import {
   SCHEDULE_PRESETS,

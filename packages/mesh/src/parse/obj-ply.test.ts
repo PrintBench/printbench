@@ -1,3 +1,4 @@
+// @contract mesh/obj-ply
 import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import { readObj } from './obj'

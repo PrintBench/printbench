@@ -7,5 +7,11 @@
     "declarationMap": false,
     "noEmit": true
   },
-  "include": ["playwright.config.ts", "scripts/smoke/**/*.ts", "scripts/smoke/**/*.mts"]
+  "include": [
+    "playwright.config.ts",
+    "scripts/smoke/**/*.ts",
+    "scripts/smoke/**/*.mts",
+    "scripts/test-map/**/*.ts",
+    "scripts/test-map/**/*.mts"
+  ]
 }

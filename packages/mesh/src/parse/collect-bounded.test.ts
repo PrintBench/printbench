@@ -1,3 +1,5 @@
+// @bug 03fff12
+// @contract mesh/collect-bounded
 import { Readable } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 import { collectBounded } from './collect-bounded'

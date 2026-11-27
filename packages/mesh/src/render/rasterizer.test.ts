@@ -1,3 +1,4 @@
+// @contract mesh/rasterizer
 import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import sharp from 'sharp'

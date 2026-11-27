@@ -1,3 +1,5 @@
+// @covers MOVE-001
+// @contract core/storage-move
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

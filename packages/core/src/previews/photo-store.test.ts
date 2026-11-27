@@ -1,3 +1,5 @@
+// @covers BROWSE-003
+// @contract core/photo-store
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

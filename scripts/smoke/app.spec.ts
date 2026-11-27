@@ -1,3 +1,5 @@
+// @covers SETUP-001 ACCOUNT-001 SCAN-001 BROWSE-001 UPLOAD-001 USER-003
+// @bug 609569b b16b8da
 import { test, expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'

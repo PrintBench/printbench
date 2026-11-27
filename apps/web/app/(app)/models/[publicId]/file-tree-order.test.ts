@@ -1,3 +1,5 @@
+// @covers BROWSE-001
+// @contract web/file-tree-order
 import { describe, expect, it } from 'vitest'
 import {
   compareFiles,

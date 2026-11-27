@@ -1,3 +1,5 @@
+// @bug 03fff12
+// @contract mesh/threemf-memory
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'

@@ -1,3 +1,5 @@
+// @bug 757d34a
+// @contract mesh/implausible
 import { describe, expect, it } from 'vitest'
 import { randomBytes } from 'node:crypto'
 import { Readable } from 'node:stream'

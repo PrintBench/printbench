@@ -35,6 +35,7 @@ npm run dev                        # web on :3000 + worker, concurrently
 npm run test:unit                  # no Postgres needed - the fast default while iterating
 npm test                           # unit + integration; needs DATABASE_URL and a migrated DB
 npm run test:integration           # database-backed tests only
+npm run test:map                   # which real-world scenarios have a test behind them
 npm run check                      # format:check, lint, typecheck, test:release, test (CI-equivalent minus build/smoke)
 npm run build                      # run too when touching build-affecting code
 npm run format                     # Prettier (no semicolons, single quotes, width 100)
@@ -54,6 +55,9 @@ npm run db:generate                # regenerate migration after editing the Driz
 
 - Tests: Vitest, co-located `*.test.ts`. New behaviour ships with a test. Any suite touching Postgres must
   be tagged: `describe('...', { tags: ['integration'] }, () => {...})`, with fixtures created in `beforeAll`.
+- Every test file starts with `// @covers <scenario ids>`, `// @bug <commit or #issue>` and/or
+  `// @contract <module>`. Scenarios live in `tests/scenarios/catalogue.json`; new user-facing behaviour
+  adds or extends one in the same PR.
 - Unused bindings that are intentional are prefixed `_` (ESLint). Lint is deliberately not type-aware;
   `npm run typecheck` is the real compiler gate.
 - Web alias `@/` points at `apps/web`.

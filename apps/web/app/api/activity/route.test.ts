@@ -1,3 +1,5 @@
+// @covers UPDATE-001
+// @contract web/activity-route
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({

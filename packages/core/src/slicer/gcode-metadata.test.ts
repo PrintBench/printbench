@@ -1,3 +1,4 @@
+// @contract core/gcode-metadata
 import { describe, expect, it } from 'vitest'
 import { parseGcodeMetadata, parseDuration } from './gcode-metadata'
 

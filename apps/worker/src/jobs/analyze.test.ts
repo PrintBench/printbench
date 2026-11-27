@@ -1,3 +1,5 @@
+// @covers SCAN-003
+// @bug 7cf75b9
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

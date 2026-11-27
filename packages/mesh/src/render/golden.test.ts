@@ -1,3 +1,5 @@
+// @covers BROWSE-004
+// @contract mesh/renderer
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { RENDERER_VERSION, Rasterizer } from './rasterizer'

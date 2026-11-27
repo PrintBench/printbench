@@ -1,3 +1,4 @@
+// @contract web/preview-poller
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelPreviewStatus } from '@pb/core'
 import { createPreviewPoller } from './preview-poller'

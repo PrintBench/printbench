@@ -3,6 +3,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { PLAYWRIGHT_DIR, PLAYWRIGHT_MATCH } from './scripts/test-map/runners.js'
 
 if (!process.env.DATABASE_URL?.trim()) {
   throw new Error('Smoke tests require DATABASE_URL pointing at an empty, migrated test database.')
@@ -36,8 +37,8 @@ const env = {
 }
 
 export default defineConfig({
-  testDir: './scripts/smoke',
-  testMatch: '**/*.spec.ts',
+  testDir: `./${PLAYWRIGHT_DIR}`,
+  testMatch: PLAYWRIGHT_MATCH,
   workers: 1,
   retries: 0,
   timeout: 120_000,

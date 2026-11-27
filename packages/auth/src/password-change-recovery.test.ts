@@ -1,3 +1,5 @@
+// @covers ACCOUNT-002
+// @bug c2365b5
 import { randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eq, sql } from 'drizzle-orm'

@@ -1,3 +1,4 @@
+// @contract core/source-network
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'

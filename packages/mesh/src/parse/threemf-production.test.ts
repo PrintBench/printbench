@@ -1,3 +1,5 @@
+// @bug 9fee077
+// @contract mesh/threemf
 import { describe, expect, it } from 'vitest'
 import { zipSync, strToU8 } from 'fflate'
 import { readThreeMf } from './threemf'

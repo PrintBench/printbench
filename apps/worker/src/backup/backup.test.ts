@@ -1,3 +1,4 @@
+// @covers BACKUP-001
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createWriteStream } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'

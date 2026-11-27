@@ -1,0 +1,665 @@
+{
+  "contracts": [
+    "clipper/client",
+    "core/delivery",
+    "core/demo",
+    "core/gcode-metadata",
+    "core/grouping",
+    "core/library-roots",
+    "core/local-adapter",
+    "core/makerworld",
+    "core/makerworld-auth",
+    "core/makerworld-network",
+    "core/photo-store",
+    "core/policy",
+    "core/printables",
+    "core/s3-adapter",
+    "core/scan-lock",
+    "core/schedule",
+    "core/security",
+    "core/slicer-metadata",
+    "core/source-network",
+    "core/storage-factory",
+    "core/storage-move",
+    "core/storage-provider",
+    "core/thingiverse",
+    "filament-catalog/bundled-data",
+    "filament-catalog/normalise",
+    "jobs/queue",
+    "mesh/collect-bounded",
+    "mesh/embedded-thumbnail",
+    "mesh/implausible",
+    "mesh/obj-ply",
+    "mesh/photo",
+    "mesh/rasterizer",
+    "mesh/renderer",
+    "mesh/stl",
+    "mesh/threemf",
+    "mesh/threemf-memory",
+    "mesh/threemf-metadata",
+    "mesh/threemf-write",
+    "scripts/release-metadata",
+    "scripts/test-map",
+    "web/activity",
+    "web/activity-route",
+    "web/activity-state",
+    "web/file-tree-order",
+    "web/preview-poller",
+    "web/preview-source",
+    "web/preview-status-route",
+    "worker/download-tokens",
+    "worker/memory-diagnostics",
+    "worker/upload-paths"
+  ],
+  "scenarios": [
+    {
+      "id": "SETUP-001",
+      "title": "I create the first admin account, and setup closes behind me",
+      "persona": "admin",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "getting-started/first-run.md"
+    },
+    {
+      "id": "SETUP-002",
+      "title": "I start the shipped compose file and my accounts survive recreating it",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "getting-started/quick-start.md"
+    },
+    {
+      "id": "ACCOUNT-001",
+      "title": "I sign in and out, and a wrong password gets me nowhere",
+      "persona": "anyone",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "guide/account.md"
+    },
+    {
+      "id": "ACCOUNT-002",
+      "title": "I change my own password and my other sessions are signed out",
+      "persona": "viewer",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/password-recovery.md"
+    },
+    {
+      "id": "ACCOUNT-003",
+      "title": "I issue a reset link so someone who forgot their password can get back in",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/password-recovery.md"
+    },
+    {
+      "id": "USER-001",
+      "title": "I invite someone and they join with the role I chose",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/users.md"
+    },
+    {
+      "id": "USER-002",
+      "title": "As a viewer I can browse and download but cannot change anything",
+      "persona": "viewer",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "reference/roles.md"
+    },
+    {
+      "id": "USER-003",
+      "title": "Revoking a role or suspending someone takes effect on a page they already have open",
+      "persona": "admin",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "reference/roles.md"
+    },
+    {
+      "id": "LIB-001",
+      "title": "I add an existing folder as a read-only library and nothing on disk changes",
+      "persona": "admin",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "admin/libraries.md"
+    },
+    {
+      "id": "LIB-002",
+      "title": "I add an uploads library that PrintBench is allowed to write to",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/libraries.md"
+    },
+    {
+      "id": "LIB-003",
+      "title": "I remove a library and choose whether my files are kept",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/libraries.md"
+    },
+    {
+      "id": "SCAN-001",
+      "title": "I press Scan and my models appear, with thumbnails",
+      "persona": "admin",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "admin/scanning.md"
+    },
+    {
+      "id": "SCAN-002",
+      "title": "My messy folder tree turns into the models I would expect",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "concepts/grouping.md"
+    },
+    {
+      "id": "SCAN-003",
+      "title": "Rescanning picks up added, changed and renamed files without losing my metadata",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["nas"],
+      "source": "admin/scanning.md"
+    },
+    {
+      "id": "SCAN-004",
+      "title": "If my share unmounts, the scan aborts and nothing is lost",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["nas"],
+      "source": "concepts/safety.md"
+    },
+    {
+      "id": "SCAN-005",
+      "title": "Scheduled scans and live watching notice changes without me asking",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/scanning.md"
+    },
+    {
+      "id": "SCAN-006",
+      "title": "A library of thousands of files scans without the worker running out of memory",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["large"],
+      "source": "deploy/large-libraries.md"
+    },
+    {
+      "id": "SCAN-007",
+      "title": "Models whose files are gone are marked missing and only pruned after the grace period",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "concepts/safety.md"
+    },
+    {
+      "id": "SIDECAR-001",
+      "title": "I lose the database and restore my metadata from the sidecar files",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "concepts/sidecars.md"
+    },
+    {
+      "id": "SIDECAR-002",
+      "title": "A declared package shows shared files and its child models",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/packages.md"
+    },
+    {
+      "id": "HEALTH-001",
+      "title": "The health page lists real problems and clears them once fixed",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/health.md"
+    },
+    {
+      "id": "BROWSE-001",
+      "title": "I open a model and see its files, preview and details",
+      "persona": "viewer",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "guide/models.md"
+    },
+    {
+      "id": "BROWSE-002",
+      "title": "I organise models by creator, tag, collection and likes",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/organising.md"
+    },
+    {
+      "id": "BROWSE-003",
+      "title": "I add notes and photos to a model",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/models.md"
+    },
+    {
+      "id": "BROWSE-004",
+      "title": "I rotate a model in the 3D viewer and thumbnails reflect the real geometry",
+      "persona": "viewer",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "concepts/previews.md"
+    },
+    {
+      "id": "BROWSE-005",
+      "title": "The app is usable on my phone",
+      "persona": "viewer",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "getting-started/tour.md"
+    },
+    {
+      "id": "SEARCH-001",
+      "title": "I find a model by words in its name, folder or file names",
+      "persona": "viewer",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "guide/search.md"
+    },
+    {
+      "id": "SEARCH-002",
+      "title": "I find a model despite a typo or a missing accent",
+      "persona": "viewer",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "concepts/search.md"
+    },
+    {
+      "id": "SEARCH-003",
+      "title": "I narrow results with filters, sorting and a shareable URL",
+      "persona": "viewer",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/search.md"
+    },
+    {
+      "id": "SEARCH-004",
+      "title": "I jump to a model from the command menu",
+      "persona": "viewer",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "getting-started/tour.md"
+    },
+    {
+      "id": "UPLOAD-001",
+      "title": "I upload files in the browser and they arrive byte for byte",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "guide/uploading.md"
+    },
+    {
+      "id": "UPLOAD-002",
+      "title": "I upload a ZIP and it is unpacked into one model",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "guide/uploading.md"
+    },
+    {
+      "id": "UPLOAD-003",
+      "title": "A slicer project 3MF I upload renders and fills in its own title, designer and licence",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "guide/uploading.md"
+    },
+    {
+      "id": "UPLOAD-004",
+      "title": "A large upload resumes after an interruption",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/uploading.md"
+    },
+    {
+      "id": "IMPORT-001",
+      "title": "I paste a MakerWorld, Printables or Thingiverse link and the model is imported with attribution",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/imports.md"
+    },
+    {
+      "id": "IMPORT-002",
+      "title": "I connect my model-site account and my credential is never shown back",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/account.md"
+    },
+    {
+      "id": "IMPORT-003",
+      "title": "I send a model to PrintBench from the browser clipper",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/imports.md"
+    },
+    {
+      "id": "DOWNLOAD-001",
+      "title": "I download one file and it is identical to the original",
+      "persona": "viewer",
+      "tier": "pr",
+      "deployments": ["compose", "nginx"],
+      "source": "guide/downloads.md"
+    },
+    {
+      "id": "DOWNLOAD-002",
+      "title": "I download a whole model as a ZIP",
+      "persona": "viewer",
+      "tier": "pr",
+      "deployments": ["compose", "nginx"],
+      "source": "guide/downloads.md"
+    },
+    {
+      "id": "SHARE-001",
+      "title": "I share a link that works signed out and stops working when revoked",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose", "proxy"],
+      "source": "guide/sharing.md"
+    },
+    {
+      "id": "DELETE-001",
+      "title": "I remove a model and can restore it, with my files untouched",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/removing.md"
+    },
+    {
+      "id": "DELETE-002",
+      "title": "I deliberately delete a model's files",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/removing.md"
+    },
+    {
+      "id": "MOVE-001",
+      "title": "I move a model to another library and keep its metadata",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/libraries.md"
+    },
+    {
+      "id": "SLICER-001",
+      "title": "Open in slicer hands my slicer a file it will accept",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "guide/slicers-and-printers.md"
+    },
+    {
+      "id": "PRINTER-001",
+      "title": "I add a printer and send it a sliced file",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/printers.md"
+    },
+    {
+      "id": "QUEUE-001",
+      "title": "I request a print and a member works through the queue",
+      "persona": "viewer",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/print-queue.md"
+    },
+    {
+      "id": "HISTORY-001",
+      "title": "I log a print and see success rates and filament used",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/print-history.md"
+    },
+    {
+      "id": "FILAMENT-001",
+      "title": "I add spools from the catalogue and track what is left",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "guide/filaments.md"
+    },
+    {
+      "id": "SETTINGS-001",
+      "title": "I change instance settings and unsafe values are refused",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "admin/settings.md"
+    },
+    {
+      "id": "S3-001",
+      "title": "I add S3 storage, scan it, and download and view files from it",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["s3"],
+      "source": "deploy/s3.md"
+    },
+    {
+      "id": "S3-002",
+      "title": "I rotate an S3 key once and every library keeps working",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["s3"],
+      "source": "admin/storage.md"
+    },
+    {
+      "id": "BACKUP-001",
+      "title": "I export a backup and restore it onto an empty instance",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "deploy/backups.md"
+    },
+    {
+      "id": "UPGRADE-001",
+      "title": "I upgrade and my existing data comes with me",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "deploy/upgrading.md"
+    },
+    {
+      "id": "UPDATE-001",
+      "title": "I am told about a new release, and can turn that off",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "deploy/update-notifications.md"
+    },
+    {
+      "id": "DIAG-001",
+      "title": "When something goes wrong I can see why, without secrets in the logs",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "deploy/troubleshooting.md"
+    },
+    {
+      "id": "DEPLOY-001",
+      "title": "Behind my reverse proxy, signing in and saving things still work",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["proxy"],
+      "source": "deploy/reverse-proxy.md"
+    },
+    {
+      "id": "BUG-609569b",
+      "title": "The Scan button queued nothing and hid the error",
+      "persona": "admin",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "609569b",
+      "bug": "609569b"
+    },
+    {
+      "id": "BUG-d49cf93",
+      "title": "Moving a model failed because the web queue was never started",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "d49cf93",
+      "bug": "d49cf93"
+    },
+    {
+      "id": "BUG-97a857c",
+      "title": "A scan error vanished on refresh before it could be read",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "97a857c",
+      "bug": "97a857c"
+    },
+    {
+      "id": "BUG-9fee077",
+      "title": "A Bambu or Orca project 3MF was rejected as containing no triangles",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "9fee077",
+      "bug": "9fee077"
+    },
+    {
+      "id": "BUG-9fdfdb2",
+      "title": "Bambu Studio ignored slicer links that did not end in .3mf",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "9fdfdb2",
+      "bug": "9fdfdb2"
+    },
+    {
+      "id": "BUG-76322bd",
+      "title": "A slicer link without a filename made files look corrupt",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "76322bd",
+      "bug": "76322bd"
+    },
+    {
+      "id": "BUG-256c39c",
+      "title": "The worker ran out of memory on a large library",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["large"],
+      "source": "256c39c",
+      "bug": "256c39c"
+    },
+    {
+      "id": "BUG-03fff12",
+      "title": "A dense 3MF exhausted the worker heap",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["large"],
+      "source": "03fff12",
+      "bug": "03fff12"
+    },
+    {
+      "id": "BUG-19a0de2",
+      "title": "Search could not find a word inside a file path",
+      "persona": "viewer",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "19a0de2",
+      "bug": "19a0de2"
+    },
+    {
+      "id": "BUG-e025e9d",
+      "title": "An uploaded ZIP was stored as one opaque file",
+      "persona": "member",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "e025e9d",
+      "bug": "e025e9d"
+    },
+    {
+      "id": "BUG-4bb9531",
+      "title": "Connecting MakerWorld failed because the worker lacked the encryption secret",
+      "persona": "member",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "4bb9531",
+      "bug": "4bb9531"
+    },
+    {
+      "id": "BUG-b0991ea",
+      "title": "The proxy dropped the port from the forwarded host and saving failed",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["proxy"],
+      "source": "b0991ea",
+      "bug": "b0991ea"
+    },
+    {
+      "id": "BUG-a410a68",
+      "title": "The web container healthcheck failed",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "a410a68",
+      "bug": "a410a68"
+    },
+    {
+      "id": "BUG-ad05cc1",
+      "title": "Coolify rejected the compose volume syntax",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["coolify"],
+      "source": "ad05cc1",
+      "bug": "ad05cc1"
+    },
+    {
+      "id": "BUG-94387c2",
+      "title": "The chosen creator image was ignored on cards and model pages",
+      "persona": "viewer",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "94387c2",
+      "bug": "94387c2"
+    },
+    {
+      "id": "BUG-64aa2ac",
+      "title": "Pages overflowed the screen on mobile",
+      "persona": "viewer",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "64aa2ac",
+      "bug": "64aa2ac"
+    },
+    {
+      "id": "DEMO-001",
+      "title": "A public demo lets visitors try things, blocks the dangerous ones and resets itself",
+      "persona": "anyone",
+      "tier": "nightly",
+      "deployments": ["compose"],
+      "source": "2788d3c"
+    },
+    {
+      "id": "BUG-b16b8da",
+      "title": "Anyone could create an account by calling the sign-up endpoint",
+      "persona": "anyone",
+      "tier": "pr",
+      "deployments": ["compose"],
+      "source": "b16b8da",
+      "bug": "b16b8da"
+    }
+  ]
+}

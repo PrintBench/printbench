@@ -1,3 +1,5 @@
+// @covers UPLOAD-003
+// @contract mesh/embedded-thumbnail
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
 import {

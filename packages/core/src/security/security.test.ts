@@ -1,3 +1,4 @@
+// @contract core/security
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SecretUnavailableError, decryptSecret, encryptSecret, maskSecret } from './secret-box'
 import { signToken, verifyToken } from './signed-token'

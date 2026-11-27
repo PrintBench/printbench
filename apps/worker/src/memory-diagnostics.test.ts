@@ -1,3 +1,4 @@
+// @contract worker/memory-diagnostics
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { withMemoryDiagnostics } from './memory-diagnostics'
 

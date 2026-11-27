@@ -1,3 +1,5 @@
+// @covers MOVE-001
+// @bug d49cf93
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({

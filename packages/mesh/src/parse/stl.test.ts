@@ -1,3 +1,4 @@
+// @contract mesh/stl
 import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import { detectStlFormat, readStl } from './stl'

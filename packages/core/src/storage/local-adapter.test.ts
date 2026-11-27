@@ -1,3 +1,5 @@
+// @covers LIB-001
+// @contract core/local-adapter
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, rm, symlink, writeFile, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -129,6 +131,7 @@ describe('read-only enforcement', () => {
   it('allows writes when explicitly opted in', async () => {
     const adapter = new LocalAdapter({ ...inPlace(), allowWrites: true })
     await adapter.write('opted-in.txt', 'ok')
+    expect(await readFile(path.join(root, 'opted-in.txt'), 'utf8')).toBe('ok')
     await adapter.remove('opted-in.txt')
   })
 

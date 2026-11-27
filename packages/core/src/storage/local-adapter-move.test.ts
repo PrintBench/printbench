@@ -1,3 +1,5 @@
+// @covers MOVE-001
+// @contract core/local-adapter
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**

@@ -1,3 +1,5 @@
+// @covers BROWSE-003
+// @contract mesh/photo
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
 import { PHOTO_DISPLAY_PX, PHOTO_THUMB_PX, renderPhoto } from './photo'
