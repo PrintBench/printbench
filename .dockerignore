@@ -13,6 +13,8 @@ coverage
 !.env.example
 data/
 libraries/
+# Sample files, bind-mounted by the deployments that want them; never baked into the image.
+demo-library/
 
 # AGPL reference material must never enter a build context.
 reference/

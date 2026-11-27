@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.913Z",
+  "name": "Phone Stand",
+  "notes": "Adjustable viewing angle. Works with most phone cases.",
+  "license": "CC BY 4.0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": true,
+  "licenseNotes": null,
+  "creator": "Kestrel Studio",
+  "tags": [
+    "desk",
+    "functional",
+    "quick-print"
+  ],
+  "links": [],
+  "previewFile": "phone_stand.stl"
+}

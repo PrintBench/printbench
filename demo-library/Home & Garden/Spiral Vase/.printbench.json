@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.932Z",
+  "name": "Spiral Vase",
+  "notes": "Print in vase mode, single wall, 0.4 mm nozzle. Silk filament looks best.",
+  "license": "CC BY-NC 4.0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": false,
+  "licenseNotes": null,
+  "creator": "Mara Ellison",
+  "tags": [
+    "home",
+    "vase",
+    "vase-mode"
+  ],
+  "links": [],
+  "previewFile": "spiral_vase.stl"
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generator": "printbench",
+  "updatedAt": "2026-11-23T08:40:46.906Z",
+  "name": "Spool Holder",
+  "notes": "Fits 55 mm spool hubs. Print the base in PETG for strength.",
+  "license": "CC0",
+  "licenseUrl": null,
+  "licenseExpiresAt": null,
+  "commercialUse": true,
+  "licenseNotes": null,
+  "creator": "Tinker Lab",
+  "tags": [
+    "functional",
+    "quick-print",
+    "workshop"
+  ],
+  "links": [],
+  "previewFile": "spool_holder.stl"
+}
