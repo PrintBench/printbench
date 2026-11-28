@@ -10,7 +10,7 @@ import {
   LockKeyhole,
   Upload,
 } from 'lucide-react'
-import type { BackupTicket } from '@pb/core'
+import type { BackupTicket, RestoreSource } from '@pb/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
@@ -73,6 +73,7 @@ export function RestorePanel({
   firstRun = false,
   footer,
   bucketBackup,
+  bucketSource,
 }: {
   getTicket: () => Promise<TicketResult>
   /** Nothing exists yet to be replaced, so there is nothing to type to confirm. */
@@ -81,6 +82,12 @@ export function RestorePanel({
   footer?: React.ReactNode
   /** Restore this backup from the schedule's bucket instead of asking for a file. */
   bucketBackup?: string
+  /**
+   * Fetch `bucketBackup` from this bucket instead of the schedule's: the
+   * first-run screen, where there is no schedule. Sent to the worker in the
+   * request body for the one fetch, and kept nowhere else.
+   */
+  bucketSource?: RestoreSource
 }) {
   const [step, setStep] = useState<Step>({ name: 'pick' })
   const [error, setError] = useState<string | null>(null)
@@ -200,7 +207,7 @@ export function RestorePanel({
       const response = await fetch('/api/backup/restore/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json', [TICKET_HEADER]: ticket.current },
-        body: JSON.stringify({ path: name }),
+        body: JSON.stringify({ path: name, source: bucketSource }),
       })
       const body = parse(await response.text()) as Staged
       if (response.ok && body.id && (body.locked || body.summary)) return staged(body)

@@ -133,6 +133,19 @@ function clean(input: S3ConnectionInput): ServiceResult<CleanInput> {
   if (!name) return { ok: false, error: 'Give the connection a name.' }
   if (name.length > 100) return { ok: false, error: 'Keep the name under 100 characters.' }
 
+  const target = cleanS3Target(input)
+  if (!target.ok) return target
+  return { ok: true, data: { name, ...target.data } }
+}
+
+/**
+ * A bucket and the credentials that reach it, checked the way a saved
+ * connection's are. Also used where nothing is saved: the first-run restore
+ * reaches a bucket with credentials typed for that one restore.
+ */
+export function cleanS3Target(
+  input: Omit<S3ConnectionInput, 'name'>,
+): ServiceResult<Omit<CleanInput, 'name'>> {
   const bucket = input.bucket.trim()
   if (!bucket) return { ok: false, error: 'Give the bucket a name.' }
 
@@ -150,7 +163,6 @@ function clean(input: S3ConnectionInput): ServiceResult<CleanInput> {
   return {
     ok: true,
     data: {
-      name,
       bucket,
       endpoint,
       region: blankToNull(input.region),

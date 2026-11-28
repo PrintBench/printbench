@@ -279,10 +279,21 @@ To restore one:
   this instance's first, then any from other instances' folders under the same
   prefix (the server this one replaced, say). Choose _Restore…_, enter the
   passphrase, check what it holds, and confirm.
-- **On a new server**, copy the file out of the bucket with any S3 tool and
-  upload it on the first-run setup screen's _Restore from a backup_, then
-  enter the passphrase. The schedule comes back with the rest of the settings,
-  so backups carry on from the new server, into its own folder.
+- **On a new server**, open _Restore from a backup_ on the first-run setup
+  screen and choose _An S3 bucket_. Enter the bucket, its endpoint (blank for
+  AWS) and region, an access key that can read it, and the prefix the old
+  server's schedule used (`printbench-backups` unless you changed it). _List
+  backups_ shows every backup under that prefix, from every instance folder,
+  newest first, with the date and version each was taken by. Choose one, enter
+  its passphrase, check what it holds, and restore. These bucket details are
+  used for that one restore and are not saved: the restored database brings
+  the old server's S3 connection back with it. Like the rest of first-run
+  setup, this closes the moment any account exists. The schedule comes back
+  with the rest of the settings, so backups carry on from the new server, into
+  its own folder.
+
+  You can still copy the file out of the bucket with any S3 tool and upload it
+  under _A backup file_ instead; it asks for the passphrase the same way.
 
 Both use the same restore as a downloaded file. A backup being restored is
 staged in `DATA_DIR/backups`, decrypted once its passphrase is given. Nothing
