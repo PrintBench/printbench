@@ -29,45 +29,59 @@ export function FirstRunRestore({
   footer: React.ReactNode
 }) {
   const [source, setSource] = useState<Source>('file')
+  /*
+   * Once restored, the way back out goes too: switching source would unmount
+   * the "Go to sign in" step, and "start fresh instead" would offer to set up
+   * an instance that now has accounts.
+   */
+  const [restored, setRestored] = useState(false)
+  const done = () => setRestored(true)
 
   return (
     <div className="space-y-5">
-      <div
-        role="radiogroup"
-        aria-label="Restore from"
-        className="inline-flex rounded-[var(--radius-control)] border border-[var(--color-border)] p-0.5"
-      >
-        {(
-          [
-            { value: 'file', label: 'A backup file', Icon: Upload },
-            { value: 'bucket', label: 'An S3 bucket', Icon: CloudDownload },
-          ] as const
-        ).map(({ value, label, Icon }) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={source === value}
-            onClick={() => setSource(value)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-sm transition-colors',
-              source === value
-                ? 'bg-[var(--color-surface-2)] font-medium text-[var(--color-ink)]'
-                : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]',
-            )}
-          >
-            <Icon className="size-3.5" />
-            {label}
-          </button>
-        ))}
-      </div>
+      {!restored && (
+        <div
+          role="radiogroup"
+          aria-label="Restore from"
+          className="inline-flex rounded-[var(--radius-control)] border border-[var(--color-border)] p-0.5"
+        >
+          {(
+            [
+              { value: 'file', label: 'A backup file', Icon: Upload },
+              { value: 'bucket', label: 'An S3 bucket', Icon: CloudDownload },
+            ] as const
+          ).map(({ value, label, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={source === value}
+              onClick={() => setSource(value)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-sm transition-colors',
+                source === value
+                  ? 'bg-[var(--color-surface-2)] font-medium text-[var(--color-ink)]'
+                  : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]',
+              )}
+            >
+              <Icon className="size-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {source === 'file' ? (
-        <RestorePanel getTicket={createFirstRunRestoreTicket} firstRun footer={footer} />
+        <RestorePanel
+          getTicket={createFirstRunRestoreTicket}
+          firstRun
+          footer={footer}
+          onRestored={done}
+        />
       ) : (
         <>
-          <BucketSource defaultPrefix={defaultPrefix} />
-          {footer}
+          <BucketSource defaultPrefix={defaultPrefix} onRestored={done} />
+          {!restored && footer}
         </>
       )}
     </div>
@@ -94,7 +108,13 @@ const EMPTY: SourceForm = {
  * the worker for the one fetch, and are gone when the page is. The restored
  * database brings the old server's S3 connection back with it.
  */
-function BucketSource({ defaultPrefix }: { defaultPrefix: string }) {
+function BucketSource({
+  defaultPrefix,
+  onRestored,
+}: {
+  defaultPrefix: string
+  onRestored: () => void
+}) {
   const [form, setForm] = useState<SourceForm>({ ...EMPTY, prefix: defaultPrefix })
   // The source a listing came from, so a restore fetches with exactly what was listed.
   const [listed, setListed] = useState<{ source: RestoreSource; rows: BucketRow[] } | null>(null)
@@ -215,6 +235,7 @@ function BucketSource({ defaultPrefix }: { defaultPrefix: string }) {
                 showInstance
                 firstRun
                 source={listed.source}
+                onRestored={onRestored}
               />
             </>
           )}

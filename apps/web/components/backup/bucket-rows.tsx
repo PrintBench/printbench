@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { ArchiveRestore } from 'lucide-react'
 import type { BackupTicket, RestoreSource } from '@pb/core'
 import type { BucketRow } from '@/lib/bucket-rows'
@@ -26,6 +27,7 @@ export function BucketRows({
   currentKeyId,
   firstRun = false,
   source,
+  onRestored,
 }: {
   rows: BucketRow[]
   open: string | null
@@ -38,7 +40,12 @@ export function BucketRows({
   firstRun?: boolean
   /** A bucket typed in for this restore rather than the schedule's. */
   source?: RestoreSource
+  onRestored?: () => void
 }) {
+  // Once a restore has finished there is nothing to close back to: the
+  // instance this list was read on has been replaced.
+  const [restored, setRestored] = useState(false)
+
   return (
     <ul className="divide-y divide-[var(--color-border)]">
       {rows.map((row) => (
@@ -77,16 +84,22 @@ export function BucketRows({
                 bucketBackup={row.path}
                 bucketSource={source}
                 firstRun={firstRun}
+                onRestored={() => {
+                  setRestored(true)
+                  onRestored?.()
+                }}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="mt-2"
-                onClick={() => setOpen(null)}
-              >
-                Close
-              </Button>
+              {!restored && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setOpen(null)}
+                >
+                  Close
+                </Button>
+              )}
             </div>
           )}
         </li>
