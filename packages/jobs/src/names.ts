@@ -23,6 +23,7 @@ export const JOB = {
   maintReconcile: 'maint.reconcile',
   maintArchive: 'maint.archive',
   filamentCatalogSync: 'filament-catalog.sync',
+  backupRun: 'backup.run',
 } as const
 
 export type JobName = (typeof JOB)[keyof typeof JOB]
@@ -64,6 +65,11 @@ export const payloads = {
   [JOB.maintReconcile]: z.object({}).default({}),
   [JOB.maintArchive]: z.object({}).default({}),
   [JOB.filamentCatalogSync]: z.object({}).default({}),
+  [JOB.backupRun]: z.object({
+    trigger: z.enum(['schedule', 'manual']),
+    /** The admin who pressed "Back up now", for the run history and audit trail. */
+    requestedBy: z.object({ id: z.string().max(200), name: z.string().max(300) }).optional(),
+  }),
 } as const
 
 export type JobPayload<N extends JobName> = z.infer<(typeof payloads)[N]>
@@ -143,4 +149,10 @@ export const JOB_OPTIONS: Record<
    * import itself takes an advisory lock, so overlapping runs are harmless.
    */
   [JOB.filamentCatalogSync]: { concurrency: 1, priority: 3, policy: 'short' },
+  /*
+   * One at a time: two backups at once would read every table twice and race
+   * each other's pruning. `short` rather than `stately`, because a second
+   * backup queued behind a running one would be a copy taken a minute later.
+   */
+  [JOB.backupRun]: { concurrency: 1, priority: 5, policy: 'short' },
 }

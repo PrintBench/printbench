@@ -45,6 +45,12 @@ export interface ExportOptions {
   includeFiles: boolean
   /** Without one, stored credentials are left out of the backup. */
   passphrase?: string
+  /**
+   * Seals stored credentials under this key instead of a passphrase. Given by
+   * a scheduled backup, whose whole file is encrypted and whose envelope
+   * supplies the key; see packages/core/src/backup/envelope.ts.
+   */
+  secretsKey?: Buffer
   appVersion?: string
   /** Aborts the archive when the client goes away. */
   signal?: AbortSignal
@@ -99,12 +105,17 @@ export async function writeBackup(options: ExportOptions): Promise<BackupManifes
       )
     ).rows
 
-    if (options.passphrase) {
+    if (options.secretsKey) {
+      const key = options.secretsKey
+      const sealed = await readSecrets(client, included, key)
+      await append(JSON.stringify(sealed), SECRETS_ENTRY)
+      secrets = { count: sealed.length, salt: '', verifier: makeVerifier(key), sealing: 'envelope' }
+    } else if (options.passphrase) {
       const salt = newSalt()
       const key = deriveKey(options.passphrase, salt)
       const sealed = await readSecrets(client, included, key)
       await append(JSON.stringify(sealed), SECRETS_ENTRY)
-      secrets = { count: sealed.length, salt, verifier: makeVerifier(key) }
+      secrets = { count: sealed.length, salt, verifier: makeVerifier(key), sealing: 'passphrase' }
     }
 
     await client.query('COMMIT')

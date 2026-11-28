@@ -29,6 +29,10 @@ export const EXCLUDED_TABLES = new Set([
   'clipper_tokens',
   'app_logs',
   'process_status',
+  // What this machine's scheduled backups did; the bucket is the real record.
+  'backup_runs',
+  // Which machine this is. A restore keeps the target's; see restore.ts.
+  'instance_identity',
   'filament_catalog_brands',
   'filament_catalog_stores',
   'filament_catalog_materials',

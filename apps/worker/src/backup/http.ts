@@ -1,16 +1,32 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
-import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { readdir, rm, stat } from 'node:fs/promises'
+import {
+  createReadStream,
+  createWriteStream,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
+import { open as openFile, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import {
   BACKUP_FIRST_RUN_SUBJECT,
   BACKUP_TICKET_HEADER,
+  EnvelopeError,
+  HEADER_PROBE_BYTES,
   SYSTEM_ACTOR,
+  backupLocation,
+  createStorageAdapter,
+  describeS3Error,
+  isEncryptedBackup,
+  parseBackupPath,
+  parseEnvelopeHeader,
   recordAudit,
+  unlockEnvelope,
   verifyToken,
   type AuditActor,
+  type ParsedHeader,
   type TokenPurpose,
 } from '@pb/core'
 import { getDb, getPool } from '@pb/db'
@@ -23,6 +39,7 @@ import {
   restoreBackup,
   verifyBackupPassphrase,
   type RestorePhase,
+  type SecretsUnlock,
 } from './restore'
 
 /**
@@ -55,12 +72,31 @@ export interface RestoreState {
   id?: string
   phase?: RestorePhase
   summary?: BackupSummary
+  /** An encrypted backup not yet unlocked: only its plaintext header is known. */
+  locked?: LockedSummary
+  /** Came from an encrypted file, so its passphrase is needed again to apply it. */
+  encrypted?: boolean
   error?: string
   startedAt?: string
   finishedAt?: string
 }
 
+/** What an encrypted backup says about itself before its passphrase is given. */
+export interface LockedSummary {
+  createdAt: string
+  appVersion: string | null
+  keyId: string
+}
+
 const FORM_MAX_BYTES = 64 * 1024
+/*
+ * A staged backup is the whole instance's data, and once unlocked it is
+ * plaintext. Cancelling discards it at once; this is the backstop for a tab
+ * that was simply closed. Measured from the file's last write, so an upload
+ * still arriving is never swept from under itself.
+ */
+const STAGED_TTL_MS = 60 * 60 * 1000
+const STAGED_SWEEP_MS = 10 * 60 * 1000
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export function createBackupHandler(options: BackupHttpOptions) {
@@ -68,6 +104,15 @@ export function createBackupHandler(options: BackupHttpOptions) {
   const stateFile = path.join(options.directory, 'restore-state.json')
   const stagedFile = (id: string) =>
     path.join(options.directory, `upload-${id}.${BACKUP_EXTENSION}`)
+  /*
+   * An encrypted backup is staged as it arrived, then decrypted into
+   * stagedFile once its passphrase is given — the ZIP inside needs random
+   * access, which a stream of sealed chunks cannot give it. Its header is
+   * kept beside the decrypted copy, because applying the restore unlocks the
+   * credentials inside with a key only the header and passphrase can produce.
+   */
+  const encryptedFile = (id: string) => path.join(options.directory, `upload-${id}.encrypted`)
+  const envelopeFile = (id: string) => path.join(options.directory, `upload-${id}.envelope`)
 
   /*
    * Kept in a file as well as in memory. It cannot live in the database — that
@@ -75,6 +120,16 @@ export function createBackupHandler(options: BackupHttpOptions) {
    * restarted while a browser is still polling.
    */
   let state: RestoreState = loadState()
+
+  /*
+   * A restore the worker never finished cannot be retried from its staged
+   * file — the browser has gone back to the start — so nothing is kept for
+   * it. Anything else is left to the sweep's age limit, since a browser may
+   * still be part-way through reviewing it.
+   */
+  if (state.status === 'failed' && state.id) void removeStagedFiles(state.id)
+  void sweepStaged()
+  setInterval(() => void sweepStaged(), STAGED_SWEEP_MS).unref()
 
   function loadState(): RestoreState {
     try {
@@ -211,14 +266,20 @@ export function createBackupHandler(options: BackupHttpOptions) {
 
     // One staged upload at a time; an abandoned one would otherwise sit on
     // the data volume for good.
-    for (const name of await readdir(options.directory)) {
-      if (name.startsWith('upload-')) await rm(path.join(options.directory, name), { force: true })
-    }
+    await clearStaged()
 
     const id = randomUUID()
     const file = stagedFile(id)
     try {
       await pipeline(request, createWriteStream(file))
+      const probe = await readStart(file)
+      if (isEncryptedBackup(probe)) {
+        const locked = lockedSummary(parseEnvelopeHeader(probe))
+        await rename(file, encryptedFile(id))
+        setState({ status: 'uploaded', id, locked, encrypted: true })
+        return json(response, 200, { id, locked })
+      }
+
       const backup = await openBackup(file)
       const summary = summarize(backup.manifest)
       backup.close()
@@ -227,10 +288,183 @@ export function createBackupHandler(options: BackupHttpOptions) {
       json(response, 200, { id, summary })
     } catch (error) {
       await rm(file, { force: true })
-      if (error instanceof BackupError) return json(response, 400, { error: error.message })
+      if (error instanceof BackupError || error instanceof EnvelopeError) {
+        return json(response, 400, { error: error.message })
+      }
       console.error('[backup] upload failed:', error)
       json(response, 500, { error: 'The upload could not be read.' })
     }
+  }
+
+  /** Removes any staged upload, so only one ever sits on the data volume. */
+  async function clearStaged(): Promise<void> {
+    for (const name of await readdir(options.directory)) {
+      if (name.startsWith('upload-')) await rm(path.join(options.directory, name), { force: true })
+    }
+  }
+
+  /** Every file staged for one upload: as uploaded, decrypted, and its header. */
+  async function removeStagedFiles(id: string): Promise<void> {
+    for (const file of [stagedFile(id), encryptedFile(id), envelopeFile(id)]) {
+      await rm(file, { force: true }).catch((error: unknown) => {
+        console.warn(`[backup] could not remove ${path.basename(file)}: ${String(error)}`)
+      })
+    }
+  }
+
+  /** Forgets a staged upload, leaving nothing of it behind. */
+  async function discardStaged(id: string): Promise<void> {
+    await removeStagedFiles(id)
+    if (state.status === 'uploaded' && state.id === id) setState({ status: 'idle' })
+  }
+
+  /** Removes staged uploads nobody has touched for STAGED_TTL_MS. */
+  async function sweepStaged(): Promise<void> {
+    if (state.status === 'restoring') return
+    try {
+      const now = Date.now()
+      for (const name of await readdir(options.directory)) {
+        if (!name.startsWith('upload-')) continue
+        const file = path.join(options.directory, name)
+        const info = await stat(file).catch(() => null)
+        if (info && now - info.mtimeMs > STAGED_TTL_MS) {
+          await rm(file, { force: true })
+          console.log(`[backup] removed an abandoned restore upload (${name})`)
+        }
+      }
+      if (state.status === 'uploaded' && state.id) {
+        const left = await Promise.all(
+          [stagedFile(state.id), encryptedFile(state.id)].map((file) =>
+            stat(file).catch(() => null),
+          ),
+        )
+        if (left.every((info) => info === null)) setState({ status: 'idle' })
+      }
+    } catch (error) {
+      console.warn(`[backup] could not sweep staged uploads: ${String(error)}`)
+    }
+  }
+
+  /** The person changed their mind: back out everything this restore staged. */
+  async function handleDiscard(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const auth = await authorize('backup-restore', ticketFrom(request))
+    if (!auth.ok) return json(response, auth.status, { error: auth.error })
+    if (state.status === 'restoring') {
+      return json(response, 409, { error: 'A restore is in progress and cannot be cancelled.' })
+    }
+    let body: { id?: unknown }
+    try {
+      body = JSON.parse(await readBody(request, FORM_MAX_BYTES)) as typeof body
+    } catch {
+      return json(response, 400, { error: 'Malformed request.' })
+    }
+    const id = typeof body.id === 'string' && UUID.test(body.id) ? body.id : ''
+    if (!id) return json(response, 400, { error: 'Malformed request.' })
+    await discardStaged(id)
+    json(response, 200, { ok: true })
+  }
+
+  /**
+   * Copies a backup from the schedule's bucket into staging, as if it had
+   * been uploaded. Only names the schedule writes are accepted, so this cannot
+   * be pointed at anything else in the bucket.
+   */
+  async function handleFetch(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const auth = await authorize('backup-restore', ticketFrom(request))
+    if (!auth.ok) return json(response, auth.status, { error: auth.error })
+    if (state.status === 'restoring') {
+      return json(response, 409, { error: 'A restore is already in progress.' })
+    }
+
+    let body: { path?: unknown }
+    try {
+      body = JSON.parse(await readBody(request, FORM_MAX_BYTES)) as typeof body
+    } catch {
+      return json(response, 400, { error: 'Malformed request.' })
+    }
+    const wanted = typeof body.path === 'string' ? parseBackupPath(body.path) : null
+    if (!wanted) return json(response, 400, { error: 'That is not a backup PrintBench wrote.' })
+    const name = `${wanted.instanceId}/${wanted.name}`
+
+    const location = await backupLocation(getDb())
+    if (!location.ok) return json(response, 400, { error: location.error })
+
+    await clearStaged()
+    const id = randomUUID()
+    const file = encryptedFile(id)
+    const storage = createStorageAdapter(location.data)
+    try {
+      await pipeline(await storage.createReadStream(name), createWriteStream(file))
+      const locked = lockedSummary(parseEnvelopeHeader(await readStart(file)))
+      setState({ status: 'uploaded', id, locked, encrypted: true })
+      json(response, 200, { id, locked })
+    } catch (error) {
+      await rm(file, { force: true })
+      if (error instanceof EnvelopeError) return json(response, 400, { error: error.message })
+      console.error('[backup] fetching from the bucket failed:', error)
+      json(response, 502, { error: describeS3Error(error, location.data.s3Bucket ?? '') })
+    } finally {
+      ;(storage as { destroy?: () => void }).destroy?.()
+    }
+  }
+
+  /** Decrypts a staged encrypted backup with its passphrase, then reads it like any other. */
+  async function handleUnlock(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const auth = await authorize('backup-restore', ticketFrom(request))
+    if (!auth.ok) return json(response, auth.status, { error: auth.error })
+    if (state.status === 'restoring') {
+      return json(response, 409, { error: 'A restore is already in progress.' })
+    }
+
+    let body: { id?: unknown; passphrase?: unknown }
+    try {
+      body = JSON.parse(await readBody(request, FORM_MAX_BYTES)) as typeof body
+    } catch {
+      return json(response, 400, { error: 'Malformed request.' })
+    }
+    const id = typeof body.id === 'string' && UUID.test(body.id) ? body.id : ''
+    const passphrase = typeof body.passphrase === 'string' ? body.passphrase : ''
+    const source = encryptedFile(id)
+    if (!id || !(await stat(source).catch(() => null))) {
+      return json(response, 404, { error: 'That upload is no longer here. Start again.' })
+    }
+
+    const target = stagedFile(id)
+    try {
+      const probe = await readStart(source)
+      const parsed = parseEnvelopeHeader(probe)
+      const unlocked = unlockEnvelope(parsed, passphrase)
+      if (!unlocked)
+        return json(response, 400, { error: 'That passphrase does not open this backup.' })
+
+      await pipeline(
+        createReadStream(source, { start: parsed.bodyOffset }),
+        unlocked.decrypt(),
+        createWriteStream(target),
+      )
+      const backup = await openBackup(target)
+      const summary = summarize(backup.manifest)
+      backup.close()
+
+      await writeFile(envelopeFile(id), probe.subarray(0, parsed.bodyOffset))
+      await rm(source, { force: true })
+      setState({ status: 'uploaded', id, summary, encrypted: true })
+      json(response, 200, { id, summary })
+    } catch (error) {
+      await rm(target, { force: true })
+      if (error instanceof BackupError || error instanceof EnvelopeError) {
+        return json(response, 400, { error: error.message })
+      }
+      console.error('[backup] unlocking failed:', error)
+      json(response, 500, { error: 'The backup could not be decrypted.' })
+    }
+  }
+
+  /** The key for the credentials inside a decrypted backup, or null for a wrong passphrase. */
+  async function secretsKeyFor(id: string, passphrase: string): Promise<Buffer | null | undefined> {
+    const saved = await readFile(envelopeFile(id)).catch(() => null)
+    if (!saved) return undefined
+    return unlockEnvelope(parseEnvelopeHeader(saved), passphrase)?.secretsKey ?? null
   }
 
   async function handleApply(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -255,10 +489,19 @@ export function createBackupHandler(options: BackupHttpOptions) {
       return json(response, 404, { error: 'That upload is no longer here. Upload the file again.' })
     }
 
+    let unlock: SecretsUnlock
     try {
-      await verifyBackupPassphrase(file, passphrase)
+      const secretsKey = await secretsKeyFor(id, passphrase ?? '')
+      if (secretsKey === null) {
+        return json(response, 400, { error: 'That passphrase does not open this backup.' })
+      }
+      unlock = secretsKey ? { key: secretsKey } : { passphrase }
+      await verifyBackupPassphrase(file, unlock)
     } catch (error) {
-      const message = error instanceof BackupError ? error.message : 'The backup could not be read.'
+      const message =
+        error instanceof BackupError || error instanceof EnvelopeError
+          ? error.message
+          : 'The backup could not be read.'
       return json(response, 400, { error: message })
     }
 
@@ -273,13 +516,13 @@ export function createBackupHandler(options: BackupHttpOptions) {
     json(response, 202, { ok: true })
 
     // Deliberately not awaited: the browser follows along by polling status.
-    void runRestore(id, file, passphrase, auth.actor)
+    void runRestore(id, file, unlock, auth.actor)
   }
 
   async function runRestore(
     id: string,
     file: string,
-    passphrase: string | undefined,
+    unlock: SecretsUnlock,
     actor: AuditActor,
   ): Promise<void> {
     const started = { ...state }
@@ -293,7 +536,8 @@ export function createBackupHandler(options: BackupHttpOptions) {
       const result = await restoreBackup({
         pool: getPool(),
         file,
-        passphrase,
+        passphrase: unlock.passphrase,
+        secretsKey: unlock.key,
         onPhase: (phase) => setState({ ...started, phase }),
       })
       restored = true
@@ -329,7 +573,7 @@ export function createBackupHandler(options: BackupHttpOptions) {
           `${result.photosRestored} photos, ${stale.length} thumbnails queued`,
       )
       setState({ ...started, status: 'done', summary, finishedAt: new Date().toISOString() })
-      await rm(file, { force: true })
+      await removeStagedFiles(id)
     } catch (error) {
       console.error('[backup] restore failed:', error)
       if (paused) {
@@ -337,6 +581,9 @@ export function createBackupHandler(options: BackupHttpOptions) {
           console.error('[backup] could not resume jobs after a failed restore:', resumeError)
         })
       }
+
+      // Back to the start, with nothing of this attempt left on disk.
+      await removeStagedFiles(id)
 
       const message = describeFailure(error, restored)
       await recordAudit(getDb(), {
@@ -366,6 +613,13 @@ export function createBackupHandler(options: BackupHttpOptions) {
         if (route === 'POST /api/backup/export') return await handleExport(request, response)
         if (route === 'POST /api/backup/restore/upload') {
           return await handleUpload(request, response)
+        }
+        if (route === 'POST /api/backup/restore/fetch') return await handleFetch(request, response)
+        if (route === 'POST /api/backup/restore/discard') {
+          return await handleDiscard(request, response)
+        }
+        if (route === 'POST /api/backup/restore/unlock') {
+          return await handleUnlock(request, response)
         }
         if (route === 'POST /api/backup/restore/apply') {
           return await handleApply(request, response)
@@ -435,4 +689,21 @@ function fileStamp(): string {
     .toISOString()
     .replace(/\.\d+Z$/, 'Z')
     .replace(/:/g, '-')
+}
+
+/** The first bytes of a staged file: enough to tell what it is and hold any header. */
+async function readStart(file: string): Promise<Buffer> {
+  const handle = await openFile(file, 'r')
+  try {
+    const buffer = Buffer.alloc(HEADER_PROBE_BYTES)
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
+    return buffer.subarray(0, bytesRead)
+  } finally {
+    await handle.close()
+  }
+}
+
+function lockedSummary(parsed: ParsedHeader): LockedSummary {
+  const { createdAt, appVersion, keyId } = parsed.header
+  return { createdAt, appVersion, keyId }
 }

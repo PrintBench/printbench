@@ -27,6 +27,7 @@ import { handleFilamentCatalogSync } from './jobs/filament-catalog'
 import { handleZipRequest } from './http/zip'
 import { handleUploadRequest } from './http/upload'
 import { createBackupHandler } from './backup/http'
+import { runBucketBackup } from './backup/scheduled'
 import { activeWatchCount, startWatchReconciler } from './watch/watcher'
 import { createDemoScheduler } from './demo/schedule'
 
@@ -160,9 +161,14 @@ async function startWork(): Promise<void> {
   await work(JOB.maintArchive, handleMaintArchive)
   await work(JOB.scheduleSweep, handleScheduleSweep)
   await work(JOB.filamentCatalogSync, handleFilamentCatalogSync)
+  await work(JOB.backupRun, async (payload) => {
+    // Its own record and audit entry say how it went; a failed backup is not
+    // retried by the queue, because the next scheduled one is the retry.
+    await runBucketBackup({ pool, db, appVersion: appVersion(), ...payload })
+  })
   console.log(
     '[worker] handlers: library.scan, library.remove, model.move, file.analyze, file.thumbnail, file.digest, ' +
-      'health.detect, library.schedule, maint.reconcile, maint.archive, filament-catalog.sync',
+      'health.detect, library.schedule, maint.reconcile, maint.archive, filament-catalog.sync, backup.run',
   )
 
   /*

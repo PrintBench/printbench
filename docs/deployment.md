@@ -236,6 +236,61 @@ A backup restores into the same or a newer PrintBench, never an older one. If
 your existing folders are mounted at a different path on the new server, their
 models show as missing until the mount matches; nothing is deleted meanwhile.
 
+### Scheduled backups to S3
+
+**Manage → Backup → Scheduled backups** writes the same backup to one of your S3
+connections on a schedule (daily, weekly, twice a day, or a cron of your own, in
+the server's time zone), keeping the newest N. Library files are never
+included; photos and stored credentials always are. The bucket needs a prefix of
+its own (no library may index it) and a key that can write and delete there; see
+[S3 storage](s3-storage.md#scheduled-backups).
+
+Every scheduled backup is **encrypted as a whole**, email addresses and password
+hashes included. You choose a passphrase when you set it up, and PrintBench keeps
+only a key sealed under it:
+
+- The server can write backups but cannot read them. Someone who takes the
+  running server, its database and its `BETTER_AUTH_SECRET` still cannot open
+  the backups already in the bucket.
+- Restoring needs the backup file and the passphrase, and nothing else: not the
+  old server and not its `BETTER_AUTH_SECRET`.
+- **The passphrase cannot be recovered.** Lose it and the backups are
+  unreadable. Use _Check your passphrase_ now and then, while there is still
+  time to change it.
+- Changing the passphrase makes a new key. Backups from then on need the new
+  one; older backups still need the old one, and the list marks them.
+
+Each instance writes into a folder of its own under the prefix:
+`<prefix>/<instance id>/printbench-<time>.encrypted.pbbackup`. The instance id
+belongs to the server, not the data. It is not in backups, and a restore keeps
+the id of the server it restores onto. So restoring onto the same server
+carries on in the same folder, and a new server restored from an old one
+starts a folder of its own. Two servers pointed at the same prefix never share
+a folder.
+
+Pruning only ever looks in the instance's own folder, deletes only files with
+that name, and runs only after a new backup has been written and seen in the
+bucket. A failing bucket never costs you the backups already in it, and no
+instance can delete another's.
+
+To restore one:
+
+- **On this instance**, the backups in the bucket are listed under the schedule:
+  this instance's first, then any from other instances' folders under the same
+  prefix (the server this one replaced, say). Choose _Restore…_, enter the
+  passphrase, check what it holds, and confirm.
+- **On a new server**, copy the file out of the bucket with any S3 tool and
+  upload it on the first-run setup screen's _Restore from a backup_, then
+  enter the passphrase. The schedule comes back with the rest of the settings,
+  so backups carry on from the new server, into its own folder.
+
+Both use the same restore as a downloaded file. A backup being restored is
+staged in `DATA_DIR/backups`, decrypted once its passphrase is given. Nothing
+staged is left behind: cancelling, closing the panel or leaving the page
+deletes it at once, a failed restore deletes it, and anything a closed tab
+abandoned is deleted after an hour untouched. This applies to uploaded
+backups as well as ones fetched from the bucket.
+
 The rest of this section is the manual equivalents.
 
 Three things can be backed up, and they are not equally important.

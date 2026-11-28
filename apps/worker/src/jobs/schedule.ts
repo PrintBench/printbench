@@ -1,5 +1,5 @@
 import { getDb } from '@pb/db'
-import { librariesDue } from '@pb/core'
+import { backupDue, librariesDue } from '@pb/core'
 import { JOB, getQueue } from '@pb/jobs'
 
 /**
@@ -13,10 +13,21 @@ import { JOB, getQueue } from '@pb/jobs'
  * rather than skipped until the following fire.
  */
 export async function handleScheduleSweep(): Promise<void> {
+  const queue = getQueue()
+
+  /*
+   * The backup schedule rides the same sweep, for the same reasons: a change
+   * takes effect at the next sweep, and a backup missed while the worker was
+   * down is taken when it comes back. backup.run is `short`, so a sweep that
+   * fires while one is still queued adds nothing.
+   */
+  if (await backupDue(getDb())) {
+    await queue.send(JOB.backupRun, { trigger: 'schedule' }, { singletonKey: 'backup' })
+    console.log('[schedule] queued a scheduled backup')
+  }
+
   const due = await librariesDue(getDb())
   if (due.length === 0) return
-
-  const queue = getQueue()
 
   for (const library of due) {
     /*
