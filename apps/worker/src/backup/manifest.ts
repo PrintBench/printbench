@@ -74,6 +74,14 @@ export const manifestSchema = z.object({
       count: z.number().int().nonnegative(),
       salt: z.string().max(200),
       verifier: z.string().max(400),
+      /**
+       * `passphrase`: sealed under a key derived from the passphrase and
+       * `salt`, as a downloaded backup is. `envelope`: sealed under a key
+       * derived from the encrypted file's own data key, so a scheduled backup
+       * can carry them without the server knowing the passphrase. Absent on
+       * backups from before scheduled backups existed, which are all the first.
+       */
+      sealing: z.enum(['passphrase', 'envelope']).default('passphrase'),
     })
     .nullable(),
 })

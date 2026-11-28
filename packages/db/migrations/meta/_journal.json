@@ -183,6 +183,13 @@
       "when": 1795546182730,
       "tag": "0025_clear_james_howlett",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795861087403,
+      "tag": "0026_mighty_havok",
+      "breakpoints": true
     }
   ]
 }

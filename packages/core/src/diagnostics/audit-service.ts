@@ -100,6 +100,10 @@ export const AUDIT_ACTIONS = {
   'backup.exported': 'Downloaded a backup',
   'backup.restored': 'Restored this instance from a backup',
   'backup.restore_failed': 'Restore from a backup failed',
+  'backup.schedule_saved': 'Changed scheduled backups',
+  'backup.schedule_removed': 'Turned off scheduled backups',
+  'backup.uploaded': 'Backed up to S3',
+  'backup.upload_failed': 'Backup to S3 failed',
 } as const
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS

@@ -469,6 +469,14 @@
       "source": "deploy/backups.md"
     },
     {
+      "id": "BACKUP-002",
+      "title": "My instance backs itself up to S3 encrypted, and I restore one with its passphrase",
+      "persona": "admin",
+      "tier": "nightly",
+      "deployments": ["s3"],
+      "source": "deploy/backups.md"
+    },
+    {
       "id": "UPGRADE-001",
       "title": "I upgrade and my existing data comes with me",
       "persona": "admin",

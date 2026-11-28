@@ -70,3 +70,8 @@ export * from './services/filament-service'
 export * from './services/filament-catalog-service'
 
 export * from './services/filament-backup'
+
+export * from './backup/envelope'
+export * from './backup/retention'
+export * from './backup/schedule-service'
+export * from './backup/bucket'

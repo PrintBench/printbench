@@ -184,10 +184,21 @@ export async function openBackup(
 
 export type RestorePhase = 'checking' | 'files' | 'database' | 'upgrading'
 
+/**
+ * What unlocks a backup's stored credentials: the passphrase it was downloaded
+ * with, or for a scheduled backup the key its encrypted envelope gave up.
+ */
+export interface SecretsUnlock {
+  passphrase?: string
+  key?: Buffer
+}
+
 export interface RestoreOptions {
   pool: pg.Pool
   file: string
   passphrase?: string
+  /** For a backup decrypted from an envelope. */
+  secretsKey?: Buffer
   /** Where managed libraries live on this instance. */
   managedRoot?: string
   onPhase?: (phase: RestorePhase) => void
@@ -208,7 +219,10 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
   const backup = await openBackup(options.file, steps)
   try {
     const { manifest } = backup
-    const secrets = await readSecrets(backup, options.passphrase)
+    const secrets = await readSecrets(backup, {
+      passphrase: options.passphrase,
+      key: options.secretsKey,
+    })
     const libraryPaths = planLibraryPaths(manifest, options.managedRoot ?? managedRoot())
 
     /*
@@ -254,6 +268,14 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
         throw error
       }
     }
+
+    /*
+     * Which machine this is outlives the restore: the backup's own identity
+     * was never in it, and this instance's is put back afterwards. So a
+     * restore onto the same server keeps backing up into the same folder, and
+     * never into the folder of the server the backup came from.
+     */
+    const instanceId = await readInstanceId(pool)
 
     options.onPhase?.('database')
     const client = await pool.connect()
@@ -348,6 +370,20 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
       )
     }
 
+    if (instanceId) {
+      // Past the commit. Should this fail, the next backup makes a new
+      // identity — a new folder, which is safe: it can prune nobody else's.
+      await pool
+        .query(
+          `INSERT INTO instance_identity (id, instance_id) VALUES (1, $1)
+           ON CONFLICT (id) DO UPDATE SET instance_id = EXCLUDED.instance_id`,
+          [instanceId],
+        )
+        .catch((error: unknown) => {
+          console.warn(`[backup] could not keep this instance's identity: ${String(error)}`)
+        })
+    }
+
     return {
       manifest,
       filesRestored: backup.files.length,
@@ -363,10 +399,13 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
  * Checks a passphrase against a backup without restoring anything, so a typo
  * is reported at once rather than after work has been paused.
  */
-export async function verifyBackupPassphrase(file: string, passphrase?: string): Promise<void> {
+export async function verifyBackupPassphrase(
+  file: string,
+  unlock: SecretsUnlock = {},
+): Promise<void> {
   const backup = await openBackup(file)
   try {
-    await readSecrets(backup, passphrase)
+    await readSecrets(backup, unlock)
   } finally {
     backup.close()
   }
@@ -398,13 +437,25 @@ interface OpenedSecret {
   plaintext: string
 }
 
-async function readSecrets(backup: OpenedBackup, passphrase?: string): Promise<OpenedSecret[]> {
+async function readSecrets(backup: OpenedBackup, unlock: SecretsUnlock): Promise<OpenedSecret[]> {
   const meta = backup.manifest.secrets
-  // No passphrase is a choice, not a mistake: the restore goes ahead and the
-  // credentials are simply re-entered afterwards.
-  if (!meta || !passphrase) return []
+  if (!meta) return []
 
-  const key = deriveKey(passphrase, meta.salt)
+  let key: Buffer
+  if (meta.sealing === 'envelope') {
+    /*
+     * Reached only with a ZIP that came out of an encrypted backup, so the
+     * key is always to hand. Without it someone has unpacked one by hand,
+     * and the restore goes ahead without the credentials, as below.
+     */
+    if (!unlock.key) return []
+    key = unlock.key
+  } else {
+    // No passphrase is a choice, not a mistake: the restore goes ahead and the
+    // credentials are simply re-entered afterwards.
+    if (!unlock.passphrase) return []
+    key = deriveKey(unlock.passphrase, meta.salt)
+  }
   if (!checkVerifier(meta.verifier, key)) {
     throw new BackupError('That passphrase does not match this backup.')
   }
@@ -467,6 +518,18 @@ function planLibraryPaths(manifest: BackupManifest, root: string): Map<string, s
     planned.set(library.id, target)
   }
   return planned
+}
+
+/** This instance's identity, or null if it has none yet (or predates the table). */
+async function readInstanceId(pool: pg.Pool): Promise<string | null> {
+  try {
+    const result = await pool.query<{ id: string }>(
+      'SELECT instance_id::text AS id FROM instance_identity LIMIT 1',
+    )
+    return result.rows[0]?.id ?? null
+  } catch {
+    return null
+  }
 }
 
 /** COPY writes explicit ids, which leaves every sequence behind its table. */

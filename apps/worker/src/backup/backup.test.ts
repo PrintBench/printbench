@@ -1,15 +1,30 @@
-// @covers BACKUP-001
+// @covers BACKUP-001 BACKUP-002
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createWriteStream } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { finished } from 'node:stream/promises'
+import { Readable } from 'node:stream'
+import { finished, pipeline } from 'node:stream/promises'
 import { ZipArchive } from 'archiver'
 import pg from 'pg'
-import { decryptSecret, encryptSecret, getPhotoStore, photoKey } from '@pb/core'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import {
+  LocalAdapter,
+  backupObjectName,
+  getInstanceId,
+  decryptSecret,
+  encryptSecret,
+  getPhotoStore,
+  parseEnvelopeHeader,
+  photoKey,
+  saveBackupSchedule,
+  unlockEnvelope,
+} from '@pb/core'
+import { schema } from '@pb/db'
 import { applyMigrations, readMigrationSteps } from '@pb/db/migrations'
 import { writeBackup } from './export'
+import { runBucketBackup } from './scheduled'
 import { BackupError, MANIFEST_ENTRY, tableEntry, type BackupManifest } from './manifest'
 import { openBackup, replayMigrations, restoreBackup } from './restore'
 import { EXCLUDED_TABLES, SECRET_COLUMNS, listForeignKeys } from './tables'
@@ -532,6 +547,185 @@ describe('backup and restore', { tags: ['integration'] }, () => {
         BackupError,
       )
     }
+  })
+
+  /**
+   * A seeded instance with backups scheduled, writing to a folder instead of a
+   * bucket. The adapter is the only thing that differs from S3, and its
+   * write, list and remove are tested on their own.
+   */
+  async function scheduled(name: string, keep = 14, shared?: string) {
+    const pool = await seeded(path.join(work, name, 'uploads'))
+    const db = drizzle(pool, { schema })
+    const connection = await pool.query<{ id: string }>(
+      `INSERT INTO s3_connections (name, bucket) VALUES ('Backups', 'backups') RETURNING id`,
+    )
+    const saved = await saveBackupSchedule(
+      db,
+      {
+        enabled: true,
+        s3ConnectionId: connection.rows[0]!.id,
+        prefix: 'printbench-backups',
+        cron: '30 2 * * *',
+        keep,
+        passphrase: 'scheduled backup passphrase',
+      },
+      async () => ({ ok: true }),
+    )
+    if (!saved.ok) throw new Error(saved.error)
+    const folder = shared ?? path.join(work, name, 'bucket')
+    const storage = new LocalAdapter({
+      id: 'backups',
+      kind: 'managed',
+      backend: 'local',
+      allowWrites: true,
+      path: folder,
+    })
+    await mkdir(folder, { recursive: true })
+    return { pool, db, storage, folder, instanceId: await getInstanceId(db) }
+  }
+
+  /** What restoring from the bucket does: unlock with the passphrase, decrypt to a ZIP. */
+  async function decrypt(file: Buffer, into: string) {
+    const parsed = parseEnvelopeHeader(file)
+    const unlocked = unlockEnvelope(parsed, 'scheduled backup passphrase')!
+    await pipeline(
+      Readable.from([file.subarray(parsed.bodyOffset)]),
+      unlocked.decrypt(),
+      createWriteStream(into),
+    )
+    return unlocked.secretsKey
+  }
+
+  it('writes an encrypted backup that restores elsewhere with its passphrase alone', async () => {
+    const { pool, db, storage, folder } = await scheduled('scheduled-a')
+    const result = await runBucketBackup({
+      pool,
+      db,
+      storage,
+      trigger: 'schedule',
+      appVersion: 't',
+    })
+    if (result.status !== 'succeeded') throw new Error(JSON.stringify(result))
+
+    const file = await readFile(path.join(folder, result.name))
+    expect(file.length).toBe(result.bytes)
+    // Not the email, the password-protected printer key, or the site name.
+    for (const secret of ['ada@example.com', 'printer-api-key', 'Workshop']) {
+      expect(file.includes(secret), secret).toBe(false)
+    }
+    const runs = await pool.query(`SELECT status, object_name FROM backup_runs`)
+    expect(runs.rows).toEqual([{ status: 'succeeded', object_name: result.name }])
+
+    // The source instance is gone: a new secret, and only the file and passphrase.
+    expect(unlockEnvelope(parseEnvelopeHeader(file), 'not the passphrase')).toBeNull()
+    const decrypted = path.join(work, 'scheduled-a', 'decrypted.pbbackup')
+    const secretsKey = await decrypt(file, decrypted)
+
+    process.env.BETTER_AUTH_SECRET = 'the-new-servers-secret'
+    const target = await scratch()
+    const restored = await restoreBackup({
+      pool: target,
+      file: decrypted,
+      secretsKey,
+      managedRoot: path.join(work, 'scheduled-a'),
+    })
+    expect(restored.secretsRestored).toBe(1)
+    expect((await target.query(`SELECT email FROM "user"`)).rows).toEqual([
+      { email: 'ada@example.com' },
+    ])
+    const stored = (await target.query(`SELECT credentials FROM print_hosts`)).rows[0].credentials
+    expect(decryptSecret(stored)).toBe('printer-api-key')
+
+    // The schedule comes back with it; this machine's run history and
+    // identity do not.
+    expect(await count(target, 'backup_schedule')).toBe(1)
+    expect(await count(target, 'backup_runs')).toBe(0)
+    expect(await count(target, 'instance_identity')).toBe(0)
+  })
+
+  it('keeps the newest backups and nothing it did not write', async () => {
+    const { pool, db, storage, folder, instanceId } = await scheduled('scheduled-b', 2)
+    const older = [1, 2, 3].map((day) => backupObjectName(new Date(Date.UTC(2026, 0, day))))
+    await mkdir(path.join(folder, instanceId))
+    for (const name of [...older, 'notes.txt']) {
+      await writeFile(path.join(folder, instanceId, name), 'x')
+    }
+    // A backup-shaped name at the top of the prefix belongs to no instance.
+    await writeFile(path.join(folder, older[0]!), 'x')
+
+    const result = await runBucketBackup({ pool, db, storage, trigger: 'manual' })
+    if (result.status !== 'succeeded') throw new Error(JSON.stringify(result))
+
+    const left = (await storage.list(instanceId)).map((entry) => entry.path).sort()
+    const mine = (name: string) => `${instanceId}/${name}`
+    expect(left).toEqual([mine(older[2]!), mine('notes.txt'), result.name].sort())
+    expect(result.pruned.sort()).toEqual([older[0], older[1]].sort())
+    expect((await storage.stat(older[0]!)) !== null).toBe(true)
+  })
+
+  it('never prunes another instance’s backups in a shared prefix', async () => {
+    const shared = path.join(work, 'shared-prefix')
+    const a = await scheduled('shared-a', 1, shared)
+    const b = await scheduled('shared-b', 1, shared)
+    expect(a.instanceId).not.toBe(b.instanceId)
+
+    const old = backupObjectName(new Date(Date.UTC(2026, 0, 1)))
+    for (const instance of [a.instanceId, b.instanceId]) {
+      await mkdir(path.join(shared, instance))
+      await writeFile(path.join(shared, instance, old), 'x')
+    }
+
+    const fromA = await runBucketBackup({ ...a, trigger: 'schedule' })
+    const fromB = await runBucketBackup({ ...b, trigger: 'schedule' })
+    if (fromA.status !== 'succeeded' || fromB.status !== 'succeeded') {
+      throw new Error(JSON.stringify([fromA, fromB]))
+    }
+
+    // Each kept one: its own newest. Neither reached into the other's folder.
+    expect((await a.storage.list(a.instanceId)).map((entry) => entry.path)).toEqual([fromA.name])
+    expect((await b.storage.list(b.instanceId)).map((entry) => entry.path)).toEqual([fromB.name])
+  })
+
+  it('keeps the identity of the instance it restores onto', async () => {
+    const source = await scheduled('identity-source')
+    const result = await runBucketBackup({ ...source, trigger: 'schedule' })
+    if (result.status !== 'succeeded') throw new Error(JSON.stringify(result))
+    const zip = path.join(work, 'identity-source', 'decrypted.pbbackup')
+    const secretsKey = await decrypt(await readFile(path.join(source.folder, result.name)), zip)
+
+    // An instance that already has an identity keeps it.
+    const existing = await seeded(path.join(work, 'identity-existing', 'uploads'))
+    const before = await getInstanceId(drizzle(existing, { schema }))
+    await restoreBackup({ pool: existing, file: zip, secretsKey })
+    const after = await getInstanceId(drizzle(existing, { schema }))
+    expect(after).toBe(before)
+
+    // A new server gets one of its own, never the source's.
+    const fresh = await scratch()
+    await restoreBackup({ pool: fresh, file: zip, secretsKey })
+    expect(await getInstanceId(drizzle(fresh, { schema }))).not.toBe(source.instanceId)
+  })
+
+  it('records a failed upload and deletes nothing', async () => {
+    const { pool, db, folder, instanceId } = await scheduled('scheduled-c', 1)
+    const kept = `${instanceId}/${backupObjectName(new Date(Date.UTC(2026, 0, 1)))}`
+    await mkdir(path.join(folder, instanceId))
+    await writeFile(path.join(folder, kept), 'x')
+    // Read-only, as a bucket key without PutObject would be.
+    const readOnly = new LocalAdapter({
+      id: 'backups',
+      kind: 'in_place',
+      backend: 'local',
+      allowWrites: false,
+      path: folder,
+    })
+
+    const result = await runBucketBackup({ pool, db, storage: readOnly, trigger: 'schedule' })
+    expect(result.status).toBe('failed')
+    expect((await readOnly.list(instanceId)).map((entry) => entry.path)).toEqual([kept])
+    const runs = await pool.query(`SELECT status FROM backup_runs`)
+    expect(runs.rows).toEqual([{ status: 'failed' }])
   })
 
   async function craft(

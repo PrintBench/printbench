@@ -492,6 +492,20 @@ export async function deleteS3Connection(
     }
   }
 
+  // The foreign key would refuse this too, but as an error nobody can act on.
+  const [backups] = await db
+    .select({ id: schema.backupSchedule.id })
+    .from(schema.backupSchedule)
+    .where(eq(schema.backupSchedule.s3ConnectionId, id))
+    .limit(1)
+  if (backups) {
+    return {
+      ok: false,
+      error:
+        'Scheduled backups go to this connection. Point them somewhere else under Backup first.',
+    }
+  }
+
   const [removed] = await db
     .delete(schema.s3Connections)
     .where(eq(schema.s3Connections.id, id))

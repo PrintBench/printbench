@@ -259,6 +259,40 @@ bucket through the application, which on a metered provider means egress:
 
 ---
 
+## Scheduled backups
+
+Scheduled backups ([deployment](deployment.md#scheduled-backups-to-s3)) write to
+a connection you already have, under a prefix no library uses, each instance in
+a folder of its own beneath it. Saving the
+schedule writes and deletes a small `.printbench-write-check` object there, so
+a key that cannot write fails now rather than at 02:30. Restoring from the list
+reads the backup back. A key scoped to the backup prefix needs:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::my-print-library",
+      "Condition": { "StringLike": { "s3:prefix": ["printbench-backups/*"] } }
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload"],
+      "Resource": "arn:aws:s3:::my-print-library/printbench-backups/*"
+    }
+  ]
+}
+```
+
+A bucket with versioning or object lock keeps pruned backups as old versions.
+That is a sound extra safeguard, but you pay to store them until a lifecycle
+rule expires them.
+
+---
+
 ## Verifying a bucket works
 
 `npm run verify:s3` exercises the whole S3 path against a real bucket —
