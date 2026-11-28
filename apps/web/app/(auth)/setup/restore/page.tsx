@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArchiveRestore } from 'lucide-react'
 import { needsFirstRunSetup } from '@/lib/setup'
-import { RestorePanel } from '@/components/backup/restore-panel'
-import { createFirstRunRestoreTicket } from './actions'
+import { BACKUP_PREFIX_DEFAULT } from '@pb/core'
+import { FirstRunRestore } from './first-run-restore'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Restore from a backup' }
@@ -27,9 +27,8 @@ export default async function SetupRestorePage() {
         </p>
       </div>
 
-      <RestorePanel
-        getTicket={createFirstRunRestoreTicket}
-        firstRun
+      <FirstRunRestore
+        defaultPrefix={BACKUP_PREFIX_DEFAULT}
         footer={
           <p className="pt-3 text-sm text-[var(--color-ink-muted)]">
             Starting fresh instead?{' '}

@@ -10,7 +10,7 @@ import {
   LockKeyhole,
   Upload,
 } from 'lucide-react'
-import type { BackupTicket } from '@pb/core'
+import type { BackupTicket, RestoreSource } from '@pb/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
@@ -73,6 +73,8 @@ export function RestorePanel({
   firstRun = false,
   footer,
   bucketBackup,
+  bucketSource,
+  onRestored,
 }: {
   getTicket: () => Promise<TicketResult>
   /** Nothing exists yet to be replaced, so there is nothing to type to confirm. */
@@ -81,6 +83,18 @@ export function RestorePanel({
   footer?: React.ReactNode
   /** Restore this backup from the schedule's bucket instead of asking for a file. */
   bucketBackup?: string
+  /**
+   * Fetch `bucketBackup` from this bucket instead of the schedule's: the
+   * first-run screen, where there is no schedule. Sent to the worker in the
+   * request body for the one fetch, and kept nowhere else.
+   */
+  bucketSource?: RestoreSource
+  /**
+   * Called once the restore has finished. Whatever surrounds the panel —
+   * a Close button, a "start fresh instead" link — then describes an
+   * instance that no longer exists, so the parent hides it.
+   */
+  onRestored?: () => void
 }) {
   const [step, setStep] = useState<Step>({ name: 'pick' })
   const [error, setError] = useState<string | null>(null)
@@ -108,6 +122,9 @@ export function RestorePanel({
     }
   }, [])
   const input = useRef<HTMLInputElement>(null)
+  // Read through a ref: the polling effect below outlives the render that set it up.
+  const restoredCallback = useRef(onRestored)
+  restoredCallback.current = onRestored
 
   const restoring = step.name === 'restoring'
   useEffect(() => {
@@ -122,8 +139,10 @@ export function RestorePanel({
         })
         const state = (await response.json()) as { status: string; phase?: string; error?: string }
         if (stopped) return
-        if (state.status === 'done') setStep({ name: 'done' })
-        else if (state.status === 'failed') {
+        if (state.status === 'done') {
+          setStep({ name: 'done' })
+          restoredCallback.current?.()
+        } else if (state.status === 'failed') {
           setError(state.error ?? 'The restore failed.')
           setStep({ name: 'pick' })
         } else setStep({ name: 'restoring', phase: state.phase })
@@ -200,7 +219,7 @@ export function RestorePanel({
       const response = await fetch('/api/backup/restore/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json', [TICKET_HEADER]: ticket.current },
-        body: JSON.stringify({ path: name }),
+        body: JSON.stringify({ path: name, source: bucketSource }),
       })
       const body = parse(await response.text()) as Staged
       if (response.ok && body.id && (body.locked || body.summary)) return staged(body)

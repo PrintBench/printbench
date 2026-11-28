@@ -287,6 +287,11 @@ reads the backup back. A key scoped to the backup prefix needs:
 }
 ```
 
+Restoring a new server straight from the bucket, on its first-run screen, only
+reads: `s3:ListBucket` and `s3:GetObject` on the same prefix are enough, and the
+key typed there is used for that restore alone, never saved. A read-only key
+kept for exactly this is a reasonable thing to hold alongside the passphrase.
+
 A bucket with versioning or object lock keeps pruned backups as old versions.
 That is a sound extra safeguard, but you pay to store them until a lifecycle
 rule expires them.

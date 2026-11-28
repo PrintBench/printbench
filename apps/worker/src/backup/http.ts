@@ -23,10 +23,13 @@ import {
   parseBackupPath,
   parseEnvelopeHeader,
   recordAudit,
+  restoreSourceLocation,
   unlockEnvelope,
   verifyToken,
   type AuditActor,
+  type LibraryLocation,
   type ParsedHeader,
+  type StorageAdapter,
   type TokenPurpose,
 } from '@pb/core'
 import { getDb, getPool } from '@pb/db'
@@ -65,6 +68,8 @@ export interface BackupHttpOptions {
   pause(): Promise<void>
   /** Starts them again. `restored` means the database underneath was replaced. */
   resume(context: { restored: boolean }): Promise<void>
+  /** Opens the bucket a backup is fetched from. Tests pass a local folder in. */
+  openBucket?: (location: LibraryLocation) => StorageAdapter
 }
 
 export interface RestoreState {
@@ -162,7 +167,10 @@ export function createBackupHandler(options: BackupHttpOptions) {
     purpose: TokenPurpose,
     fields: URLSearchParams,
     { live = true } = {},
-  ): Promise<{ ok: true; actor: AuditActor } | { ok: false; status: number; error: string }> {
+  ): Promise<
+    | { ok: true; actor: AuditActor; firstRun: boolean }
+    | { ok: false; status: number; error: string }
+  > {
     const secret = process.env.BETTER_AUTH_SECRET
     if (!secret) return { ok: false, status: 500, error: 'Backups are not configured.' }
 
@@ -176,7 +184,7 @@ export function createBackupHandler(options: BackupHttpOptions) {
     )
     if (!signed) return { ok: false, status: 403, error: 'This link has expired. Start again.' }
     // Status is polled after the database, and the account in it, has gone.
-    if (!live) return { ok: true, actor: SYSTEM_ACTOR }
+    if (!live) return { ok: true, actor: SYSTEM_ACTOR, firstRun: false }
 
     const pool = getPool()
     if (subject === BACKUP_FIRST_RUN_SUBJECT) {
@@ -189,7 +197,7 @@ export function createBackupHandler(options: BackupHttpOptions) {
       if ((users.rows[0]?.n ?? 0) > 0) {
         return { ok: false, status: 403, error: 'Setup has already been completed.' }
       }
-      return { ok: true, actor: { type: 'anonymous', name: 'First-run setup' } }
+      return { ok: true, actor: { type: 'anonymous', name: 'First-run setup' }, firstRun: true }
     }
 
     const userId = subject.startsWith('user:') ? subject.slice('user:'.length) : ''
@@ -201,7 +209,7 @@ export function createBackupHandler(options: BackupHttpOptions) {
     if (!user || user.role !== 'admin' || user.banned) {
       return { ok: false, status: 403, error: 'Not permitted.' }
     }
-    return { ok: true, actor: { type: 'user', id: userId, name: user.name } }
+    return { ok: true, actor: { type: 'user', id: userId, name: user.name }, firstRun: false }
   }
 
   async function handleExport(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -365,9 +373,14 @@ export function createBackupHandler(options: BackupHttpOptions) {
   }
 
   /**
-   * Copies a backup from the schedule's bucket into staging, as if it had
-   * been uploaded. Only names the schedule writes are accepted, so this cannot
-   * be pointed at anything else in the bucket.
+   * Copies a backup from a bucket into staging, as if it had been uploaded.
+   * Only names the schedule writes are accepted, so this cannot be pointed at
+   * anything else in the bucket.
+   *
+   * The bucket is the schedule's, or — on a brand-new server, which has no
+   * schedule and no connections — one typed in for this restore (`source`).
+   * Its credentials arrive in this body and go no further: not into the
+   * restore state, not into the log, not into the database.
    */
   async function handleFetch(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const auth = await authorize('backup-restore', ticketFrom(request))
@@ -376,7 +389,7 @@ export function createBackupHandler(options: BackupHttpOptions) {
       return json(response, 409, { error: 'A restore is already in progress.' })
     }
 
-    let body: { path?: unknown }
+    let body: { path?: unknown; source?: unknown }
     try {
       body = JSON.parse(await readBody(request, FORM_MAX_BYTES)) as typeof body
     } catch {
@@ -386,13 +399,22 @@ export function createBackupHandler(options: BackupHttpOptions) {
     if (!wanted) return json(response, 400, { error: 'That is not a backup PrintBench wrote.' })
     const name = `${wanted.instanceId}/${wanted.name}`
 
-    const location = await backupLocation(getDb())
+    /*
+     * A typed-in bucket is for the first-run screen only. An instance with
+     * accounts restores from the bucket its own schedule names, so an admin
+     * ticket cannot point the worker at arbitrary endpoints.
+     */
+    const typedIn = body.source !== undefined
+    if (typedIn && !auth.firstRun) {
+      return json(response, 403, { error: 'Restore from the bucket scheduled backups use.' })
+    }
+    const location = typedIn ? restoreSourceLocation(body.source) : await backupLocation(getDb())
     if (!location.ok) return json(response, 400, { error: location.error })
 
     await clearStaged()
     const id = randomUUID()
     const file = encryptedFile(id)
-    const storage = createStorageAdapter(location.data)
+    const storage = (options.openBucket ?? createStorageAdapter)(location.data)
     try {
       await pipeline(await storage.createReadStream(name), createWriteStream(file))
       const locked = lockedSummary(parseEnvelopeHeader(await readStart(file)))
@@ -401,8 +423,12 @@ export function createBackupHandler(options: BackupHttpOptions) {
     } catch (error) {
       await rm(file, { force: true })
       if (error instanceof EnvelopeError) return json(response, 400, { error: error.message })
-      console.error('[backup] fetching from the bucket failed:', error)
-      json(response, 502, { error: describeS3Error(error, location.data.s3Bucket ?? '') })
+      const reason = describeS3Error(error, location.data.s3Bucket ?? '')
+      // Only the reason for a typed-in bucket: an SDK error can echo the
+      // request back, access key ID and all.
+      if (typedIn) console.error(`[backup] fetching from the bucket failed: ${reason}`)
+      else console.error('[backup] fetching from the bucket failed:', error)
+      json(response, 502, { error: reason })
     } finally {
       ;(storage as { destroy?: () => void }).destroy?.()
     }

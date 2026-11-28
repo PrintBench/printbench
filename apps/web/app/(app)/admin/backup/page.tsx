@@ -23,7 +23,8 @@ import { LocalTime } from '@/components/ui/local-time'
 import { RestorePanel } from '@/components/backup/restore-panel'
 import { Badge } from '@/components/ui/badge'
 import { createRestoreTicket } from './actions'
-import { BucketList, type BucketRow } from './bucket-list'
+import { toBucketRow, type BucketRow } from '@/lib/bucket-rows'
+import { BucketList } from './bucket-list'
 import { ExportPanel } from './export-panel'
 import { ScheduleForm } from './schedule-form'
 
@@ -194,20 +195,7 @@ async function readBucket(): Promise<
   const location = await backupLocation(getDb())
   if (!location.ok) return location
   try {
-    const backups = await listBucketBackups(location.data)
-    return {
-      ok: true,
-      rows: backups.map((backup) => ({
-        path: backup.path,
-        instanceId: backup.instanceId,
-        name: backup.name,
-        bytes: backup.bytes,
-        createdAt: backup.header?.createdAt ?? null,
-        appVersion: backup.header?.appVersion ?? null,
-        keyId: backup.header?.keyId ?? null,
-        problem: backup.problem,
-      })),
-    }
+    return { ok: true, rows: (await listBucketBackups(location.data)).map(toBucketRow) }
   } catch (error) {
     return { ok: false, error: describeS3Error(error, location.data.s3Bucket ?? '') }
   }
